@@ -10,3 +10,11 @@ dist/
 output/
 *.log
 *.tmp
+
+META-INF/
+
+instantclient_11_2/*
+!instantclient_11_2/README.md
+
+model/*
+!model/README.md

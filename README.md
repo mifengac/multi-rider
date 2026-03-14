@@ -7,6 +7,11 @@
 - 保留满足置信度阈值的图片
 - 将结果按日期写入 ZIP 并提供浏览器下载
 
+注意：仓库默认**不提交大二进制运行文件**。以下内容需要你在本地自行放入对应目录后再构建镜像：
+
+- `model/biaochezhajiev2.pt`
+- Linux 版 Oracle Instant Client 文件，放到 `instantclient_11_2/`
+
 本仓库已经补齐了面向内网 `CentOS Stream 10` 的离线部署交付物：
 
 - `Dockerfile`: 使用清华 APT / PyPI 源构建 CPU 镜像
@@ -31,6 +36,7 @@ sha256sum dist/multi-rider_20260313_cpu.tar > dist/multi-rider_20260313_cpu.tar.
 - `torch/torchvision` 使用 CPU-only wheel，避免打入 CUDA 依赖
 - 其他 Python 依赖使用 `requirements.lock` 固定版本
 - 当前默认构建为 CPU 镜像，适合大多数内网服务器
+- 如果缺少模型文件或 Oracle Instant Client，构建会直接失败并给出提示
 
 ## 2. 需要交付到内网的文件
 
@@ -156,7 +162,7 @@ sudo firewall-cmd --reload
 ## 6. 部署注意事项
 
 - 宿主机是 CentOS 没问题，容器内部运行的是 Debian 用户态
-- 仓库内的 `instantclient_11_2` 必须保持为 Linux `.so` 版本
+- 本地准备的 `instantclient_11_2` 必须是 Linux `.so` 版本
 - 任务状态保存在进程内存中，容器重启后运行中的任务状态会丢失
 - 筛选输出 ZIP 会保存在宿主机 `/opt/multi-rider/output`
 - 当前镜像为 CPU-only，不需要 CUDA 库，也不需要 NVIDIA 运行时

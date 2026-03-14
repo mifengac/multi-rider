@@ -37,7 +37,9 @@ COPY templates ./templates
 COPY model ./model
 COPY instantclient_11_2 ./instantclient
 
-RUN mkdir -p /app/output
+RUN test -f /app/model/biaochezhajiev2.pt || (echo "Missing model/biaochezhajiev2.pt" >&2; exit 1) \
+    && test -f /app/instantclient/libclntsh.so.11.1 || (echo "Missing Oracle Instant Client files under instantclient_11_2/" >&2; exit 1) \
+    && mkdir -p /app/output
 
 EXPOSE 5001
 
