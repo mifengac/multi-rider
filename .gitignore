@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+dist/
+.remote_check_*/
+
+output/
+*.log
+*.tmp

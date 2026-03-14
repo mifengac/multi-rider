@@ -1,0 +1,14 @@
+Flask==3.0.0
+requests==2.31.0
+ultralytics==8.3.226
+
+# 与 Python 兼容的稳定版本
+numpy==2.0.2
+opencv-python-headless==4.8.0.74
+Pillow==10.4.0
+
+# 改为 python-oracledb（厚模式可连 11g）
+oracledb==3.4.0
+
+# 说明：
+# - 不在此处固定 torch/torchvision；在 Dockerfile 中通过指定索引安装（CUDA 12.8 通道）。
