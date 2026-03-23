@@ -59,7 +59,7 @@ multi-rider/
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `ORACLE_HOST` | `10.45.100.147` | Oracle 服务器 IP |
+| `ORACLE_HOST` | `oracledb.example.com` | Oracle 服务器 IP |
 | `ORACLE_PORT` | `1521` | Oracle 端口 |
 | `ORACLE_SERVICE` | `yfgxpt` | Oracle 服务名 |
 | `ORACLE_USER` | `yfzagk` | 数据库用户名 |
@@ -113,7 +113,7 @@ uv pip install torch==2.8.0+cpu torchvision==0.23.0+cpu `
 
 ```powershell
 $env:YOLO_TELEMETRY   = "false"
-$env:ORACLE_HOST      = "10.45.100.147"
+$env:ORACLE_HOST      = "oracledb.example.com"
 $env:ORACLE_PASSWORD  = "你的数据库密码"
 $env:FLASK_SECRET_KEY = "改成随机字符串"
 # 其他变量按需修改，不设置则使用 config.py 中的默认值
