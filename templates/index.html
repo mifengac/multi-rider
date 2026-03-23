@@ -4,236 +4,854 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>图片分类与打包下载</title>
+  <script src="{{ url_for('static', filename='tailwind.min.js') }}"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Microsoft Yahei', sans-serif; margin: 24px; }
-    .container { max-width: 900px; margin: 0 auto; }
-    .row { margin-bottom: 12px; }
-    label { display: inline-block; min-width: 120px; }
-    input[type=text], input[type=datetime-local] { width: 320px; padding: 6px 8px; }
-    .hours { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 8px 0; }
-    .hours label { min-width: auto; }
-    .btn { background: #1677ff; border: none; color: #fff; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
-    .btn:hover { background: #0f67dd; }
-    .tip { color: #666; font-size: 12px; }
-    .alert { background: #fffbe6; border: 1px solid #ffe58f; padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; }
+    body {
+      font-family: "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(186, 230, 253, 0.85), transparent 32%),
+        radial-gradient(circle at bottom left, rgba(254, 215, 170, 0.75), transparent 28%),
+        linear-gradient(180deg, #f8fafc 0%, #fff7ed 100%);
+    }
   </style>
   <script>
-    function checkAllHours(checked) {
-      var boxes = document.querySelectorAll('input[name="hours"]');
-      for (var i = 0; i < boxes.length; i++) {
-        boxes[i].checked = checked;
+    const MODEL_UI = {
+      bczj: {
+        label: '类别过滤',
+        placeholder: '0,1,2 或类别名',
+        help: '按索引或类别名过滤飙车炸街模型结果；留空表示不过滤。',
+        presets: []
+      },
+      general: {
+        label: '检测提示词',
+        placeholder: 'motorcycle, person, helmet（留空 = 检测所有）',
+        help: '英文逗号分隔。留空时使用 YOLOE 无提示模式，自动检测开放词表中的目标。',
+        presets: [
+          { label: '摩托车', value: 'motorcycle' },
+          { label: '未戴头盔', value: 'motorcycle, person, helmet' },
+          { label: '人员', value: 'person' }
+        ]
       }
+    };
+
+    const STATUS_UI = {
+      running: { label: '运行中', badge: 'bg-sky-100 text-sky-700 ring-sky-200', bar: 'bg-sky-500' },
+      done: { label: '已完成', badge: 'bg-emerald-100 text-emerald-700 ring-emerald-200', bar: 'bg-emerald-500' },
+      error: { label: '失败', badge: 'bg-rose-100 text-rose-700 ring-rose-200', bar: 'bg-rose-500' },
+      canceled: { label: '已取消', badge: 'bg-slate-200 text-slate-700 ring-slate-300', bar: 'bg-slate-500' },
+      interrupted: { label: '已中断', badge: 'bg-amber-100 text-amber-700 ring-amber-200', bar: 'bg-amber-500' }
+    };
+
+    function modelDisplay(modelKey) {
+      return modelKey === 'bczj' ? '飙车炸街' : '通用';
     }
-  </script>
-  <script>
-    function cancelCurrent(){
-      try{ var jobId = localStorage.getItem('bczj_last_job'); }catch(e){ jobId=null; }
-      if(!jobId){ alert('当前无正在运行的任务'); return; }
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST','{{ url_for('cancel_job', job_id='__J__') }}'.replace('__J__', jobId));
-      xhr.onload = function(){ refreshJobs(); };
-      xhr.send();
+
+    function statusMeta(status) {
+      return STATUS_UI[status] || STATUS_UI.running;
     }
-    function cancelJob(jobId){
-      if(!jobId) return;
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST','{{ url_for('cancel_job', job_id='__J__') }}'.replace('__J__', jobId));
-      xhr.onload = function(){ refreshJobs(); };
-      xhr.send();
+
+    function checkAllHours(checked) {
+      document.querySelectorAll('input[name="hours"]').forEach(function (box) {
+        box.checked = checked;
+      });
     }
-    function formatPercent(p, t){
-      if(!t) return '0%';
-      var v = Math.floor(Math.min(100, Math.max(0, p*100/t)));
-      return v+'%';
+
+    function syncConfValue() {
+      const range = document.getElementById('confRange');
+      const value = document.getElementById('confValue');
+      value.textContent = Number(range.value).toFixed(2);
     }
-    function refreshJobs(){
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET','{{ url_for('list_jobs') }}');
-      xhr.onload = function(){
-        try{
-          var res = JSON.parse(xhr.responseText);
-          if(!res.ok) return;
-          var list = res.running||[];
-          var html = '<div>运行中: '+(res.running_count||0)+'</div>';
-          if(list.length>0){
-            html += '<ul style="padding-left:18px;">';
-            for(var i=0;i<list.length;i++){
-              var j=list[i];
-              var pct = formatPercent(j.processed||0, j.total||0);
-              html += '<li style="margin:6px 0;">'
-                   +  '<code>'+ (j.id||'') +'</code>'
-                   +  ' | 进度 '+(j.processed||0)+'/'+(j.total||0)+' ('+pct+')'
-                   +  ' | <button class="btn" style="background:#ff4d4f;margin-left:8px" onclick="cancelJob(\''+(j.id||'')+'\')">停止</button>'
-                   +  '</li>';
-            }
-            html += '</ul>';
+
+    function applyModelUI() {
+      const modelKey = document.getElementById('model_key').value;
+      const config = MODEL_UI[modelKey] || MODEL_UI.general;
+      const label = document.getElementById('classesLabel');
+      const input = document.getElementById('classes');
+      const help = document.getElementById('classesHelp');
+      const panel = document.getElementById('presetPanel');
+      const box = document.getElementById('presetButtons');
+
+      label.textContent = config.label;
+      input.placeholder = config.placeholder;
+      input.disabled = false;
+      help.textContent = config.help;
+
+      if (config.presets.length === 0) {
+        panel.classList.add('hidden');
+        box.innerHTML = '';
+        return;
+      }
+
+      panel.classList.remove('hidden');
+      box.innerHTML = config.presets.map(function (preset) {
+        return '<button type="button" class="rounded-full border border-teal-200 bg-white px-3 py-1 text-xs font-medium text-teal-700 transition hover:border-teal-400 hover:bg-teal-50" data-value="' + preset.value + '">' + preset.label + '</button>';
+      }).join('');
+
+      box.querySelectorAll('button[data-value]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          input.value = button.getAttribute('data-value') || '';
+          input.focus();
+        });
+      });
+    }
+
+    function formatPercent(processed, total) {
+      if (!total) return 0;
+      return Math.min(100, Math.max(0, Math.floor(processed * 100 / total)));
+    }
+
+    function setProgressState(job) {
+      const processed = job.processed || 0;
+      const total = job.total || 0;
+      const kept = job.kept || 0;
+      const notfound = job.notfound || 0;
+      const failed = job.failed || 0;
+      const pct = formatPercent(processed, total);
+      const meta = statusMeta(job.status || 'running');
+
+      document.getElementById('progressText').textContent = '已处理 ' + processed + ' / ' + total;
+      document.getElementById('progressSubtext').textContent =
+        '模型：' + modelDisplay(job.model_key || 'general') + ' · 保留 ' + kept + ' · 404 ' + notfound + ' · 失败 ' + failed;
+
+      const bar = document.getElementById('progressBar');
+      bar.style.width = pct + '%';
+      bar.className = 'h-3 rounded-full transition-all duration-300 ' + meta.bar;
+
+      const badge = document.getElementById('progressStatus');
+      badge.textContent = meta.label;
+      badge.className = 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ' + meta.badge;
+    }
+
+    function clearLastJob() {
+      try {
+        localStorage.removeItem('bczj_last_job');
+      } catch (e) {}
+    }
+
+    function cancelJob(jobId) {
+      if (!jobId) return;
+      fetch('{{ url_for("job.cancel_job", job_id="__J__") }}'.replace('__J__', jobId), { method: 'POST' })
+        .finally(function () {
+          refreshJobs();
+        });
+    }
+
+    function cancelCurrent() {
+      let jobId = null;
+      try {
+        jobId = localStorage.getItem('bczj_last_job');
+      } catch (e) {}
+      if (!jobId) {
+        alert('当前没有可取消的任务');
+        return;
+      }
+      cancelJob(jobId);
+    }
+
+    function renderRunningJobs(items) {
+      const box = document.getElementById('jobsInfo');
+      if (!items || items.length === 0) {
+        box.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-5 text-sm text-slate-500">当前没有运行中的任务。</div>';
+        return;
+      }
+
+      box.innerHTML = items.map(function (job) {
+        const pct = formatPercent(job.processed || 0, job.total || 0);
+        const meta = statusMeta(job.status || 'running');
+        return (
+          '<div class="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm shadow-slate-200/60">' +
+            '<div class="flex items-start justify-between gap-3">' +
+              '<div>' +
+                '<div class="text-xs uppercase tracking-[0.25em] text-slate-400">JOB</div>' +
+                '<div class="mt-1 break-all font-mono text-xs text-slate-600">' + (job.id || '') + '</div>' +
+              '</div>' +
+              '<div class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ' + meta.badge + '">' + meta.label + '</div>' +
+            '</div>' +
+            '<div class="mt-3 flex items-center justify-between text-sm text-slate-600">' +
+              '<span>模型：' + modelDisplay(job.model_key || 'general') + '</span>' +
+              '<span>' + (job.processed || 0) + '/' + (job.total || 0) + ' · ' + pct + '%</span>' +
+            '</div>' +
+            '<div class="mt-3 h-2 rounded-full bg-slate-100">' +
+              '<div class="h-2 rounded-full ' + meta.bar + '" style="width:' + pct + '%"></div>' +
+            '</div>' +
+            '<div class="mt-4 flex justify-end">' +
+              '<button type="button" class="rounded-full bg-rose-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-600" onclick="cancelJob(\'' + (job.id || '') + '\')">停止任务</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function refreshJobs() {
+      fetch('{{ url_for("job.list_jobs") }}')
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+          if (!data.ok) return;
+          document.getElementById('runningCount').textContent = data.running_count || 0;
+          renderRunningJobs(data.running || []);
+        })
+        .catch(function () {})
+        .finally(function () {
+          window.setTimeout(refreshJobs, 3000);
+        });
+    }
+
+    function poll(jobId) {
+      fetch('{{ url_for("job.get_progress", job_id="__J__") }}'.replace('__J__', jobId))
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+          if (!data.ok) return;
+          const job = data.job || {};
+          document.getElementById('progressBox').classList.remove('hidden');
+          setProgressState(job);
+
+          if (job.status === 'done') {
+            const zipUrl = '{{ url_for("file.download_zip", job_id="__J__") }}'.replace('__J__', jobId);
+            const summaryUrl = '{{ url_for("file.download_summary", job_id="__J__") }}'.replace('__J__', jobId);
+            document.getElementById('downloadLinks').classList.remove('hidden');
+            document.getElementById('zipLink').href = zipUrl;
+            document.getElementById('sumLink').href = summaryUrl;
+            clearLastJob();
+            window.location.href = zipUrl;
+          } else if (job.status === 'canceled') {
+            clearLastJob();
+            alert('任务已取消');
+          } else if (job.status === 'interrupted') {
+            clearLastJob();
+            alert('任务因服务重启而中断');
+          } else if (job.status === 'error') {
+            clearLastJob();
+            alert('任务失败：' + (job.message || '未知错误'));
+          } else {
+            window.setTimeout(function () { poll(jobId); }, 1000);
           }
-          var el = document.getElementById('jobsInfo');
-          if(el) el.innerHTML = html;
-        }catch(e){}
-      };
-      xhr.send();
-      setTimeout(refreshJobs, 3000);
+        })
+        .catch(function () {
+          window.setTimeout(function () { poll(jobId); }, 1500);
+        });
     }
-    window.addEventListener('load', function(){
-      refreshJobs();
-      try{
-        var last = localStorage.getItem('bczj_last_job');
-        if(last){
-          var box = document.getElementById('progressBox');
-          if(box) box.style.display='block';
-          poll(last);
-        }
-      }catch(e){}
-    });
-  </script>
-  <script>
-    function startJob(e){
-      if(e) e.preventDefault();
-      var form = document.getElementById('form');
-      var fd = new FormData(form);
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST','{{ url_for('start_job') }}');
-      xhr.onload = function(){
-        try {
-          var res = JSON.parse(xhr.responseText);
-          if(!res.ok){ alert(res.error||'启动任务失败'); return false; }
-          var jobId = res.job_id;
-          try { localStorage.setItem('bczj_last_job', jobId); } catch(e){}
-          var box = document.getElementById('progressBox');
-          box.style.display='block';
-          document.getElementById('downloadLinks').style.display='none';
-          updateProgress(0, res.total||0, 0, 0, 0);
+
+    function startJob(event) {
+      if (event) event.preventDefault();
+      const form = document.getElementById('jobForm');
+      const data = new FormData(form);
+
+      fetch('{{ url_for("job.start_job") }}', {
+        method: 'POST',
+        body: data
+      })
+        .then(function (resp) { return resp.json(); })
+        .then(function (payload) {
+          if (!payload.ok) {
+            alert(payload.error || '启动任务失败');
+            return;
+          }
+          const jobId = payload.job_id;
+          try {
+            localStorage.setItem('bczj_last_job', jobId);
+          } catch (e) {}
+          document.getElementById('progressBox').classList.remove('hidden');
+          document.getElementById('downloadLinks').classList.add('hidden');
+          setProgressState({
+            status: 'running',
+            model_key: document.getElementById('model_key').value,
+            total: payload.total || 0,
+            processed: 0,
+            kept: 0,
+            notfound: 0,
+            failed: 0
+          });
           poll(jobId);
-        } catch(err){ alert('启动失败'); }
-      };
-      xhr.onerror = function(){ alert('网络错误'); };
-      xhr.send(fd);
+        })
+        .catch(function () {
+          alert('网络错误，任务未启动');
+        });
       return false;
     }
-    function updateProgress(proc,total,kept,nf,fail){
-      var pct = total>0 ? Math.min(100, Math.floor(proc*100/total)) : 0;
-      document.getElementById('progressText').innerText = '已处理 '+proc+' / '+total;
-      document.getElementById('progressBar').style.width = pct+'%';
-      document.getElementById('statsText').innerText = '保留 '+kept+' | 404 '+nf+' | 失败 '+fail;
+
+    // ==================== UPLOAD TAB ====================
+
+    function switchTab(tab) {
+      var oraclePanel = document.getElementById('tabOracle');
+      var uploadPanel = document.getElementById('tabUpload');
+      var btnOracle = document.getElementById('tabBtnOracle');
+      var btnUpload = document.getElementById('tabBtnUpload');
+      if (tab === 'Upload') {
+        oraclePanel.classList.add('hidden');
+        uploadPanel.classList.remove('hidden');
+        btnOracle.classList.remove('bg-slate-900', 'text-white');
+        btnOracle.classList.add('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
+        btnUpload.classList.add('bg-slate-900', 'text-white');
+        btnUpload.classList.remove('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
+      } else {
+        uploadPanel.classList.add('hidden');
+        oraclePanel.classList.remove('hidden');
+        btnUpload.classList.remove('bg-slate-900', 'text-white');
+        btnUpload.classList.add('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
+        btnOracle.classList.add('bg-slate-900', 'text-white');
+        btnOracle.classList.remove('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
+      }
+      try { localStorage.setItem('bczj_active_tab', tab); } catch (e) {}
     }
-    function poll(jobId){
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET','{{ url_for('get_progress', job_id='__J__') }}'.replace('__J__', jobId));
-      xhr.onload = function(){
-        try {
-          var res = JSON.parse(xhr.responseText);
-          if(!res.ok){ return; }
-          var j = res.job||{};
-          updateProgress(j.processed||0, j.total||0, j.kept||0, j.notfound||0, j.failed||0);
-          if(j.status==='done'){
-            var zip = '{{ url_for('download_zip', job_id='__J__') }}'.replace('__J__', jobId);
-            // 自动触发下载
-            window.location.href = zip;
-            var sum = '{{ url_for('download_summary', job_id='__J__') }}'.replace('__J__', jobId);
-            document.getElementById('zipLink').href = zip;
-            document.getElementById('sumLink').href = sum;
-            document.getElementById('downloadLinks').style.display='inline-block';
-            try { localStorage.removeItem('bczj_last_job'); } catch(e){}
-          } else if(j.status==='canceled'){
+
+    function applyUploadModelUI() {
+      var modelKey = document.getElementById('uploadModelKey').value;
+      var config = MODEL_UI[modelKey] || MODEL_UI.general;
+      var label = document.getElementById('uploadClassesLabel');
+      var input = document.getElementById('uploadClasses');
+      var help = document.getElementById('uploadClassesHelp');
+      var panel = document.getElementById('uploadPresetPanel');
+      var box = document.getElementById('uploadPresetButtons');
+      label.textContent = config.label;
+      input.placeholder = config.placeholder;
+      help.textContent = config.help;
+      if (config.presets.length === 0) {
+        panel.classList.add('hidden');
+        box.innerHTML = '';
+        return;
+      }
+      panel.classList.remove('hidden');
+      box.innerHTML = config.presets.map(function (preset) {
+        return '<button type="button" class="rounded-full border border-teal-200 bg-white px-3 py-1 text-xs font-medium text-teal-700 transition hover:border-teal-400 hover:bg-teal-50" data-value="' + preset.value + '">' + preset.label + '</button>';
+      }).join('');
+      box.querySelectorAll('button[data-value]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          input.value = button.getAttribute('data-value') || '';
+          input.focus();
+        });
+      });
+    }
+
+    function syncUploadConfValue() {
+      document.getElementById('uploadConfValue').textContent = Number(document.getElementById('uploadConfRange').value).toFixed(2);
+    }
+
+    function onUploadFileChange(input) {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var ext = file.name.split('.').pop().toLowerCase();
+      var isVideo = ['mp4', 'avi', 'mov', 'mkv'].includes(ext);
+      document.getElementById('uploadFileName').textContent = file.name;
+      document.getElementById('uploadFileSize').textContent = (file.size / 1024 / 1024).toFixed(1) + ' MB';
+      document.getElementById('uploadFileInfo').classList.remove('hidden');
+      document.getElementById('frameIntervalRow').classList.toggle('hidden', !isVideo);
+    }
+
+    function setUploadProgressState(job) {
+      var processed = job.processed || 0;
+      var total = job.total || 0;
+      var kept = job.kept || 0;
+      var pct = total ? Math.min(100, Math.floor(processed * 100 / total)) : 0;
+      var meta = statusMeta(job.status || 'running');
+      document.getElementById('uploadProgressText').textContent = '已处理 ' + processed + ' / ' + total;
+      document.getElementById('uploadProgressSubtext').textContent =
+        '模型：' + modelDisplay(job.model_key || 'general') + ' · 保留 ' + kept;
+      var bar = document.getElementById('uploadProgressBar');
+      bar.style.width = pct + '%';
+      bar.className = 'h-3 rounded-full transition-all duration-300 ' + meta.bar;
+      var badge = document.getElementById('uploadProgressStatus');
+      badge.textContent = meta.label;
+      badge.className = 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ' + meta.badge;
+    }
+
+    function pollUpload(jobId) {
+      fetch('/upload/progress/' + jobId)
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+          if (!data.ok) return;
+          var job = data.job || {};
+          document.getElementById('uploadProgressBox').classList.remove('hidden');
+          setUploadProgressState(job);
+          if (job.status === 'done') {
+            document.getElementById('uploadDownloadLinks').classList.remove('hidden');
+            document.getElementById('uploadZipLink').href = '/upload/download/' + jobId;
+            try { localStorage.removeItem('bczj_upload_job'); } catch (e) {}
+            window.location.href = '/upload/download/' + jobId;
+          } else if (job.status === 'canceled') {
+            try { localStorage.removeItem('bczj_upload_job'); } catch (e) {}
             alert('任务已取消');
-            try { localStorage.removeItem('bczj_last_job'); } catch(e){}
-          } else if(j.status==='error'){
-            alert('任务失败: '+(j.message||''));
+          } else if (job.status === 'error') {
+            try { localStorage.removeItem('bczj_upload_job'); } catch (e) {}
+            alert('任务失败：' + (job.message || '未知错误'));
           } else {
-            setTimeout(function(){ poll(jobId); }, 1000);
+            window.setTimeout(function () { pollUpload(jobId); }, 1000);
           }
-        } catch(err){ setTimeout(function(){ poll(jobId); }, 1500); }
-      };
-      xhr.onerror = function(){ setTimeout(function(){ poll(jobId); }, 1500); };
-      xhr.send();
+        })
+        .catch(function () { window.setTimeout(function () { pollUpload(jobId); }, 1500); });
     }
+
+    function startUploadJob(event) {
+      if (event) event.preventDefault();
+      var fileInput = document.getElementById('uploadFile');
+      if (!fileInput.files || !fileInput.files[0]) {
+        alert('请先选择文件');
+        return false;
+      }
+      var form = document.getElementById('uploadForm');
+      var data = new FormData(form);
+      document.getElementById('uploadProgressBox').classList.remove('hidden');
+      document.getElementById('uploadDownloadLinks').classList.add('hidden');
+      setUploadProgressState({ status: 'running', total: 0, processed: 0, kept: 0 });
+      fetch('/upload/start', { method: 'POST', body: data })
+        .then(function (resp) { return resp.json(); })
+        .then(function (payload) {
+          if (!payload.ok) {
+            alert(payload.error || '启动失败');
+            return;
+          }
+          try { localStorage.setItem('bczj_upload_job', payload.job_id); } catch (e) {}
+          pollUpload(payload.job_id);
+        })
+        .catch(function () { alert('网络错误，任务未启动'); });
+      return false;
+    }
+
+    function cancelUploadJob() {
+      var jobId = null;
+      try { jobId = localStorage.getItem('bczj_upload_job'); } catch (e) {}
+      if (!jobId) { alert('当前没有可取消的上传任务'); return; }
+      fetch('/upload/cancel/' + jobId, { method: 'POST' }).catch(function () {});
+    }
+
+    function initUploadDragDrop() {
+      var label = document.getElementById('uploadDropZone');
+      if (!label) return;
+      label.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        label.classList.add('border-teal-400', 'bg-teal-50');
+      });
+      label.addEventListener('dragleave', function () {
+        label.classList.remove('border-teal-400', 'bg-teal-50');
+      });
+      label.addEventListener('drop', function (e) {
+        e.preventDefault();
+        label.classList.remove('border-teal-400', 'bg-teal-50');
+        var files = e.dataTransfer && e.dataTransfer.files;
+        if (files && files[0]) {
+          try {
+            var dt = new DataTransfer();
+            dt.items.add(files[0]);
+            document.getElementById('uploadFile').files = dt.files;
+          } catch (ex) {}
+          onUploadFileChange(document.getElementById('uploadFile'));
+        }
+      });
+    }
+
+    window.addEventListener('load', function () {
+      document.getElementById('model_key').addEventListener('change', applyModelUI);
+      document.getElementById('confRange').addEventListener('input', syncConfValue);
+      applyModelUI();
+      syncConfValue();
+      refreshJobs();
+
+      // Upload tab init
+      document.getElementById('uploadModelKey').addEventListener('change', applyUploadModelUI);
+      document.getElementById('uploadConfRange').addEventListener('input', syncUploadConfValue);
+      applyUploadModelUI();
+      syncUploadConfValue();
+      initUploadDragDrop();
+
+      try {
+        var activeTab = localStorage.getItem('bczj_active_tab');
+        if (activeTab === 'Upload') { switchTab('Upload'); }
+      } catch (e) {}
+
+      try {
+        const lastJob = localStorage.getItem('bczj_last_job');
+        if (lastJob) {
+          document.getElementById('progressBox').classList.remove('hidden');
+          poll(lastJob);
+        }
+      } catch (e) {}
+
+      try {
+        var lastUploadJob = localStorage.getItem('bczj_upload_job');
+        if (lastUploadJob) {
+          switchTab('Upload');
+          document.getElementById('uploadProgressBox').classList.remove('hidden');
+          pollUpload(lastUploadJob);
+        }
+      } catch (e) {}
+    });
   </script>
-  <!-- 若使用模板变量，请确保 Flask 提供默认值 -->
 </head>
-<body>
-  <div class="container">
-    <h2>图片分类（YOLOv8）并打包下载</h2>
+<body class="min-h-screen text-slate-900">
+  <div class="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-10">
+    <header class="mb-8 grid gap-4 xl:grid-cols-[1.5fr,0.9fr]">
+      <section class="rounded-[32px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Multi-Rider</div>
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <span class="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-teal-200">多模型切换</span>
+          <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">SQLite 历史记录</span>
+          <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-200">YOLOE 提示词</span>
+        </div>
+        <h1 class="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">图片分类与打包下载</h1>
+        <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
+          统一支持飙车炸街模型与通用 YOLOE 模型。通用模式下可直接输入英文提示词，留空时按开放词表做无提示检测；任务完成后会自动写入历史记录并支持重新下载。
+        </p>
+      </section>
+
+      <section class="rounded-[32px] border border-slate-200/70 bg-slate-900 p-6 text-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-200">Quick Access</div>
+        <div class="mt-5 space-y-4">
+          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div class="text-sm text-slate-300">运行中的任务</div>
+            <div id="runningCount" class="mt-2 text-4xl font-semibold text-white">0</div>
+          </div>
+          <a href="{{ url_for('job.history_page') }}" class="inline-flex w-full items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100">
+            打开历史记录
+          </a>
+          <button type="button" onclick="cancelCurrent()" class="inline-flex w-full items-center justify-center rounded-full border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
+            取消当前任务
+          </button>
+        </div>
+      </section>
+    </header>
+
     {% with messages = get_flashed_messages() %}
     {% if messages %}
-      {% for msg in messages %}
-      <div class="alert">{{ msg }}</div>
-      {% endfor %}
+      <div class="mb-6 space-y-3">
+        {% for msg in messages %}
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">{{ msg }}</div>
+        {% endfor %}
+      </div>
     {% endif %}
     {% endwith %}
 
-    <form id="form" action="#" method="post" onsubmit="return startJob(event)">
-      <div class="row">
-        <label for="kssj">开始时间</label>
-        <input type="datetime-local" id="kssj" name="kssj" value="{{ kssj_local }}" step="1" />
-      </div>
-      <div class="row">
-        <label for="jssj">结束时间</label>
-        <input type="datetime-local" id="jssj" name="jssj" value="{{ jssj_local }}" step="1" />
-      </div>
-      <div class="row">
-        <label for="conf">置信度阈值</label>
-        <input type="text" id="conf" name="conf" value="{{ conf_default }}" placeholder="0.7" />
-      </div>
-      <div class="row">
-        <label for="batch_size">批大小</label>
-        <input type="text" id="batch_size" name="batch_size" value="{{ batch_default }}" placeholder="8" />
-      </div>
-      <div class="row">
-        <label for="imgsz">图片尺寸</label>
-        <input type="text" id="imgsz" name="imgsz" value="{{ imgsz_default }}" placeholder="640" />
-      </div>
-      <div class="row">
-        <label for="classes">类别过滤</label>
-        <input type="text" id="classes" name="classes" value="" placeholder="用逗号分隔，如 car,truck 或 0,1；留空表示不限" />
-      </div>
-      <div class="row">
-        <label>时段范围</label>
-        <div>
-          <div class="tip">多选小时（例：选 20、21、23），不选表示不限</div>
-          <div class="hours">
-            {% for h in range(24) %}
-            <label><input type="checkbox" name="hours" value="{{ '%02d' % h }}"> {{ '%02d' % h }}</label>
-            {% endfor %}
+    <div class="mb-6 flex gap-3">
+      <button id="tabBtnOracle" type="button" onclick="switchTab('Oracle')"
+        class="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700">
+        数据库检测
+      </button>
+      <button id="tabBtnUpload" type="button" onclick="switchTab('Upload')"
+        class="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">
+        本地上传检测
+      </button>
+    </div>
+
+    <div id="tabOracle">
+    <main class="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
+      <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+        <form id="jobForm" onsubmit="return startJob(event)" class="space-y-8">
+          <div>
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">01</div>
+              <div>
+                <h2 class="text-lg font-semibold text-slate-900">时间范围</h2>
+                <p class="text-sm text-slate-500">按时间窗口和小时过滤数据库记录。</p>
+              </div>
+            </div>
+            <div class="mt-5 grid gap-4 md:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">开始时间</span>
+                <input type="datetime-local" id="kssj" name="kssj" value="{{ kssj_local }}" step="1" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">结束时间</span>
+                <input type="datetime-local" id="jssj" name="jssj" value="{{ jssj_local }}" step="1" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+              </label>
+            </div>
           </div>
-          <div class="tip">
-            <button type="button" class="btn" onclick="checkAllHours(true)">全选</button>
-            <button type="button" class="btn" style="background:#999;margin-left:8px" onclick="checkAllHours(false)">全不选</button>
+
+          <div class="border-t border-slate-100 pt-8">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-teal-600 text-sm font-semibold text-white">02</div>
+              <div>
+                <h2 class="text-lg font-semibold text-slate-900">模型与检测参数</h2>
+                <p class="text-sm text-slate-500">通用模型支持英文提示词，飙车炸街模型沿用原有类别过滤。</p>
+              </div>
+            </div>
+
+            <div class="mt-5 grid gap-4 xl:grid-cols-3">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">模型选择</span>
+                <select id="model_key" name="model_key" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100">
+                  <option value="general" {% if model_default == 'general' %}selected{% endif %}>通用（general）</option>
+                  <option value="bczj" {% if model_default == 'bczj' %}selected{% endif %}>飙车炸街（bczj）</option>
+                </select>
+              </label>
+
+              <div class="xl:col-span-2 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                <div class="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+                  <div>
+                    <label for="classes" id="classesLabel" class="mb-2 block text-sm font-medium text-slate-700">检测提示词</label>
+                    <input type="text" id="classes" name="classes" value="" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+                    <p id="classesHelp" class="mt-2 text-xs leading-6 text-slate-500"></p>
+                  </div>
+
+                  <div id="presetPanel" class="hidden rounded-2xl border border-dashed border-teal-200 bg-white/90 p-4">
+                    <div class="text-xs font-semibold uppercase tracking-[0.25em] text-teal-600">常用预设</div>
+                    <div id="presetButtons" class="mt-3 flex flex-wrap gap-2"></div>
+                    <p class="mt-3 text-xs leading-6 text-slate-500">“未戴头盔”无法通过单个文本类直接表达，这里会填入相关目标词用于粗筛。</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5 grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+              <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                <div class="flex items-center justify-between">
+                  <label for="confRange" class="text-sm font-medium text-slate-700">置信度阈值</label>
+                  <span id="confValue" class="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">{{ conf_default }}</span>
+                </div>
+                <input type="range" id="confRange" name="conf" min="0" max="1" step="0.01" value="{{ conf_default }}" class="mt-4 h-2 w-full cursor-pointer accent-teal-600" />
+                <div class="mt-2 flex justify-between text-xs text-slate-400">
+                  <span>0.00</span>
+                  <span>1.00</span>
+                </div>
+              </div>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">批大小</span>
+                  <input type="number" id="batch_size" name="batch_size" value="{{ batch_default }}" min="1" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+                </label>
+                <label class="block rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">图片尺寸</span>
+                  <input type="number" id="imgsz" name="imgsz" value="{{ imgsz_default }}" min="64" step="32" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 pt-8">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500 text-sm font-semibold text-white">03</div>
+              <div>
+                <h2 class="text-lg font-semibold text-slate-900">高级过滤</h2>
+                <p class="text-sm text-slate-500">可按小时进一步约束查询范围。</p>
+              </div>
+            </div>
+
+            <div class="mt-5 rounded-3xl border border-slate-200 bg-slate-50/80 p-4 md:p-5">
+              <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <p class="text-sm leading-7 text-slate-500">多选小时，不选表示不过滤。数据库查询条件始终为 <code class="rounded bg-white px-2 py-1 text-xs text-slate-600 ring-1 ring-inset ring-slate-200">TIME BETWEEN</code>，飙车炸街模型会附加其专用动态条件。</p>
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" onclick="checkAllHours(true)" class="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700">全选</button>
+                  <button type="button" onclick="checkAllHours(false)" class="rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">清空</button>
+                </div>
+              </div>
+
+              <div class="mt-5 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
+                {% for h in range(24) %}
+                <label class="group flex cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm font-medium text-slate-600 transition hover:border-teal-300 hover:text-teal-700">
+                  <input type="checkbox" name="hours" value="{{ '%02d' % h }}" class="mr-2 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
+                  {{ '%02d' % h }}
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-4 border-t border-slate-100 pt-8 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-sm leading-7 text-slate-500">
+              提交后会先查库，再并发下载图片，推理结束时写入 SQLite 历史记录。若同一 IP 已有运行中的任务，会先将旧任务标记取消。
+            </div>
+            <button type="submit" class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:bg-slate-700">
+              开始分类并下载 ZIP
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="space-y-6">
+        <div id="progressBox" class="hidden rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Progress</div>
+              <h3 class="mt-2 text-xl font-semibold text-slate-900">任务进度</h3>
+            </div>
+            <div id="progressStatus" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset bg-sky-100 text-sky-700 ring-sky-200">运行中</div>
+          </div>
+          <div class="mt-5 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+            <div id="progressText" class="text-sm font-medium text-slate-800">已处理 0 / 0</div>
+            <div id="progressSubtext" class="mt-2 text-xs leading-6 text-slate-500">模型：通用 · 保留 0 · 404 0 · 失败 0</div>
+            <div class="mt-4 h-3 rounded-full bg-slate-100">
+              <div id="progressBar" class="h-3 rounded-full bg-sky-500 transition-all duration-300" style="width:0%"></div>
+            </div>
+          </div>
+          <div id="downloadLinks" class="mt-5 hidden space-y-3">
+            <a id="zipLink" href="#" target="_blank" class="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500">下载 ZIP</a>
+            <a id="sumLink" href="#" target="_blank" class="inline-flex w-full items-center justify-center rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-500">下载摘要说明</a>
+            <button type="button" onclick="cancelCurrent()" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">停止当前任务</button>
           </div>
         </div>
-      </div>
-      <div class="row">
-        <button type="button" class="btn" onclick="return startJob(event)">开始分类并下载 ZIP</button>
-      </div>
-      <div class="tip">
-        - 查询 SQL：TIME BETWEEN {kssj} AND {jssj} 且 HOUR IN 选中小时（格式：YYYY-MM-DD HH:MM:SS）<br />
-        - 分类规则：任一检测框置信度 ≥ 0.8 的图片保留并打包
-      </div>
-    </form>
-    <div id="progressBox" style="display:none; margin-top:16px;">
-      <div class="row"><strong>处理进度</strong></div>
-      <div class="row">
-        <div id="progressText">已处理 0 / 0</div>
-        <div style="height:14px;border:1px solid #ddd;border-radius:4px;overflow:hidden;width:100%;max-width:480px;margin-top:6px;">
-          <div id="progressBar" style="height:100%;width:0;background:#52c41a;"></div>
+
+        <div class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Active Jobs</div>
+              <h3 class="mt-2 text-xl font-semibold text-slate-900">运行中的任务</h3>
+            </div>
+            <span class="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">实时刷新</span>
+          </div>
+          <div id="jobsInfo" class="mt-5 space-y-4">
+            <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-5 text-sm text-slate-500">加载中...</div>
+          </div>
         </div>
-      </div>
-      <div class="row" id="statsText">保留 0 | 404 0 | 失败 0</div>
-      <div class="row" id="downloadLinks" style="display:none;">
-        <a id="zipLink" class="btn" href="#" target="_blank">下载 ZIP</a>
-        <a id="sumLink" class="btn" style="background:#13c2c2;margin-left:8px" href="#" target="_blank">下载分类文档</a>
-        <button id="cancelBtn" type="button" class="btn" style="background:#ff4d4f;margin-left:8px" onclick="cancelCurrent()">停止任务</button>
-      </div>
-    </div>
-    <div id="jobsBox" style="margin-top:18px;">
-      <div class="row"><strong>运行中的任务</strong></div>
-      <div class="row" id="jobsInfo">查询中...</div>
-    </div>
+      </section>
+    </main>
+    </div><!-- /tabOracle -->
+
+    <div id="tabUpload" class="hidden grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
+      <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+        <form id="uploadForm" onsubmit="return startUploadJob(event)" class="space-y-8">
+
+          <!-- Step 01: File Upload -->
+          <div>
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">01</div>
+              <div>
+                <h2 class="text-lg font-semibold text-slate-900">上传文件</h2>
+                <p class="text-sm text-slate-500">支持 ZIP 图片包 或 MP4 / AVI / MOV 视频，单文件最大 500 MB。</p>
+              </div>
+            </div>
+            <div class="mt-5">
+              <label id="uploadDropZone" for="uploadFile"
+                class="group flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/80 px-6 py-10 text-center transition hover:border-teal-300 hover:bg-teal-50/40">
+                <svg class="h-12 w-12 text-slate-300 transition group-hover:text-teal-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+                <span class="mt-4 text-sm font-medium text-slate-600 group-hover:text-teal-700">点击选择文件，或将文件拖放至此</span>
+                <span class="mt-1 text-xs text-slate-400">.zip（图片包）· .mp4 / .avi / .mov（视频）</span>
+                <input id="uploadFile" name="file" type="file" accept=".zip,.mp4,.avi,.mov,.mkv" class="hidden" onchange="onUploadFileChange(this)" />
+              </label>
+              <div id="uploadFileInfo" class="hidden mt-4 flex items-center gap-3 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3">
+                <svg class="h-5 w-5 flex-shrink-0 text-teal-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                <div class="min-w-0 flex-1">
+                  <div id="uploadFileName" class="truncate text-sm font-medium text-teal-800"></div>
+                  <div id="uploadFileSize" class="text-xs text-teal-600"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 02: Model & Detection Params -->
+          <div class="border-t border-slate-100 pt-8">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-teal-600 text-sm font-semibold text-white">02</div>
+              <div>
+                <h2 class="text-lg font-semibold text-slate-900">模型与检测参数</h2>
+                <p class="text-sm text-slate-500">通用模型支持英文提示词；飙车炸街模型沿用类别过滤。</p>
+              </div>
+            </div>
+
+            <div class="mt-5 grid gap-4 xl:grid-cols-3">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">模型选择</span>
+                <select id="uploadModelKey" name="model_key" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100">
+                  <option value="general">通用（general）</option>
+                  <option value="bczj">飙车炸街（bczj）</option>
+                </select>
+              </label>
+
+              <div class="xl:col-span-2 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                <div class="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+                  <div>
+                    <label for="uploadClasses" id="uploadClassesLabel" class="mb-2 block text-sm font-medium text-slate-700">检测提示词</label>
+                    <input type="text" id="uploadClasses" name="classes" value=""
+                      class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+                    <p id="uploadClassesHelp" class="mt-2 text-xs leading-6 text-slate-500"></p>
+                  </div>
+                  <div id="uploadPresetPanel" class="hidden rounded-2xl border border-dashed border-teal-200 bg-white/90 p-4">
+                    <div class="text-xs font-semibold uppercase tracking-[0.25em] text-teal-600">常用预设</div>
+                    <div id="uploadPresetButtons" class="mt-3 flex flex-wrap gap-2"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5 grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+              <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                <div class="flex items-center justify-between">
+                  <label for="uploadConfRange" class="text-sm font-medium text-slate-700">置信度阈值</label>
+                  <span id="uploadConfValue" class="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">0.80</span>
+                </div>
+                <input type="range" id="uploadConfRange" name="conf" min="0" max="1" step="0.01" value="0.80"
+                  class="mt-4 h-2 w-full cursor-pointer accent-teal-600" />
+                <div class="mt-2 flex justify-between text-xs text-slate-400"><span>0.00</span><span>1.00</span></div>
+              </div>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">批大小</span>
+                  <input type="number" name="batch_size" value="8" min="1"
+                    class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+                </label>
+                <div id="frameIntervalRow" class="hidden rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">帧采样间隔</span>
+                  <input type="number" name="frame_interval" value="5" min="1" max="60"
+                    class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+                  <p class="mt-2 text-xs text-slate-500">每隔 N 帧提取 1 帧检测</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-4 border-t border-slate-100 pt-8 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-sm leading-7 text-slate-500">
+              ZIP 包将逐图推理；视频按帧间隔采样后推理；命中目标的图片 / 帧打包为 ZIP 供下载。
+            </div>
+            <button type="submit"
+              class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:bg-slate-700">
+              开始检测
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Upload Right Panel -->
+      <section class="space-y-6">
+        <div id="uploadProgressBox" class="hidden rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Progress</div>
+              <h3 class="mt-2 text-xl font-semibold text-slate-900">检测进度</h3>
+            </div>
+            <div id="uploadProgressStatus" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset bg-sky-100 text-sky-700 ring-sky-200">运行中</div>
+          </div>
+          <div class="mt-5 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+            <div id="uploadProgressText" class="text-sm font-medium text-slate-800">已处理 0 / 0</div>
+            <div id="uploadProgressSubtext" class="mt-2 text-xs leading-6 text-slate-500">保留 0</div>
+            <div class="mt-4 h-3 rounded-full bg-slate-100">
+              <div id="uploadProgressBar" class="h-3 rounded-full bg-sky-500 transition-all duration-300" style="width:0%"></div>
+            </div>
+          </div>
+          <div id="uploadDownloadLinks" class="mt-5 hidden space-y-3">
+            <a id="uploadZipLink" href="#" target="_blank"
+              class="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500">
+              下载检测结果 ZIP
+            </a>
+          </div>
+          <div class="mt-4 flex justify-end">
+            <button type="button" onclick="cancelUploadJob()" class="text-xs text-slate-400 transition hover:text-rose-500">停止任务</button>
+          </div>
+        </div>
+
+        <div class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6">
+          <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Guide</div>
+          <h3 class="mt-2 text-xl font-semibold text-slate-900">使用说明</h3>
+          <dl class="mt-5 space-y-4 text-sm">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <dt class="font-semibold text-slate-800">📦 ZIP 图片包</dt>
+              <dd class="mt-2 leading-6 text-slate-500">将 JPG / PNG / BMP / TIFF 图片打包成 ZIP 上传，推理后只保留触发检测的图片，重新打包下载。</dd>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <dt class="font-semibold text-slate-800">🎬 视频文件</dt>
+              <dd class="mt-2 leading-6 text-slate-500">支持 MP4 / AVI / MOV / MKV。按帧采样间隔每隔 N 帧取一帧推理，命中的帧保存为 JPG 打包下载。</dd>
+            </div>
+            <div class="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+              <dt class="font-semibold text-amber-800">⚠️ 注意</dt>
+              <dd class="mt-2 leading-6 text-amber-700">单文件最大 500 MB；服务重启后进行中的任务会丢失，请勿上传过大的文件。</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+    </div><!-- /tabUpload -->
+
   </div>
 </body>
 </html>
-
-
-
-
-

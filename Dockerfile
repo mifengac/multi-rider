@@ -6,7 +6,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     ORACLE_IC_DIR=/app/instantclient \
     LD_LIBRARY_PATH=/app/instantclient \
-    OUTPUT_DIR=/app/output
+    OUTPUT_DIR=/app/output \
+    YOLO_TELEMETRY=false
 
 RUN set -eux; \
     sed -i -e 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' \
@@ -32,14 +33,21 @@ RUN grep -Ev '^(torch|torchvision|triton|nvidia-[^=]+)==' requirements.lock > re
         torchvision==0.23.0+cpu \
     && pip install --no-cache-dir -r requirements.docker.lock
 
-COPY app.py ./
+# Copy application source (Blueprint structure)
+COPY app.py config.py ./
+COPY db ./db
+COPY routes ./routes
+COPY service ./service
+COPY utils ./utils
 COPY templates ./templates
+COPY static ./static
 COPY model ./model
 COPY instantclient_11_2 ./instantclient
 
 RUN test -f /app/model/biaochezhajiev2.pt || (echo "Missing model/biaochezhajiev2.pt" >&2; exit 1) \
+    && test -f /app/model/yoloe-26n-seg.pt  || (echo "Missing model/yoloe-26n-seg.pt"  >&2; exit 1) \
     && test -f /app/instantclient/libclntsh.so.11.1 || (echo "Missing Oracle Instant Client files under instantclient_11_2/" >&2; exit 1) \
-    && mkdir -p /app/output
+    && mkdir -p /app/output /app/upload_tmp
 
 EXPOSE 5001
 

@@ -1,14 +1,28 @@
-Flask==3.0.0
-requests==2.31.0
-ultralytics==8.3.226
+# ─── Web framework ────────────────────────────────────────────────────────────
+Flask==3.0.0           # routing, templates, blueprints (werkzeug bundled)
 
-# 与 Python 兼容的稳定版本
+# ─── HTTP client (Oracle tab: download images from intranet URLs) ─────────────
+requests==2.31.0
+
+# ─── YOLO inference engine ────────────────────────────────────────────────────
+ultralytics==8.3.226   # YOLOE open-vocab + custom bczj model
+
+# ─── Numerical / image processing ────────────────────────────────────────────
 numpy==2.0.2
-opencv-python-headless==4.8.0.74
+# opencv-python-headless: cv2 used for video frame extraction (upload tab).
+# headless variant avoids X11/display dependencies on server.
+# Note: ultralytics also pulls in opencv-python; uv lock resolves to
+#   opencv-python==4.12.0.88 — see requirements.lock for the pinned tree.
+opencv-python-headless>=4.8,<5
 Pillow==10.4.0
 
-# 改为 python-oracledb（厚模式可连 11g）
+# ─── Oracle database driver ───────────────────────────────────────────────────
+# python-oracledb thick mode supports Oracle 11g Instant Client (libclntsh).
 oracledb==3.4.0
 
-# 说明：
-# - 不在此处固定 torch/torchvision；在 Dockerfile 中通过指定索引安装（CUDA 12.8 通道）。
+# ─── Notes ────────────────────────────────────────────────────────────────────
+# torch / torchvision are NOT listed here; they are installed separately in the
+# Dockerfile using the PyTorch CPU-only wheel index to keep the image lean.
+# All pinned transitive versions are captured in requirements.lock (uv-generated).
+# YOLO_TELEMETRY=false must be set in the environment (see deploy/app.env.example)
+# to suppress ultralytics PyPI version-check and analytics calls on intranet hosts.
