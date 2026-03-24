@@ -22,7 +22,7 @@ from service.upload_job_service import (
 
 upload_bp = Blueprint("upload", __name__, url_prefix="/upload")
 
-_ALLOWED_EXTS = {".zip", ".mp4", ".avi", ".mov", ".mkv"}
+_ALLOWED_EXTS = {".zip", ".mp4", ".avi", ".mov", ".mkv", ".mpg", ".mpeg"}
 
 
 def _parse_params(form) -> tuple:
@@ -66,7 +66,7 @@ def upload_start():
     filename = secure_filename(file.filename)
     ext = os.path.splitext(filename.lower())[1]
     if ext not in _ALLOWED_EXTS:
-        return jsonify({"ok": False, "error": f"不支持的文件类型 {ext}，请上传 ZIP 或 MP4/AVI/MOV/MKV"}), 400
+        return jsonify({"ok": False, "error": f"不支持的文件类型 {ext}，请上传 ZIP 或 MP4/AVI/MOV/MKV/MPG/MPEG"}), 400
 
     owner_ip = (
         request.headers.get("X-Forwarded-For", "").split(",")[0].strip()

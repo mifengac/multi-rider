@@ -10,6 +10,10 @@ dist/
 output/
 *.log
 *.tmp
+app.env
+offline_bundle/
+wheels/
+pkgs/
 
 META-INF/
 

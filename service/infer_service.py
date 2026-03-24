@@ -5,14 +5,20 @@ from typing import Optional, Set
 import requests
 from PIL import Image
 
-from config import MODEL_REGISTRY
+from config import MOBILECLIP_TS_PATH, MOBILECLIP2_TS_PATH, MODEL_REGISTRY, logger
 
 
 ULTR_ERR = None
 try:
     from ultralytics import YOLO
+    from ultralytics.nn.modules import block as ultralytics_block
+    from ultralytics.nn.modules import head as ultralytics_head
+    from ultralytics.utils import downloads as ultralytics_downloads
 except Exception as exc:
     YOLO = None
+    ultralytics_block = None
+    ultralytics_head = None
+    ultralytics_downloads = None
     ULTR_ERR = str(exc)
 
 
@@ -24,6 +30,83 @@ session = requests.Session()
 session.headers.update(
     {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Python/requests"}
 )
+
+_DOWNLOAD_PATCHED = False
+
+
+def _patch_ultralytics_head_compat() -> None:
+    """Provide aliases for legacy class names embedded in older model files."""
+    if ultralytics_head is None:
+        return
+
+    alias_map = {
+        "YOLOESegment26": ("Segment26", "YOLOESegment", "Segment"),
+        "YOLOSegment26": ("Segment26", "Segment"),
+        "YOLOEDetect26": ("YOLOEDetect", "Detect"),
+        "YOLODetect26": ("Detect",),
+    }
+
+    for missing_name, candidates in alias_map.items():
+        if hasattr(ultralytics_head, missing_name):
+            continue
+        for candidate in candidates:
+            target = getattr(ultralytics_head, candidate, None)
+            if target is not None:
+                setattr(ultralytics_head, missing_name, target)
+                logger.info(
+                    "Applied ultralytics compatibility alias: %s -> %s",
+                    missing_name,
+                    candidate,
+                )
+                break
+
+
+def _patch_ultralytics_block_compat() -> None:
+    """Provide aliases for legacy block names embedded in older model files."""
+    if ultralytics_block is None:
+        return
+
+    alias_map = {
+        "Proto26": ("Proto",),
+    }
+
+    for missing_name, candidates in alias_map.items():
+        if hasattr(ultralytics_block, missing_name):
+            continue
+        for candidate in candidates:
+            target = getattr(ultralytics_block, candidate, None)
+            if target is not None:
+                setattr(ultralytics_block, missing_name, target)
+                logger.info(
+                    "Applied ultralytics compatibility alias: %s -> %s",
+                    missing_name,
+                    candidate,
+                )
+                break
+
+
+def _patch_ultralytics_asset_downloads() -> None:
+    """Resolve MobileCLIP TorchScript assets from local files before downloading."""
+    global _DOWNLOAD_PATCHED
+    if ultralytics_downloads is None or _DOWNLOAD_PATCHED:
+        return
+
+    original_attempt_download_asset = ultralytics_downloads.attempt_download_asset
+    local_assets = {
+        "mobileclip_blt.ts": MOBILECLIP_TS_PATH,
+        "mobileclip2_b.ts": MOBILECLIP2_TS_PATH,
+    }
+
+    def _attempt_download_asset_offline_first(file, *args, **kwargs):
+        asset_name = os.path.basename(str(file))
+        local_path = local_assets.get(asset_name)
+        if local_path and os.path.isfile(local_path):
+            logger.info("Using local text-model asset: %s", local_path)
+            return local_path
+        return original_attempt_download_asset(file, *args, **kwargs)
+
+    ultralytics_downloads.attempt_download_asset = _attempt_download_asset_offline_first
+    _DOWNLOAD_PATCHED = True
 
 
 def _normalize_names(names) -> list[str]:
@@ -63,6 +146,10 @@ def get_model(model_key: str):
             raise RuntimeError(
                 f"ultralytics import failed: {ULTR_ERR or 'not installed or missing dependencies'}"
             )
+
+        _patch_ultralytics_asset_downloads()
+        _patch_ultralytics_head_compat()
+        _patch_ultralytics_block_compat()
 
         model_path = MODEL_REGISTRY[model_key]
         if not os.path.exists(model_path):

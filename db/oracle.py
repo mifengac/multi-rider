@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 from typing import List, Tuple
 
 from config import (
@@ -24,15 +25,41 @@ else:
     cx_oracle = None
 
 
+_ORACLE_CLIENT_READY = False
+
+
+def _prepare_windows_oracle_dll_path() -> None:
+    if os.name != "nt":
+        return
+    if not os.path.isdir(INSTANT_CLIENT_DIR):
+        logger.warning("Oracle Instant Client directory not found: %s", INSTANT_CLIENT_DIR)
+        return
+    try:
+        os.add_dll_directory(INSTANT_CLIENT_DIR)
+        logger.info("Added Oracle DLL directory: %s", INSTANT_CLIENT_DIR)
+    except Exception as exc:
+        logger.warning("Failed to add Oracle DLL directory %s: %s", INSTANT_CLIENT_DIR, exc)
+
+
 def init_oracle_client_if_needed() -> None:
+    global _ORACLE_CLIENT_READY
+    if _ORACLE_CLIENT_READY:
+        return
+
+    _prepare_windows_oracle_dll_path()
+
     if oracledb is not None and hasattr(oracledb, "init_oracle_client"):
         try:
             oracledb.init_oracle_client(lib_dir=INSTANT_CLIENT_DIR)
+            _ORACLE_CLIENT_READY = True
+            logger.info("Oracle client initialized with lib_dir=%s", INSTANT_CLIENT_DIR)
         except Exception as exc:
             logger.warning("init_oracle_client failed: %s", exc)
     elif cx_oracle is not None:
         try:
             cx_oracle.init_oracle_client(lib_dir=INSTANT_CLIENT_DIR)
+            _ORACLE_CLIENT_READY = True
+            logger.info("cx_Oracle client initialized with lib_dir=%s", INSTANT_CLIENT_DIR)
         except Exception as exc:
             logger.warning("cx_Oracle init failed: %s", exc)
 

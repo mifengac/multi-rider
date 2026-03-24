@@ -6,6 +6,8 @@ requests==2.31.0
 
 # ─── YOLO inference engine ────────────────────────────────────────────────────
 ultralytics==8.3.226   # YOLOE open-vocab + custom bczj model
+# YOLOE models import the `clip` module at runtime for text embeddings.
+git+https://github.com/ultralytics/CLIP.git
 
 # ─── Numerical / image processing ────────────────────────────────────────────
 numpy==2.0.2
