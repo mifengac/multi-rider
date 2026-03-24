@@ -3,7 +3,15 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
-from config import BATCH_SIZE, CONF_THRESH, IMGSZ, MODEL_DEFAULT, MODEL_REGISTRY
+from config import (
+    BATCH_SIZE,
+    CONF_THRESH,
+    IMGSZ,
+    MODEL_DEFAULT,
+    MODEL_REGISTRY,
+    get_upload_model_default,
+    get_upload_model_options,
+)
 from db.oracle import fetch_image_urls
 from db.sqlite import get_job as get_saved_job
 from db.sqlite import list_jobs as list_saved_jobs
@@ -79,6 +87,8 @@ def index():
         batch_default=BATCH_SIZE,
         imgsz_default=IMGSZ,
         model_default=MODEL_DEFAULT,
+        upload_model_default=get_upload_model_default(),
+        upload_models=get_upload_model_options(),
     )
 
 

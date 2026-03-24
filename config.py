@@ -3,6 +3,10 @@ import os
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(BASE_DIR, "model")
+UPLOAD_MODEL_EXTS = {".pt"}
+PROMPT_MODEL_DEFAULT_CLASSES = "person,motorcycle,bicycle,car,bus,truck"
+PROMPT_MODEL_DEFAULT_CONF = 0.10
 
 
 def _resolve_path(path_value: str) -> str:
@@ -43,7 +47,7 @@ INSTANT_CLIENT_DIR = _resolve_path(os.getenv("ORACLE_IC_DIR", os.path.join(BASE_
 
 
 def _resolve_model_path(default_filename: str, *env_names: str) -> str:
-    project_model_path = os.path.join(BASE_DIR, "model", default_filename)
+    project_model_path = os.path.join(MODEL_DIR, default_filename)
     for env_name in env_names:
         env_value = (os.getenv(env_name, "") or "").strip()
         if not env_value:
@@ -55,9 +59,27 @@ def _resolve_model_path(default_filename: str, *env_names: str) -> str:
     return os.path.abspath(project_model_path)
 
 
+def _resolve_model_path_candidates(default_filenames: tuple[str, ...], *env_names: str) -> str:
+    for env_name in env_names:
+        env_value = (os.getenv(env_name, "") or "").strip()
+        if not env_value:
+            continue
+        candidate = _resolve_path(env_value)
+        if os.path.isfile(candidate):
+            return os.path.abspath(candidate)
+        return os.path.abspath(candidate)
+
+    for default_filename in default_filenames:
+        candidate = os.path.join(MODEL_DIR, default_filename)
+        if os.path.isfile(candidate):
+            return os.path.abspath(candidate)
+
+    return os.path.abspath(os.path.join(MODEL_DIR, default_filenames[0]))
+
+
 MODEL_REGISTRY = {
     "bczj": _resolve_model_path("biaochezhajiev2.pt", "MODEL_PATH_BCZJ", "MODEL_PATH"),
-    "general": _resolve_model_path("yoloe-26n-seg.pt", "MODEL_PATH_GENERAL"),
+    "general": _resolve_model_path_candidates(("yoloe-26s-seg.pt", "yoloe-26n-seg.pt"), "MODEL_PATH_GENERAL"),
 }
 MOBILECLIP_TS_PATH = _resolve_model_path("mobileclip_blt.ts", "MOBILECLIP_TS_PATH")
 MOBILECLIP2_TS_PATH = _resolve_model_path("mobileclip2_b.ts", "MOBILECLIP2_TS_PATH")
@@ -82,6 +104,126 @@ FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
 APP_PORT = int(os.getenv("APP_PORT", "5001"))
 
+
+def _is_prompt_model_name(model_name: str) -> bool:
+    lower = os.path.basename(model_name).lower()
+    return "yoloe" in lower or ("yolo" in lower and "world" in lower)
+
+
+def model_supports_text_prompt(model_key: str) -> bool:
+    key = (model_key or "").strip()
+    if key == "general":
+        return True
+    if key == "bczj":
+        return False
+    return _is_prompt_model_name(key)
+
+
+def list_upload_model_paths() -> dict[str, str]:
+    registry: dict[str, str] = {}
+
+    def _register(path: str | None) -> None:
+        if not path or not os.path.isfile(path):
+            return
+        model_name = os.path.basename(path)
+        if os.path.splitext(model_name)[1].lower() not in UPLOAD_MODEL_EXTS:
+            return
+        registry.setdefault(model_name, os.path.abspath(path))
+
+    _register(MODEL_REGISTRY.get("general"))
+    _register(MODEL_REGISTRY.get("bczj"))
+
+    if os.path.isdir(MODEL_DIR):
+        for entry in sorted(os.listdir(MODEL_DIR), key=str.lower):
+            _register(os.path.join(MODEL_DIR, entry))
+
+    return registry
+
+
+def resolve_model_path(model_key: str) -> str:
+    key = (model_key or "").strip()
+    if key in MODEL_REGISTRY:
+        return MODEL_REGISTRY[key]
+
+    registry = list_upload_model_paths()
+    if key in registry:
+        return registry[key]
+
+    normalized_key = os.path.basename(key).lower()
+    for model_name, model_path in registry.items():
+        if model_name.lower() == normalized_key:
+            return model_path
+
+    raise ValueError(f"unsupported model key: {model_key}")
+
+
+def get_upload_model_default() -> str:
+    registry = list_upload_model_paths()
+    if not registry:
+        return ""
+
+    preferred_names = [
+        os.path.basename(MODEL_REGISTRY.get("general", "")),
+        "yoloe-26s-seg.pt",
+        "yoloe-26n-seg.pt",
+        "yolov8s-worldv2.pt",
+        os.path.basename(MODEL_REGISTRY.get("bczj", "")),
+    ]
+    name_lookup = {name.lower(): name for name in registry}
+    for preferred in preferred_names:
+        if preferred and preferred.lower() in name_lookup:
+            return name_lookup[preferred.lower()]
+
+    prompt_models = [name for name in registry if model_supports_text_prompt(name)]
+    if prompt_models:
+        return sorted(prompt_models, key=str.lower)[0]
+    return sorted(registry, key=str.lower)[0]
+
+
+def _upload_model_description(model_name: str) -> str:
+    lower = model_name.lower()
+    if lower == "biaochezhajiev2.pt":
+        return "飙车炸街专用模型，适合类别过滤。"
+    if "yoloe" in lower:
+        return "YOLOE 开放词表模型，支持英文提示词。"
+    if "yolo" in lower and "world" in lower:
+        return "YOLO-World 开放词表模型，支持英文提示词。"
+    return "自定义检测模型。"
+
+
+def get_upload_model_options() -> list[dict[str, object]]:
+    registry = list_upload_model_paths()
+    if not registry:
+        return []
+
+    preferred_rank = {
+        os.path.basename(MODEL_REGISTRY.get("general", "")).lower(): 0,
+        "yoloe-26s-seg.pt": 1,
+        "yoloe-26n-seg.pt": 2,
+        "yolov8s-worldv2.pt": 3,
+        os.path.basename(MODEL_REGISTRY.get("bczj", "")).lower(): 10,
+    }
+
+    def _sort_key(model_name: str) -> tuple[int, str]:
+        return preferred_rank.get(model_name.lower(), 50), model_name.lower()
+
+    options: list[dict[str, object]] = []
+    for model_name in sorted(registry, key=_sort_key):
+        is_prompt = model_supports_text_prompt(model_name)
+        options.append(
+            {
+                "value": model_name,
+                "label": model_name,
+                "short_label": model_name,
+                "description": _upload_model_description(model_name),
+                "ui_mode": "prompt" if is_prompt else "filter",
+                "default_conf": PROMPT_MODEL_DEFAULT_CONF if is_prompt else CONF_THRESH,
+                "default_classes": PROMPT_MODEL_DEFAULT_CLASSES if is_prompt else "",
+            }
+        )
+
+    return options
+
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(UPLOAD_TEMP_DIR, exist_ok=True)
 
@@ -92,3 +234,9 @@ os.environ.setdefault("YOLO_TELEMETRY", "false")
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("multi_rider")
+
+if os.path.basename(MODEL_REGISTRY["general"]).lower() != "yoloe-26s-seg.pt":
+    logger.warning(
+        "Preferred general model yoloe-26s-seg.pt is not active; currently using %s",
+        MODEL_REGISTRY["general"],
+    )

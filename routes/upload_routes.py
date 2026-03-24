@@ -8,9 +8,13 @@ from config import (
     BATCH_SIZE,
     CONF_THRESH,
     IMGSZ,
-    MODEL_DEFAULT,
+    PROMPT_MODEL_DEFAULT_CLASSES,
+    PROMPT_MODEL_DEFAULT_CONF,
     UPLOAD_TEMP_DIR,
     VIDEO_FRAME_INTERVAL,
+    get_upload_model_default,
+    model_supports_text_prompt,
+    resolve_model_path,
 )
 from service.upload_job_service import (
     get_upload_job_snapshot,
@@ -27,17 +31,18 @@ _ALLOWED_EXTS = {".zip", ".mp4", ".avi", ".mov", ".mkv", ".mpg", ".mpeg"}
 
 def _parse_params(form) -> tuple:
     """Parse and validate common detection parameters from a form dict."""
+    model_key = (form.get("model_key", "") or "").strip() or get_upload_model_default()
     conf_in = (form.get("conf", "") or "").strip()
     batch_in = (form.get("batch_size", "") or "").strip()
     imgsz_in = (form.get("imgsz", "") or "").strip()
-    model_key = (form.get("model_key", MODEL_DEFAULT) or MODEL_DEFAULT).strip()
     classes_raw = (form.get("classes", "") or "").strip()
     frame_interval_in = (form.get("frame_interval", "") or "").strip()
+    default_conf = PROMPT_MODEL_DEFAULT_CONF if model_supports_text_prompt(model_key) else CONF_THRESH
 
     try:
-        conf = max(0.01, min(1.0, float(conf_in))) if conf_in else CONF_THRESH
+        conf = max(0.01, min(1.0, float(conf_in))) if conf_in else default_conf
     except ValueError:
-        conf = CONF_THRESH
+        conf = default_conf
     try:
         batch_size = max(1, min(64, int(batch_in))) if batch_in else BATCH_SIZE
     except ValueError:
@@ -50,6 +55,9 @@ def _parse_params(form) -> tuple:
         frame_interval = max(1, min(60, int(frame_interval_in))) if frame_interval_in else VIDEO_FRAME_INTERVAL
     except ValueError:
         frame_interval = VIDEO_FRAME_INTERVAL
+
+    if model_supports_text_prompt(model_key) and not classes_raw:
+        classes_raw = PROMPT_MODEL_DEFAULT_CLASSES
 
     return conf, batch_size, imgsz, classes_raw, model_key, frame_interval
 
@@ -74,6 +82,10 @@ def upload_start():
         or ""
     )
     conf, batch_size, imgsz, classes_raw, model_key, frame_interval = _parse_params(request.form)
+    try:
+        resolve_model_path(model_key)
+    except Exception:
+        return jsonify({"ok": False, "error": f"未找到可用模型: {model_key}"}), 400
 
     if ext == ".zip":
         file_bytes = file.read()

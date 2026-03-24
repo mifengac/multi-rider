@@ -14,11 +14,12 @@ from config import (
     BATCH_SIZE,
     CONF_THRESH,
     IMGSZ,
-    MODEL_DEFAULT,
     OUTPUT_DIR,
+    get_upload_model_default,
     UPLOAD_TEMP_DIR,
     VIDEO_FRAME_INTERVAL,
     logger,
+    model_supports_text_prompt,
 )
 from service.infer_service import _predict_batch, get_model
 
@@ -65,7 +66,7 @@ def _new_upload_job(total: int, source_name: str, source_type: str) -> dict:
         "batch_size": BATCH_SIZE,
         "imgsz": IMGSZ,
         "classes_raw": "",
-        "model_key": MODEL_DEFAULT,
+        "model_key": get_upload_model_default(),
         "owner_ip": "",
         "cancel": threading.Event(),
     }
@@ -97,7 +98,7 @@ def _run_upload_job(
         allowed_classes: Optional[Set[int]] = None
         prompt_classes: list[str] | None = None
 
-        if model_key == "general":
+        if model_supports_text_prompt(model_key):
             prompt_classes = [t.strip() for t in classes_raw.split(",") if t.strip()] or None
         else:
             names = getattr(model, "names", None)

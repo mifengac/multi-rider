@@ -15,7 +15,7 @@
 
 | key | 文件 | 说明 |
 |---|---|---|
-| `general` | `model/yoloe-26n-seg.pt` | YOLOE 开放词表，支持英文提示词（留空=自动检测） |
+| `general` | `model/yoloe-26s-seg.pt` | YOLOE 开放词表，支持英文提示词（留空=自动检测） |
 | `bczj` | `model/biaochezhajiev2.pt` | 私有训练模型，针对飙车炸街场景，支持类别索引过滤 |
 
 > **注意**：模型文件不随仓库提交，需手动放入 `model/` 目录。
@@ -86,7 +86,7 @@ multi-rider/
 - Python 3.10 或以上（推荐通过官网离线安装包安装）
 - Oracle Instant Client **Windows 版**（`.dll` 文件），解压到 `instantclient_11_2\`
   - 需包含 `oci.dll`、`oraocci11.dll`、`oraociei11.dll` 等
-- 模型文件已放入 `model\`：`biaochezhajiev2.pt`、`yoloe-26n-seg.pt`
+- 模型文件已放入 `model\`：`biaochezhajiev2.pt`、`yoloe-26s-seg.pt`
 - `static\tailwind.min.js` 已存在（已包含在仓库）
 - 建议使用 [uv](https://github.com/astral-sh/uv) 管理虚拟环境（也可用标准 `venv`）
 
@@ -163,7 +163,7 @@ http://本机IP:5001/
 
 ### 前提条件（构建机，需能访问互联网或清华镜像源）
 
-1. `model/biaochezhajiev2.pt` 和 `model/yoloe-26n-seg.pt` 已放入 `model/`
+1. `model/biaochezhajiev2.pt` 和 `model/yoloe-26s-seg.pt` 已放入 `model/`
 2. Oracle Instant Client **Linux 版**（`.so` 文件），解压到 `instantclient_11_2/`
    - 需包含 `libclntsh.so.11.1`
 3. `static/tailwind.min.js` 已存在（已包含在仓库）

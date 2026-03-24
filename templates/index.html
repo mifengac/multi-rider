@@ -20,18 +20,49 @@
         label: '类别过滤',
         placeholder: '0,1,2 或类别名',
         help: '按索引或类别名过滤飙车炸街模型结果；留空表示不过滤。',
+        uploadDefaultConf: 0.80,
         presets: []
       },
       general: {
         label: '检测提示词',
-        placeholder: 'motorcycle, person, helmet（留空 = 检测所有）',
-        help: '英文逗号分隔。留空时使用 YOLOE 无提示模式，自动检测开放词表中的目标。',
+        placeholder: 'person, motorcycle, bicycle, car, bus, truck',
+        help: '英文逗号分隔。本地上传检测建议优先使用交通场景提示词组合，以提高 YOLOE 命中率。',
+        uploadDefaultConf: 0.10,
         presets: [
+          { label: '交通场景', value: 'person,motorcycle,bicycle,car,bus,truck' },
           { label: '摩托车', value: 'motorcycle' },
           { label: '未戴头盔', value: 'motorcycle, person, helmet' },
           { label: '人员', value: 'person' }
         ]
       }
+    };
+
+    const UPLOAD_MODEL_OPTIONS = {{ upload_models | tojson }};
+    const UPLOAD_MODEL_MAP = Object.fromEntries(
+      UPLOAD_MODEL_OPTIONS.map(function (item) {
+        return [item.value, item];
+      })
+    );
+    const UPLOAD_PROMPT_UI = {
+      label: '检测提示词',
+      placeholder: 'person, motorcycle, bicycle, car, bus, truck',
+      help: '英文逗号分隔。开放词表模型可直接输入要检测的英文提示词。',
+      uploadDefaultConf: 0.10,
+      defaultClasses: 'person,motorcycle,bicycle,car,bus,truck',
+      presets: [
+        { label: '交通场景', value: 'person,motorcycle,bicycle,car,bus,truck' },
+        { label: '反光衣人员', value: 'person wearing reflective vest,worker in reflective vest,traffic police in reflective vest' },
+        { label: '摩托车', value: 'motorcycle' },
+        { label: '人员', value: 'person' }
+      ]
+    };
+    const UPLOAD_FILTER_UI = {
+      label: '类别过滤',
+      placeholder: '0,1,2 或类别名',
+      help: '自定义模型使用类别索引或类别名过滤，留空表示不过滤。',
+      uploadDefaultConf: 0.80,
+      defaultClasses: '',
+      presets: []
     };
 
     const STATUS_UI = {
@@ -43,6 +74,9 @@
     };
 
     function modelDisplay(modelKey) {
+      if (UPLOAD_MODEL_MAP[modelKey] && UPLOAD_MODEL_MAP[modelKey].short_label) {
+        return UPLOAD_MODEL_MAP[modelKey].short_label;
+      }
       return modelKey === 'bczj' ? '飙车炸街' : '通用';
     }
 
@@ -93,6 +127,20 @@
           input.focus();
         });
       });
+    }
+
+    function getUploadModelConfig(modelKey) {
+      var meta = UPLOAD_MODEL_MAP[modelKey] || null;
+      var base = meta && meta.ui_mode === 'filter' ? UPLOAD_FILTER_UI : UPLOAD_PROMPT_UI;
+      return {
+        label: base.label,
+        placeholder: base.placeholder,
+        help: meta && meta.description ? meta.description : base.help,
+        uploadDefaultConf: meta && typeof meta.default_conf === 'number' ? meta.default_conf : base.uploadDefaultConf,
+        defaultClasses: meta && meta.default_classes ? meta.default_classes : base.defaultClasses,
+        presets: base.presets || [],
+        uiMode: meta && meta.ui_mode ? meta.ui_mode : 'prompt'
+      };
     }
 
     function formatPercent(processed, total) {
@@ -294,17 +342,63 @@
       try { localStorage.setItem('bczj_active_tab', tab); } catch (e) {}
     }
 
+    function populateUploadModelSelect() {
+      var select = document.getElementById('uploadModelKey');
+      if (!select) return;
+      if (!UPLOAD_MODEL_OPTIONS.length) {
+        select.innerHTML = '<option value="" selected>未发现可用模型</option>';
+        select.disabled = true;
+        return;
+      }
+      select.disabled = false;
+      select.innerHTML = UPLOAD_MODEL_OPTIONS.map(function (item) {
+        return '<option value="' + item.value + '">' + item.label + '</option>';
+      }).join('');
+      var defaultValue = '{{ upload_model_default }}';
+      if (defaultValue && UPLOAD_MODEL_MAP[defaultValue]) {
+        select.value = defaultValue;
+      }
+      if (!select.value && UPLOAD_MODEL_OPTIONS[0]) {
+        select.value = UPLOAD_MODEL_OPTIONS[0].value;
+      }
+    }
+
     function applyUploadModelUI() {
       var modelKey = document.getElementById('uploadModelKey').value;
-      var config = MODEL_UI[modelKey] || MODEL_UI.general;
+      var meta = UPLOAD_MODEL_MAP[modelKey] || null;
+      var config = getUploadModelConfig(modelKey);
       var label = document.getElementById('uploadClassesLabel');
       var input = document.getElementById('uploadClasses');
       var help = document.getElementById('uploadClassesHelp');
+      var modelHint = document.getElementById('uploadModelHint');
+      if (!modelHint) {
+        modelHint = document.createElement('p');
+        modelHint.id = 'uploadModelHint';
+        modelHint.className = 'mt-2 text-xs leading-6 text-slate-500';
+        document.getElementById('uploadModelKey').insertAdjacentElement('afterend', modelHint);
+      }
       var panel = document.getElementById('uploadPresetPanel');
       var box = document.getElementById('uploadPresetButtons');
+      var confRange = document.getElementById('uploadConfRange');
+      var confValue = document.getElementById('uploadConfValue');
+      var previousMode = input.dataset.uiMode || '';
+      var nextMode = config.uiMode || 'prompt';
       label.textContent = config.label;
       input.placeholder = config.placeholder;
       help.textContent = config.help;
+      if (modelHint) {
+        modelHint.textContent = meta && meta.description ? meta.description : '';
+      }
+      confRange.value = Number(config.uploadDefaultConf || 0.80).toFixed(2);
+      confValue.textContent = confRange.value;
+      if (nextMode === 'prompt') {
+        if (!input.value.trim() || previousMode !== 'prompt') {
+          input.value = config.defaultClasses || '';
+        }
+      } else if (previousMode !== 'filter') {
+        input.value = '';
+      }
+      input.dataset.uiMode = nextMode;
       if (config.presets.length === 0) {
         panel.classList.add('hidden');
         box.innerHTML = '';
@@ -330,7 +424,7 @@
       var file = input.files && input.files[0];
       if (!file) return;
       var ext = file.name.split('.').pop().toLowerCase();
-      var isVideo = ['mp4', 'avi', 'mov', 'mkv'].includes(ext);
+      var isVideo = ['mp4', 'avi', 'mov', 'mkv', 'mpg', 'mpeg'].includes(ext);
       document.getElementById('uploadFileName').textContent = file.name;
       document.getElementById('uploadFileSize').textContent = (file.size / 1024 / 1024).toFixed(1) + ' MB';
       document.getElementById('uploadFileInfo').classList.remove('hidden');
@@ -383,15 +477,20 @@
     function startUploadJob(event) {
       if (event) event.preventDefault();
       var fileInput = document.getElementById('uploadFile');
+      var modelSelect = document.getElementById('uploadModelKey');
       if (!fileInput.files || !fileInput.files[0]) {
         alert('请先选择文件');
+        return false;
+      }
+      if (!modelSelect || !modelSelect.value) {
+        alert('未发现可用模型');
         return false;
       }
       var form = document.getElementById('uploadForm');
       var data = new FormData(form);
       document.getElementById('uploadProgressBox').classList.remove('hidden');
       document.getElementById('uploadDownloadLinks').classList.add('hidden');
-      setUploadProgressState({ status: 'running', total: 0, processed: 0, kept: 0 });
+      setUploadProgressState({ status: 'running', total: 0, processed: 0, kept: 0, model_key: document.getElementById('uploadModelKey').value });
       fetch('/upload/start', { method: 'POST', body: data })
         .then(function (resp) { return resp.json(); })
         .then(function (payload) {
@@ -446,6 +545,7 @@
       refreshJobs();
 
       // Upload tab init
+      populateUploadModelSelect();
       document.getElementById('uploadModelKey').addEventListener('change', applyUploadModelUI);
       document.getElementById('uploadConfRange').addEventListener('input', syncUploadConfValue);
       applyUploadModelUI();
@@ -715,7 +815,7 @@
                 </svg>
                 <span class="mt-4 text-sm font-medium text-slate-600 group-hover:text-teal-700">点击选择文件，或将文件拖放至此</span>
                 <span class="mt-1 text-xs text-slate-400">.zip（图片包）· .mp4 / .avi / .mov（视频）</span>
-                <input id="uploadFile" name="file" type="file" accept=".zip,.mp4,.avi,.mov,.mkv" class="hidden" onchange="onUploadFileChange(this)" />
+                <input id="uploadFile" name="file" type="file" accept=".zip,.mp4,.avi,.mov,.mkv,.mpg,.mpeg" class="hidden" onchange="onUploadFileChange(this)" />
               </label>
               <div id="uploadFileInfo" class="hidden mt-4 flex items-center gap-3 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3">
                 <svg class="h-5 w-5 flex-shrink-0 text-teal-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -768,9 +868,9 @@
               <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
                 <div class="flex items-center justify-between">
                   <label for="uploadConfRange" class="text-sm font-medium text-slate-700">置信度阈值</label>
-                  <span id="uploadConfValue" class="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">0.80</span>
+                  <span id="uploadConfValue" class="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">0.10</span>
                 </div>
-                <input type="range" id="uploadConfRange" name="conf" min="0" max="1" step="0.01" value="0.80"
+                <input type="range" id="uploadConfRange" name="conf" min="0" max="1" step="0.01" value="0.10"
                   class="mt-4 h-2 w-full cursor-pointer accent-teal-600" />
                 <div class="mt-2 flex justify-between text-xs text-slate-400"><span>0.00</span><span>1.00</span></div>
               </div>

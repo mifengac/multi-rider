@@ -5,7 +5,13 @@ from typing import Optional, Set
 import requests
 from PIL import Image
 
-from config import MOBILECLIP_TS_PATH, MOBILECLIP2_TS_PATH, MODEL_REGISTRY, logger
+from config import (
+    MOBILECLIP_TS_PATH,
+    MOBILECLIP2_TS_PATH,
+    logger,
+    model_supports_text_prompt,
+    resolve_model_path,
+)
 
 
 ULTR_ERR = None
@@ -32,6 +38,10 @@ session.headers.update(
 )
 
 _DOWNLOAD_PATCHED = False
+
+
+def _model_cache_key(model_key: str) -> str:
+    return os.path.normcase(os.path.abspath(resolve_model_path(model_key)))
 
 
 def _patch_ultralytics_head_compat() -> None:
@@ -134,11 +144,10 @@ def _ensure_general_prompt_state(model, prompt_classes: list[str] | None) -> Non
 
 
 def get_model(model_key: str):
-    if model_key not in MODEL_REGISTRY:
-        raise ValueError(f"unsupported model key: {model_key}")
+    cache_key = _model_cache_key(model_key)
 
     with _CACHE_LOCK:
-        model = _MODEL_CACHE.get(model_key)
+        model = _MODEL_CACHE.get(cache_key)
         if model is not None:
             return model
 
@@ -151,18 +160,18 @@ def get_model(model_key: str):
         _patch_ultralytics_head_compat()
         _patch_ultralytics_block_compat()
 
-        model_path = MODEL_REGISTRY[model_key]
+        model_path = resolve_model_path(model_key)
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"model file not found: {model_path}")
 
         model = YOLO(model_path)
-        if model_key == "general":
+        if model_supports_text_prompt(model_key):
             default_classes = tuple(_normalize_names(getattr(model, "names", [])))
             model._codex_default_classes = default_classes
             model._codex_active_classes = default_classes
 
-        _MODEL_CACHE[model_key] = model
-        _MODEL_LOCKS.setdefault(model_key, threading.Lock())
+        _MODEL_CACHE[cache_key] = model
+        _MODEL_LOCKS.setdefault(cache_key, threading.Lock())
         return model
 
 
@@ -194,9 +203,9 @@ def _predict_batch(
     model_key: str,
     prompt_classes: list[str] | None = None,
 ) -> list[bool]:
-    model_lock = _MODEL_LOCKS.setdefault(model_key, threading.Lock())
+    model_lock = _MODEL_LOCKS.setdefault(_model_cache_key(model_key), threading.Lock())
     with model_lock:
-        if model_key == "general":
+        if model_supports_text_prompt(model_key):
             _ensure_general_prompt_state(model, prompt_classes)
 
         results = model.predict(images, conf=min(conf_thresh, 0.25), imgsz=imgsz, verbose=False)
