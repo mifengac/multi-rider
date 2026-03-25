@@ -53,6 +53,19 @@ DATASET_COLUMNS = (
     "updated_ts",
 )
 
+DATASET_ASSET_COLUMNS = (
+    "id",
+    "dataset_id",
+    "filename",
+    "origin_name",
+    "source_type",
+    "file_path",
+    "width",
+    "height",
+    "size_bytes",
+    "created_ts",
+)
+
 
 def _connect() -> sqlite3.Connection:
     parent = os.path.dirname(SQLITE_DB_PATH)
@@ -115,6 +128,12 @@ def _row_to_dataset(row: sqlite3.Row | None) -> dict[str, Any] | None:
 
     dataset["class_names"] = class_names
     return dataset
+
+
+def _row_to_dataset_asset(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    if row is None:
+        return None
+    return {column: row[column] for column in DATASET_ASSET_COLUMNS}
 
 
 def init_db() -> None:
@@ -227,6 +246,44 @@ def init_db() -> None:
             conn.execute("ALTER TABLE datasets ADD COLUMN updated_ts INTEGER NOT NULL DEFAULT 0")
 
         conn.execute("CREATE INDEX IF NOT EXISTS idx_datasets_updated_ts ON datasets(updated_ts DESC)")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dataset_assets (
+                id TEXT PRIMARY KEY,
+                dataset_id TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                origin_name TEXT NOT NULL,
+                source_type TEXT NOT NULL DEFAULT 'zip',
+                file_path TEXT NOT NULL,
+                width INTEGER NOT NULL DEFAULT 0,
+                height INTEGER NOT NULL DEFAULT 0,
+                size_bytes INTEGER NOT NULL DEFAULT 0,
+                created_ts INTEGER NOT NULL,
+                FOREIGN KEY(dataset_id) REFERENCES datasets(id)
+            )
+            """
+        )
+
+        asset_columns = _existing_columns(conn, "dataset_assets")
+        if "origin_name" not in asset_columns:
+            conn.execute("ALTER TABLE dataset_assets ADD COLUMN origin_name TEXT NOT NULL DEFAULT ''")
+        if "source_type" not in asset_columns:
+            conn.execute("ALTER TABLE dataset_assets ADD COLUMN source_type TEXT NOT NULL DEFAULT 'zip'")
+        if "file_path" not in asset_columns:
+            conn.execute("ALTER TABLE dataset_assets ADD COLUMN file_path TEXT NOT NULL DEFAULT ''")
+        if "width" not in asset_columns:
+            conn.execute("ALTER TABLE dataset_assets ADD COLUMN width INTEGER NOT NULL DEFAULT 0")
+        if "height" not in asset_columns:
+            conn.execute("ALTER TABLE dataset_assets ADD COLUMN height INTEGER NOT NULL DEFAULT 0")
+        if "size_bytes" not in asset_columns:
+            conn.execute("ALTER TABLE dataset_assets ADD COLUMN size_bytes INTEGER NOT NULL DEFAULT 0")
+        if "created_ts" not in asset_columns:
+            conn.execute("ALTER TABLE dataset_assets ADD COLUMN created_ts INTEGER NOT NULL DEFAULT 0")
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dataset_assets_dataset_created_ts ON dataset_assets(dataset_id, created_ts DESC)"
+        )
         conn.commit()
 
 
@@ -365,6 +422,72 @@ def get_dataset(dataset_id: str) -> dict[str, Any] | None:
     with _connect() as conn:
         row = conn.execute("SELECT * FROM datasets WHERE id = ?", (dataset_id,)).fetchone()
     return _row_to_dataset(row)
+
+
+def save_dataset_asset(asset: dict[str, Any]) -> None:
+    payload = {
+        "id": asset.get("id", ""),
+        "dataset_id": asset.get("dataset_id", ""),
+        "filename": asset.get("filename", ""),
+        "origin_name": asset.get("origin_name", ""),
+        "source_type": asset.get("source_type", "zip"),
+        "file_path": asset.get("file_path", ""),
+        "width": int(asset.get("width") or 0),
+        "height": int(asset.get("height") or 0),
+        "size_bytes": int(asset.get("size_bytes") or 0),
+        "created_ts": int(asset.get("created_ts") or 0),
+    }
+
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO dataset_assets (
+                id, dataset_id, filename, origin_name, source_type, file_path,
+                width, height, size_bytes, created_ts
+            )
+            VALUES (
+                :id, :dataset_id, :filename, :origin_name, :source_type, :file_path,
+                :width, :height, :size_bytes, :created_ts
+            )
+            ON CONFLICT(id) DO UPDATE SET
+                dataset_id = excluded.dataset_id,
+                filename = excluded.filename,
+                origin_name = excluded.origin_name,
+                source_type = excluded.source_type,
+                file_path = excluded.file_path,
+                width = excluded.width,
+                height = excluded.height,
+                size_bytes = excluded.size_bytes,
+                created_ts = excluded.created_ts
+            """,
+            payload,
+        )
+        conn.commit()
+
+
+def count_dataset_assets(dataset_id: str) -> int:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS total FROM dataset_assets WHERE dataset_id = ?",
+            (dataset_id,),
+        ).fetchone()
+    return int(row["total"] if row is not None else 0)
+
+
+def list_dataset_assets(dataset_id: str, limit: int = 100) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(int(limit or 100), 500))
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM dataset_assets
+            WHERE dataset_id = ?
+            ORDER BY created_ts DESC, id DESC
+            LIMIT ?
+            """,
+            (dataset_id, safe_limit),
+        ).fetchall()
+    return [_row_to_dataset_asset(row) for row in rows if row is not None]
 
 
 def list_datasets(limit: int = 100) -> list[dict[str, Any]]:

@@ -540,10 +540,27 @@
       fetch('/upload/cancel/' + jobId, { method: 'POST' }).catch(function () {});
     }
 
-    const TRAIN_DATASET_STATE = { items: [], loading: false };
+    const TRAIN_DATASET_STATE = { items: [], loading: false, importing: false };
 
     function setTrainDatasetFeedback(message, tone) {
       var box = document.getElementById('trainDatasetFeedback');
+      if (!box) return;
+      if (!message) {
+        box.className = 'hidden';
+        box.textContent = '';
+        return;
+      }
+      box.textContent = message;
+      box.className = 'rounded-2xl border px-4 py-3 text-sm';
+      if (tone === 'error') {
+        box.classList.add('border-rose-200', 'bg-rose-50', 'text-rose-700');
+      } else {
+        box.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700');
+      }
+    }
+
+    function setTrainImportFeedback(message, tone) {
+      var box = document.getElementById('trainImportFeedback');
       if (!box) return;
       if (!message) {
         box.className = 'hidden';
@@ -573,11 +590,48 @@
       });
     }
 
+    function renderTrainDatasetOptions(items) {
+      var select = document.getElementById('trainImportDataset');
+      var fileInput = document.getElementById('trainImportFile');
+      var submitBtn = document.getElementById('trainImportSubmit');
+      if (!select) return;
+
+      var previousValue = select.value;
+      var hasItems = !!(items && items.length);
+      if (!hasItems) {
+        select.innerHTML = '<option value="">请先创建数据集</option>';
+        select.disabled = true;
+        if (fileInput) {
+          fileInput.disabled = true;
+          fileInput.value = '';
+        }
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+      }
+
+      select.innerHTML = items.map(function (item) {
+        return '<option value="' + escapeHtml(item.id || '') + '">' + escapeHtml(item.name || item.id || '') + '</option>';
+      }).join('');
+
+      var matched = items.some(function (item) {
+        return item.id === previousValue;
+      });
+      if (matched) {
+        select.value = previousValue;
+      } else if (items[0]) {
+        select.value = items[0].id;
+      }
+
+      select.disabled = false;
+      if (fileInput) fileInput.disabled = false;
+      if (submitBtn) submitBtn.disabled = TRAIN_DATASET_STATE.importing;
+    }
+
     function renderTrainDatasets(items) {
       var box = document.getElementById('trainDatasetList');
       if (!box) return;
       if (!items || !items.length) {
-        box.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">暂无数据集。创建后可继续做 ZIP 导入、历史结果回流和标注。</div>';
+        box.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">暂无数据集。先创建一个数据集，再继续做 ZIP 导入、历史结果回流和标注。</div>';
         return;
       }
 
@@ -585,6 +639,27 @@
         var classBadges = (item.class_names || []).map(function (name) {
           return '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200">' + escapeHtml(name) + '</span>';
         }).join('');
+        if (!classBadges) {
+          classBadges = '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-200">未设置类别</span>';
+        }
+
+        var recentAssets = item.recent_assets || [];
+        var previewGrid = recentAssets.map(function (asset) {
+          var imageUrl = asset.asset_url || '#';
+          var assetName = asset.origin_name || asset.filename || 'image';
+          return (
+            '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noreferrer" class="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-sm">' +
+              '<div class="aspect-[4/3] overflow-hidden bg-slate-100">' +
+                '<img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(assetName) + '" loading="lazy" class="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]" />' +
+              '</div>' +
+              '<div class="px-3 py-3">' +
+                '<div class="truncate text-sm font-medium text-slate-800">' + escapeHtml(assetName) + '</div>' +
+                '<div class="mt-1 text-xs text-slate-500">' + escapeHtml(asset.width || 0) + ' × ' + escapeHtml(asset.height || 0) + ' · ' + escapeHtml(formatBytes(asset.size_bytes || 0)) + '</div>' +
+              '</div>' +
+            '</a>'
+          );
+        }).join('');
+
         var updatedAt = item.updated_ts ? new Date(item.updated_ts * 1000).toLocaleString('zh-CN') : '--';
         return (
           '<div class="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-200/60">' +
@@ -609,6 +684,15 @@
               '<span>更新时间：' + escapeHtml(updatedAt) + '</span>' +
               '<span class="break-all">目录：' + escapeHtml(item.root_dir || '') + '</span>' +
             '</div>' +
+            '<div class="mt-5 border-t border-slate-100 pt-5">' +
+              '<div class="flex items-center justify-between gap-3">' +
+                '<div class="text-sm font-semibold text-slate-800">最近导入</div>' +
+                '<div class="text-xs text-slate-400">显示最近 ' + escapeHtml(recentAssets.length || 0) + ' 张</div>' +
+              '</div>' +
+              (previewGrid
+                ? '<div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">' + previewGrid + '</div>'
+                : '<div class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-5 text-sm text-slate-500">还没有导入图片，可从上方选择 ZIP 包导入。</div>') +
+            '</div>' +
           '</div>'
         );
       }).join('');
@@ -617,6 +701,7 @@
     function applyTrainDatasetPayload(payload) {
       TRAIN_DATASET_STATE.items = payload.items || [];
       renderTrainSummary(payload.summary || {});
+      renderTrainDatasetOptions(TRAIN_DATASET_STATE.items);
       renderTrainDatasets(TRAIN_DATASET_STATE.items);
     }
 
@@ -624,6 +709,7 @@
       var box = document.getElementById('trainDatasetList');
       TRAIN_DATASET_STATE.loading = true;
       setTrainDatasetFeedback('', '');
+      setTrainImportFeedback('', '');
       if (box && !TRAIN_DATASET_STATE.items.length) {
         box.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">正在加载数据集...</div>';
       }
@@ -687,13 +773,83 @@
           }
           applyTrainDatasetPayload(data);
           document.getElementById('trainDatasetForm').reset();
-          setTrainDatasetFeedback('数据集已创建，可继续接 ZIP 导入和标注功能。', 'success');
+          if (data.dataset_id) {
+            var datasetSelect = document.getElementById('trainImportDataset');
+            if (datasetSelect) datasetSelect.value = data.dataset_id;
+          }
+          setTrainImportFeedback('', '');
+          setTrainDatasetFeedback('数据集已创建，可继续导入 ZIP 图片。', 'success');
         })
         .catch(function (err) {
           setTrainDatasetFeedback(err.message || '创建数据集失败', 'error');
         })
         .finally(function () {
           submitBtn.disabled = false;
+        });
+      return false;
+    }
+
+    function importTrainZip(event) {
+      if (event) event.preventDefault();
+      var datasetSelect = document.getElementById('trainImportDataset');
+      var fileInput = document.getElementById('trainImportFile');
+      var submitBtn = document.getElementById('trainImportSubmit');
+      if (!datasetSelect || !fileInput || !submitBtn) return false;
+
+      var datasetId = datasetSelect.value;
+      var file = fileInput.files && fileInput.files[0];
+      if (!datasetId) {
+        setTrainImportFeedback('请先选择一个数据集。', 'error');
+        return false;
+      }
+      if (!file) {
+        setTrainImportFeedback('请选择要导入的 ZIP 文件。', 'error');
+        return false;
+      }
+
+      TRAIN_DATASET_STATE.importing = true;
+      submitBtn.disabled = true;
+      setTrainImportFeedback('', '');
+
+      var formData = new FormData();
+      formData.append('file', file);
+
+      fetch('/train/datasets/' + encodeURIComponent(datasetId) + '/import-zip', {
+        method: 'POST',
+        body: formData
+      })
+        .then(function (resp) {
+          return resp.text().then(function (text) {
+            var data = {};
+            try {
+              data = text ? JSON.parse(text) : {};
+            } catch (e) {
+              data = {};
+            }
+            data.__http_ok = resp.ok;
+            data.__http_status = resp.status;
+            return data;
+          });
+        })
+        .then(function (data) {
+          if (!data.ok || data.__http_ok === false) {
+            throw new Error(data.error || ('ZIP 导入失败，HTTP ' + (data.__http_status || 'unknown')));
+          }
+          applyTrainDatasetPayload(data);
+          document.getElementById('trainImportForm').reset();
+          if (data.dataset_id) {
+            var select = document.getElementById('trainImportDataset');
+            if (select) select.value = data.dataset_id;
+          }
+          setTrainDatasetFeedback('', '');
+          setTrainImportFeedback(data.message || 'ZIP 导入完成', 'success');
+        })
+        .catch(function (err) {
+          setTrainImportFeedback(err.message || 'ZIP 导入失败', 'error');
+        })
+        .finally(function () {
+          TRAIN_DATASET_STATE.importing = false;
+          renderTrainDatasetOptions(TRAIN_DATASET_STATE.items);
         });
       return false;
     }
@@ -1985,6 +2141,55 @@
           </form>
 
           <div class="mt-8 border-t border-slate-100 pt-8">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">ZIP 导入</div>
+              <h3 class="mt-2 text-xl font-semibold text-slate-900">批量导入图片</h3>
+              <p class="mt-3 text-sm leading-7 text-slate-500">
+                选择已有数据集后，上传一个包含图片的 ZIP 包。系统会自动解压有效图片到
+                <code class="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">images/</code>
+                目录，并记录图片元数据用于后续标注和训练。
+              </p>
+            </div>
+
+            <form id="trainImportForm" onsubmit="return importTrainZip(event)" class="mt-6 space-y-5">
+              <div class="grid gap-4 lg:grid-cols-[1fr,1fr]">
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">目标数据集</span>
+                  <select id="trainImportDataset"
+                    class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100">
+                    <option value="">请先创建数据集</option>
+                  </select>
+                </label>
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">ZIP 文件</span>
+                  <input id="trainImportFile" type="file" accept=".zip,application/zip"
+                    class="block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
+                    disabled />
+                </label>
+              </div>
+
+              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-7 text-slate-600">
+                支持 ZIP 内包含
+                <code class="rounded bg-white px-2 py-1 text-xs text-slate-700">jpg / jpeg / png / bmp / tif / tiff / webp</code>
+                图片。非图片文件会自动跳过，导入结果会同步更新到下方数据集列表。
+              </div>
+
+              <div id="trainImportFeedback" class="hidden"></div>
+
+              <div class="flex flex-col gap-4 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm leading-7 text-slate-500">
+                  第一阶段只做图片归档和元数据入库。后续会在这批图片上继续接历史结果回流、标注和训练任务。
+                </div>
+                <button id="trainImportSubmit" type="submit"
+                  class="inline-flex items-center justify-center rounded-full bg-teal-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-600/20 transition hover:-translate-y-0.5 hover:bg-teal-500"
+                  disabled>
+                  导入 ZIP
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="mt-8 border-t border-slate-100 pt-8">
             <div class="flex items-start justify-between gap-3">
               <div>
                 <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">数据集列表</div>
@@ -2031,7 +2236,7 @@
             <div class="mt-5 space-y-3 text-sm leading-7 text-slate-600">
               <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">训练页签已经接入真实首页。</div>
               <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">数据集记录会落到 SQLite，并同步创建本地目录结构。</div>
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">ZIP 导入、历史结果回流、标注和训练任务会在后续切片继续补齐。</div>
+              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持把 ZIP 中的图片导入到指定数据集，并展示最近导入预览。</div>
             </div>
           </div>
 
@@ -2040,7 +2245,7 @@
             <h3 class="mt-2 text-xl font-semibold text-slate-900">后续计划</h3>
             <div class="mt-5 space-y-3">
               <div class="rounded-2xl border border-dashed border-teal-200 bg-teal-50/60 p-4 text-sm leading-7 text-teal-800">
-                按 handoff 的优先级，下一步先做 ZIP 导入，再做历史结果回流，之后补图片标注。
+                按 handoff 的优先级，下一步接历史结果回流，再补图片标注和训练任务。
               </div>
               <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm leading-7 text-slate-600">
                 训练预设、预标注模型选择，以及发布到
