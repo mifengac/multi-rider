@@ -23,6 +23,7 @@ from db.sqlite import save_job
 from service.infer_service import _predict_batch, download_image_with_status, get_model
 from service.result_store_service import add_result_bytes, create_result_store, finalize_result_store
 from utils.helpers import filename_from_url, format_timestamp, infer_ext_from_bytes
+from utils.ownership import job_matches_owner
 
 
 JOBS: dict[str, dict] = {}
@@ -44,12 +45,11 @@ def get_job_snapshot(job_id: str) -> dict | None:
         return _job_snapshot(job)
 
 
-def list_running_jobs() -> list[dict]:
+def list_running_jobs(owner_key: str = "", owner_ip: str = "") -> list[dict]:
     with JOBS_LOCK:
         return [
             {
                 "id": job.get("id"),
-                "owner_ip": job.get("owner_ip"),
                 "start_ts": job.get("start_ts"),
                 "total": job.get("total"),
                 "processed": job.get("processed"),
@@ -58,13 +58,14 @@ def list_running_jobs() -> list[dict]:
             }
             for job in JOBS.values()
             if job.get("status") == "running"
+            and job_matches_owner(job, owner_key, owner_ip)
         ]
 
 
-def request_cancel(job_id: str) -> bool:
+def request_cancel(job_id: str, owner_key: str = "", owner_ip: str = "") -> bool:
     with JOBS_LOCK:
         job = JOBS.get(job_id)
-        if job is None:
+        if job is None or not job_matches_owner(job, owner_key, owner_ip):
             return False
         job["cancel"].set()
         return True
@@ -93,6 +94,7 @@ def _new_job_record(total: int) -> dict:
         "failed": 0,
         "start_ts": int(time.time()),
         "end_ts": None,
+        "owner_key": "",
         "zip_bytes": None,
         "zip_path": None,
         "zip_parts": [],

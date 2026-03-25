@@ -321,24 +321,30 @@
     // ==================== UPLOAD TAB ====================
 
     function switchTab(tab) {
-      var oraclePanel = document.getElementById('tabOracle');
-      var uploadPanel = document.getElementById('tabUpload');
-      var btnOracle = document.getElementById('tabBtnOracle');
-      var btnUpload = document.getElementById('tabBtnUpload');
-      if (tab === 'Upload') {
-        oraclePanel.classList.add('hidden');
-        uploadPanel.classList.remove('hidden');
-        btnOracle.classList.remove('bg-slate-900', 'text-white');
-        btnOracle.classList.add('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
-        btnUpload.classList.add('bg-slate-900', 'text-white');
-        btnUpload.classList.remove('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
-      } else {
-        uploadPanel.classList.add('hidden');
-        oraclePanel.classList.remove('hidden');
-        btnUpload.classList.remove('bg-slate-900', 'text-white');
-        btnUpload.classList.add('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
-        btnOracle.classList.add('bg-slate-900', 'text-white');
-        btnOracle.classList.remove('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
+      var panels = {
+        Oracle: document.getElementById('tabOracle'),
+        Upload: document.getElementById('tabUpload'),
+        Face: document.getElementById('tabFace')
+      };
+      var buttons = {
+        Oracle: document.getElementById('tabBtnOracle'),
+        Upload: document.getElementById('tabBtnUpload'),
+        Face: document.getElementById('tabBtnFace')
+      };
+      Object.keys(panels).forEach(function (key) {
+        if (panels[key]) panels[key].classList.add('hidden');
+        if (buttons[key]) {
+          buttons[key].classList.remove('bg-slate-900', 'text-white');
+          buttons[key].classList.add('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
+        }
+      });
+      if (panels[tab]) panels[tab].classList.remove('hidden');
+      if (buttons[tab]) {
+        buttons[tab].classList.add('bg-slate-900', 'text-white');
+        buttons[tab].classList.remove('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
+      }
+      if (tab === 'Face') {
+        refreshFaceTab();
       }
       try { localStorage.setItem('bczj_active_tab', tab); } catch (e) {}
     }
@@ -535,6 +541,7 @@
       upload: { jobId: '', items: [], selected: new Set(), identifyResults: {}, identitySummary: {}, library: null, loading: false }
     };
     const FACE_LIBRARY_TASK_STATE = { id: '', status: '', message: '', action: '', processed: 0, total: 0 };
+    const FACE_LIBRARY_STATE = { library: null };
     const RESULT_DETAIL_STATE = { prefix: '', assetId: '' };
 
     function escapeHtml(value) {
@@ -577,6 +584,13 @@
       };
     }
 
+    function getFaceLibraryDom() {
+      return {
+        status: document.getElementById('faceLibraryStatusGlobal'),
+        task: document.getElementById('faceLibraryTaskGlobal')
+      };
+    }
+
     function resetResultState(prefix) {
       FACE_RESULT_STATE[prefix] = { jobId: '', items: [], selected: new Set(), identifyResults: {}, identitySummary: {}, library: null, loading: false };
       var dom = getResultDom(prefix);
@@ -609,6 +623,19 @@
     }
 
     function renderLibraryTaskState() {
+      var globalDom = getFaceLibraryDom();
+      if (globalDom.task) {
+        if (!FACE_LIBRARY_TASK_STATE.id) {
+          globalDom.task.textContent = '';
+        } else {
+          var globalText = '人脸库任务：' + (FACE_LIBRARY_TASK_STATE.action === 'sync' ? '同步' : '重建') + ' · ' +
+            (FACE_LIBRARY_TASK_STATE.message || FACE_LIBRARY_TASK_STATE.status || '运行中');
+          if (FACE_LIBRARY_TASK_STATE.total) {
+            globalText += ' · ' + FACE_LIBRARY_TASK_STATE.processed + '/' + FACE_LIBRARY_TASK_STATE.total;
+          }
+          globalDom.task.textContent = globalText;
+        }
+      }
       ['oracle', 'upload'].forEach(function (prefix) {
         var dom = getResultDom(prefix);
         if (!dom.task) return;
@@ -665,6 +692,25 @@
         ' · 有效人员 ' + (lib.valid_person_count || 0) +
         ' · 底库照片 ' + (lib.photo_count || 0) +
         ' · 特征文件 ' + (lib.feature_count || 0);
+    }
+
+    function renderGlobalFaceLibraryStatus() {
+      var dom = getFaceLibraryDom();
+      if (!dom.status) return;
+      if (!FACE_LIBRARY_STATE.library) {
+        dom.status.textContent = '正在读取人脸库状态...';
+        return;
+      }
+      var lib = FACE_LIBRARY_STATE.library;
+      var text =
+        '人脸库：' + (lib.ready ? '已就绪' : '未就绪') +
+        ' · 有效人员 ' + (lib.valid_person_count || 0) +
+        ' · 底库照片 ' + (lib.photo_count || 0) +
+        ' · 特征文件 ' + (lib.feature_count || 0);
+      if (!lib.sql_configured) {
+        text += ' · 未配置内网数据库连接';
+      }
+      dom.status.textContent = text;
     }
 
     function getResultItem(prefix, assetId) {
@@ -741,6 +787,7 @@
 
         facesBox.innerHTML = (identify.faces || []).map(function (face, index) {
           var matches = face.top_matches || [];
+          var similarityScore = matches.length && matches[0].score ? matches[0].score : '-';
           var matchesHtml = matches.length ? matches.map(function (match) {
             var photo = match.photo_url ? '<img src="' + match.photo_url + '" alt="' + escapeHtml(match.name || '') + '" class="h-12 w-12 rounded-2xl object-cover ring-1 ring-inset ring-slate-200" />' : '';
             return (
@@ -750,7 +797,7 @@
                   '<div class="truncate text-sm font-semibold text-slate-800">' + escapeHtml(match.name || '') + '</div>' +
                   '<div class="truncate text-xs text-slate-500">' + escapeHtml(match.id_number || '') + '</div>' +
                 '</div>' +
-                '<div class="text-right text-xs font-semibold text-emerald-700">' + escapeHtml(match.score || '') + '</div>' +
+                '<div class="text-right text-xs font-semibold text-slate-500">检测分 ' + escapeHtml(face.det_score || '-') + '</div>' +
               '</div>'
             );
           }).join('') : '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-500">该人脸暂无匹配结果。</div>';
@@ -761,7 +808,7 @@
                 '<div class="text-sm font-semibold text-slate-800">人脸 ' + (index + 1) + '</div>' +
                 '<span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-200">框：' + escapeHtml((face.bbox || []).join(', ')) + '</span>' +
               '</div>' +
-              '<div class="mt-2 text-xs leading-6 text-slate-500">置信度 ' + escapeHtml(face.det_score || '') + ' · 清晰度 ' + escapeHtml(face.blur_score || '') + ' · 对齐 ' + (face.used_align ? '是' : '否') + '</div>' +
+              '<div class="mt-2 text-xs leading-6 text-slate-500">相似度 ' + escapeHtml(similarityScore) + ' · 清晰度 ' + escapeHtml(face.blur_score || '') + ' · 对齐 ' + (face.used_align ? '是' : '否') + '</div>' +
               '<div class="mt-3 space-y-3">' + matchesHtml + '</div>' +
             '</div>'
           );
@@ -808,7 +855,7 @@
           statusHtml = '<div class="mt-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ' + meta.badge + '">' + meta.label + '</div>';
           if (identify.status === 'matched' && identify.faces && identify.faces[0] && identify.faces[0].top_matches && identify.faces[0].top_matches[0]) {
             var top = identify.faces[0].top_matches[0];
-            detailHtml += '<div class="mt-2 text-xs leading-5 text-emerald-700">命中：' + escapeHtml(top.name || '') + ' · ' + escapeHtml(top.id_number || '') + ' · ' + escapeHtml(top.score || '') + '</div>';
+            detailHtml += '<div class="mt-2 text-xs leading-5 text-emerald-700">命中：' + escapeHtml(top.name || '') + ' · ' + escapeHtml(top.id_number || '') + ' · 相似度 ' + escapeHtml(top.score || '') + '</div>';
           } else if (identify.error) {
             detailHtml += '<div class="mt-2 text-xs leading-5 text-rose-600">' + escapeHtml(identify.error) + '</div>';
           } else {
@@ -864,21 +911,33 @@
     }
 
     function refreshFaceLibraryStatus(prefix) {
+      var targetPrefixes = FACE_RESULT_STATE[prefix] ? [prefix] : ['oracle', 'upload'];
       fetch('/face/library/status')
         .then(function (resp) { return resp.json(); })
         .then(function (data) {
           if (!data.ok) return;
-          FACE_RESULT_STATE[prefix].library = data.library || null;
+          targetPrefixes.forEach(function (itemPrefix) {
+            FACE_RESULT_STATE[itemPrefix].library = data.library || null;
+            renderLibraryStatus(itemPrefix);
+          });
+          FACE_LIBRARY_STATE.library = data.library || null;
           if (data.task) {
             var shouldPoll = data.task.status === 'running' && FACE_LIBRARY_TASK_STATE.id !== data.task.id;
             setFaceLibraryTask(data.task);
             if (shouldPoll) pollFaceLibraryTask(data.task.id);
           }
-          renderLibraryStatus(prefix);
+          renderGlobalFaceLibraryStatus();
+          renderFaceTabStatus();
+          renderFaceTabTask();
         })
         .catch(function () {
-          FACE_RESULT_STATE[prefix].library = { ready: false, valid_person_count: 0, photo_count: 0, feature_count: 0 };
-          renderLibraryStatus(prefix);
+          var fallbackLibrary = { ready: false, valid_person_count: 0, photo_count: 0, feature_count: 0 };
+          targetPrefixes.forEach(function (itemPrefix) {
+            FACE_RESULT_STATE[itemPrefix].library = fallbackLibrary;
+            renderLibraryStatus(itemPrefix);
+          });
+          FACE_LIBRARY_STATE.library = fallbackLibrary;
+          renderGlobalFaceLibraryStatus();
         });
     }
 
@@ -992,7 +1051,8 @@
             }
             pollFaceLibraryTask(task.id);
           } else {
-            refreshFaceLibraryStatus(prefix);
+            refreshFaceLibraryStatus('oracle');
+            refreshFaceLibraryStatus('upload');
           }
         })
         .catch(function () {
@@ -1025,6 +1085,218 @@
       });
     }
 
+
+    // ==================== FACE TAB ====================
+    const PERSON_STATE = { page: 1, pages: 1, total: 0, keyword: '', items: [] };
+    let _personSearchTimer = null;
+
+    function debouncePersonSearch() {
+      clearTimeout(_personSearchTimer);
+      _personSearchTimer = setTimeout(function () {
+        PERSON_STATE.keyword = (document.getElementById('personSearchInput').value || '').trim();
+        loadPersonDirectory(1);
+      }, 400);
+    }
+
+    function loadPersonDirectory(page) {
+      page = page || 1;
+      var keyword = PERSON_STATE.keyword || '';
+      var url = '/face/library/persons?page=' + page + '&page_size=12';
+      if (keyword) url += '&keyword=' + encodeURIComponent(keyword);
+      fetch(url)
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+          if (!data.ok) return;
+          PERSON_STATE.page = data.page || 1;
+          PERSON_STATE.pages = data.pages || 1;
+          PERSON_STATE.total = data.total || 0;
+          PERSON_STATE.items = data.items || [];
+          renderPersonGrid();
+        })
+        .catch(function () {
+          PERSON_STATE.items = [];
+          renderPersonGrid();
+        });
+    }
+
+    function renderPersonGrid() {
+      var grid = document.getElementById('personGrid');
+      var pageInfo = document.getElementById('personPageInfo');
+      var prevBtn = document.getElementById('personPrevBtn');
+      var nextBtn = document.getElementById('personNextBtn');
+      if (!grid) return;
+
+      pageInfo.textContent = '共 ' + PERSON_STATE.total + ' 人 · 第 ' + PERSON_STATE.page + ' / ' + PERSON_STATE.pages + ' 页';
+      prevBtn.disabled = PERSON_STATE.page <= 1;
+      nextBtn.disabled = PERSON_STATE.page >= PERSON_STATE.pages;
+
+      if (!PERSON_STATE.items.length) {
+        grid.innerHTML = '<div class="col-span-full rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">暂无人员数据。同步人脸库后可在此浏览。</div>';
+        return;
+      }
+
+      var avatarColors = ['bg-teal-100 text-teal-700','bg-sky-100 text-sky-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700','bg-violet-100 text-violet-700','bg-emerald-100 text-emerald-700'];
+      grid.innerHTML = PERSON_STATE.items.map(function (p, i) {
+        var ac = avatarColors[i % avatarColors.length];
+        var initial = (p.name || '?')[0];
+        var statusBadge = p.status === 'valid'
+          ? '<span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">有效</span>'
+          : '<span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">特征缺失</span>';
+        return (
+          '<div class="overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60 transition hover:shadow-md hover:shadow-slate-200/80 cursor-pointer" onclick="openPersonDetail(\'' + escapeHtml(p.id || '') + '\')">' +
+            '<div class="flex items-center gap-4">' +
+              '<div class="flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-full ' + ac + ' text-lg font-bold">' + escapeHtml(initial) + '</div>' +
+              '<div class="min-w-0 flex-1">' +
+                '<div class="truncate text-base font-semibold text-slate-900">' + escapeHtml(p.name || '') + '</div>' +
+                '<div class="truncate text-xs text-slate-500">' + escapeHtml(p.id_number || '') + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">' +
+              '<div class="text-xs text-slate-500">照片 ' + (p.has_photo ? '有' : '无') + ' · 特征 ' + (p.has_feature ? '已提取' : '缺失') + '</div>' +
+            '</div>' +
+            '<div class="mt-4 flex items-center justify-between">' +
+              statusBadge +
+              '<button type="button" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" onclick="event.stopPropagation();openPersonDetail(\'' + escapeHtml(p.id || '') + '\')">查看</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function openPersonDetail(personId) {
+      var person = null;
+      for (var i = 0; i < PERSON_STATE.items.length; i++) {
+        if (PERSON_STATE.items[i].id === personId) { person = PERSON_STATE.items[i]; break; }
+      }
+      if (!person) return;
+
+      document.getElementById('personDetailName').textContent = person.name || '';
+      document.getElementById('personDetailFullName').textContent = person.name || '';
+      document.getElementById('personDetailIdNumber').textContent = person.id_number || '';
+      document.getElementById('personDetailAvatar').textContent = (person.name || '?')[0];
+      document.getElementById('personDetailIdType').textContent = person.id_type || '--';
+      document.getElementById('personDetailIdNum2').textContent = person.id_number || '--';
+
+      var featureEl = document.getElementById('personDetailFeature');
+      if (person.has_feature) {
+        featureEl.textContent = '已提取';
+        featureEl.className = 'font-medium text-emerald-600';
+      } else {
+        featureEl.textContent = '缺失';
+        featureEl.className = 'font-medium text-amber-600';
+      }
+      document.getElementById('personDetailPhotoStatus').textContent = person.has_photo ? '有' : '无';
+
+      var photoBox = document.getElementById('personDetailPhoto');
+      if (person.has_photo) {
+        photoBox.innerHTML = '<img src="/face/library/photo/' + encodeURIComponent(personId) + '" alt="底库照片" class="aspect-square rounded-2xl border border-slate-200 object-cover" style="min-height:160px" />';
+      } else {
+        photoBox.innerHTML = '<div class="col-span-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center text-sm text-slate-500">暂无底库照片</div>';
+      }
+
+      document.getElementById('personDetailOverlay').classList.remove('hidden');
+      document.getElementById('personDetailDrawer').classList.remove('translate-x-full');
+    }
+
+    function closePersonDetail() {
+      document.getElementById('personDetailOverlay').classList.add('hidden');
+      document.getElementById('personDetailDrawer').classList.add('translate-x-full');
+    }
+
+    function loadOperationHistory() {
+      fetch('/face/library/tasks')
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+          if (!data.ok) return;
+          renderOperationHistory(data.tasks || []);
+        })
+        .catch(function () {});
+    }
+
+    function renderOperationHistory(tasks) {
+      var box = document.getElementById('faceHistoryRows');
+      if (!box) return;
+      if (!tasks.length) {
+        box.innerHTML = '<div class="px-5 py-5 text-center text-sm text-slate-500">暂无操作记录。</div>';
+        return;
+      }
+      box.innerHTML = tasks.map(function (t) {
+        var actionLabel = t.action === 'sync' ? '同步' : '重建特征';
+        var statusMap = {
+          done: '<span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">已完成</span>',
+          running: '<span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-200">运行中</span>',
+          error: '<span class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">失败</span>'
+        };
+        var statusHtml = statusMap[t.status] || '<span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">' + escapeHtml(t.status || '--') + '</span>';
+        var timeStr = t.start_ts ? new Date(t.start_ts * 1000).toLocaleString('zh-CN') : '--';
+        var countStr = (t.processed || 0) + ' / ' + (t.total || 0);
+        var remark = t.error || t.message || '—';
+        return (
+          '<div class="grid grid-cols-12 items-center gap-3 border-t border-slate-100 px-5 py-3.5" style="' + (tasks.indexOf(t) % 2 === 1 ? 'background:rgba(248,250,252,0.6)' : '') + '">' +
+            '<div class="col-span-2 text-sm font-medium text-slate-900">' + escapeHtml(actionLabel) + '</div>' +
+            '<div class="col-span-2">' + statusHtml + '</div>' +
+            '<div class="col-span-3 text-sm text-slate-600">' + escapeHtml(timeStr) + '</div>' +
+            '<div class="col-span-2 text-sm text-slate-600">' + escapeHtml(countStr) + '</div>' +
+            '<div class="col-span-3 text-sm text-slate-400">' + escapeHtml(remark) + '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function renderFaceTabStatus() {
+      var lib = FACE_LIBRARY_STATE.library;
+      if (!lib) return;
+      var readyEl = document.getElementById('faceMetricReady');
+      if (readyEl) {
+        readyEl.textContent = lib.ready ? '已就绪' : '未就绪';
+        readyEl.className = 'mt-2 text-xl font-bold ' + (lib.ready ? 'text-emerald-600' : 'text-amber-600');
+      }
+      var personsEl = document.getElementById('faceMetricPersons');
+      if (personsEl) personsEl.textContent = lib.valid_person_count || 0;
+      var photosEl = document.getElementById('faceMetricPhotos');
+      if (photosEl) photosEl.textContent = lib.photo_count || 0;
+      var featuresEl = document.getElementById('faceMetricFeatures');
+      if (featuresEl) featuresEl.textContent = lib.feature_count || 0;
+      var sqlEl = document.getElementById('faceMetricSql');
+      if (sqlEl) {
+        sqlEl.textContent = lib.sql_configured ? '已配置' : '未配置';
+        sqlEl.className = 'mt-2 text-xl font-bold ' + (lib.sql_configured ? 'text-emerald-600' : 'text-amber-600');
+      }
+    }
+
+    function renderFaceTabTask() {
+      var section = document.getElementById('faceTaskSection');
+      if (!section) return;
+      if (!FACE_LIBRARY_TASK_STATE.id) {
+        section.classList.add('hidden');
+        return;
+      }
+      section.classList.remove('hidden');
+      var t = FACE_LIBRARY_TASK_STATE;
+      var actionLabel = t.action === 'sync' ? '同步' : '重建特征';
+      var meta = statusMeta(t.status || 'running');
+      document.getElementById('faceTaskTitle').textContent = '人脸库任务：' + actionLabel;
+      document.getElementById('faceTaskMessage').textContent = t.message || t.status || '';
+      var badge = document.getElementById('faceTaskBadge');
+      badge.textContent = meta.label;
+      badge.className = 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ' + meta.badge;
+      var pct = t.total ? Math.min(100, Math.floor(t.processed * 100 / t.total)) : 0;
+      document.getElementById('faceTaskBar').style.width = pct + '%';
+      document.getElementById('faceTaskBar').className = 'h-3 rounded-full transition-all ' + meta.bar;
+      document.getElementById('faceTaskPct').textContent = '进度 ' + pct + '%';
+      document.getElementById('faceTaskCount').textContent = t.processed + ' / ' + t.total;
+    }
+
+    function refreshFaceTab() {
+      refreshFaceLibraryStatus('oracle');
+      setTimeout(function () {
+        renderFaceTabStatus();
+        renderFaceTabTask();
+      }, 500);
+      loadPersonDirectory(PERSON_STATE.page);
+      loadOperationHistory();
+    }
+
     window.addEventListener('load', function () {
       document.getElementById('model_key').addEventListener('change', applyModelUI);
       document.getElementById('confRange').addEventListener('input', syncConfValue);
@@ -1046,7 +1318,7 @@
 
       try {
         var activeTab = localStorage.getItem('bczj_active_tab');
-        if (activeTab === 'Upload') { switchTab('Upload'); }
+        if (activeTab === 'Upload') { switchTab('Upload'); } else if (activeTab === 'Face') { switchTab('Face'); }
       } catch (e) {}
 
       try {
@@ -1119,6 +1391,10 @@
       <button id="tabBtnUpload" type="button" onclick="switchTab('Upload')"
         class="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">
         本地上传检测
+      </button>
+      <button id="tabBtnFace" type="button" onclick="switchTab('Face')"
+        class="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">
+        人脸库
       </button>
     </div>
 
@@ -1286,8 +1562,6 @@
           <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span id="oracleLibraryStatus"></span>
             <span id="oracleLibraryTask" class="text-amber-700"></span>
-            <button type="button" onclick="runFaceLibraryAction('oracle', 'sync')" class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">同步人脸库</button>
-            <button type="button" onclick="runFaceLibraryAction('oracle', 'rebuild')" class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">重建特征</button>
           </div>
           <div id="oracleResultGrid" class="mt-5 grid gap-4 sm:grid-cols-2"></div>
         </div>
@@ -1461,8 +1735,6 @@
           <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span id="uploadLibraryStatus"></span>
             <span id="uploadLibraryTask" class="text-amber-700"></span>
-            <button type="button" onclick="runFaceLibraryAction('upload', 'sync')" class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">同步人脸库</button>
-            <button type="button" onclick="runFaceLibraryAction('upload', 'rebuild')" class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">重建特征</button>
           </div>
           <div id="uploadResultGrid" class="mt-5 grid gap-4 sm:grid-cols-2"></div>
         </div>
@@ -1488,6 +1760,112 @@
       </section>
     </div><!-- /tabUpload -->
 
+    <div id="tabFace" class="hidden">
+      <div class="space-y-6">
+
+        <!-- Status Dashboard -->
+        <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Face Library</div>
+              <h2 class="mt-2 text-2xl font-bold text-slate-900">人脸库状态</h2>
+              <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-500">管理人脸识别底库：同步内网照片、重建特征向量、浏览已注册人员。</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" onclick="runFaceLibraryAction('global', 'sync')" class="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700">同步人脸库</button>
+              <button type="button" onclick="runFaceLibraryAction('global', 'rebuild')" class="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">重建特征</button>
+            </div>
+          </div>
+          <div id="faceStatusMetrics" class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="text-xs text-slate-500">库状态</div>
+              <div id="faceMetricReady" class="mt-2 text-xl font-bold text-slate-400">--</div>
+            </div>
+            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="text-xs text-slate-500">有效人员</div>
+              <div id="faceMetricPersons" class="mt-2 text-xl font-bold text-slate-900">--</div>
+            </div>
+            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="text-xs text-slate-500">底库照片</div>
+              <div id="faceMetricPhotos" class="mt-2 text-xl font-bold text-slate-900">--</div>
+            </div>
+            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="text-xs text-slate-500">特征文件</div>
+              <div id="faceMetricFeatures" class="mt-2 text-xl font-bold text-slate-900">--</div>
+            </div>
+            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="text-xs text-slate-500">SQL 连接</div>
+              <div id="faceMetricSql" class="mt-2 text-xl font-bold text-slate-400">--</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Task Progress -->
+        <section id="faceTaskSection" class="hidden rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6">
+          <div class="flex items-center gap-4">
+            <div class="flex-1">
+              <div class="flex items-center gap-3">
+                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Task Progress</div>
+                <span id="faceTaskBadge" class="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-200">运行中</span>
+              </div>
+              <h3 id="faceTaskTitle" class="mt-2 text-lg font-semibold text-slate-900">人脸库任务</h3>
+              <p id="faceTaskMessage" class="mt-2 text-sm text-slate-500"></p>
+            </div>
+          </div>
+          <div class="mt-4 h-3 rounded-full bg-slate-100">
+            <div id="faceTaskBar" class="h-3 rounded-full bg-sky-500 transition-all" style="width:0%"></div>
+          </div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
+            <span id="faceTaskPct">进度 0%</span>
+            <span id="faceTaskCount">0 / 0</span>
+          </div>
+        </section>
+
+        <!-- Person Directory -->
+        <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Person Directory</div>
+              <h2 class="mt-2 text-2xl font-bold text-slate-900">人员名录</h2>
+              <p class="mt-3 text-sm leading-7 text-slate-500">浏览人脸库中的所有已注册人员。点击人员卡片可查看底库照片。</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="relative">
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/></svg>
+                <input id="personSearchInput" type="text" placeholder="搜索姓名或身份证号..." oninput="debouncePersonSearch()" class="w-64 rounded-full border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+              </div>
+            </div>
+          </div>
+          <div id="personGrid" class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"></div>
+          <div id="personPagination" class="mt-6 flex items-center justify-between border-t border-slate-100 pt-5">
+            <div id="personPageInfo" class="text-sm text-slate-500"></div>
+            <div class="flex gap-2">
+              <button id="personPrevBtn" type="button" onclick="loadPersonDirectory(PERSON_STATE.page - 1)" class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-400 disabled:cursor-not-allowed" disabled>上一页</button>
+              <button id="personNextBtn" type="button" onclick="loadPersonDirectory(PERSON_STATE.page + 1)" class="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed" disabled>下一页</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Operation History -->
+        <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+          <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Operation History</div>
+          <h2 class="mt-2 text-2xl font-bold text-slate-900">操作历史</h2>
+          <p class="mt-3 text-sm leading-7 text-slate-500">人脸库的同步与重建操作记录。</p>
+          <div id="faceOperationHistory" class="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+            <div class="grid grid-cols-12 gap-3 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <div class="col-span-2">操作类型</div>
+              <div class="col-span-2">状态</div>
+              <div class="col-span-3">时间</div>
+              <div class="col-span-2">处理数</div>
+              <div class="col-span-3">备注</div>
+            </div>
+            <div id="faceHistoryRows"></div>
+          </div>
+        </section>
+
+      </div>
+    </div><!-- /tabFace -->
+
   </div>
   <div id="resultDetailOverlay" class="fixed inset-0 z-40 hidden bg-slate-900/35 backdrop-blur-[1px]" onclick="closeResultDetail()"></div>
   <aside id="resultDetailDrawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-xl translate-x-full overflow-y-auto border-l border-white/60 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] transition-transform duration-300">
@@ -1507,6 +1885,38 @@
       </div>
       <div id="resultDetailStatus"></div>
       <div id="resultDetailFaces" class="space-y-4"></div>
+    </div>
+  </aside>
+  <div id="personDetailOverlay" class="fixed inset-0 z-40 hidden bg-slate-900/35 backdrop-blur-[1px]" onclick="closePersonDetail()"></div>
+  <aside id="personDetailDrawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-md translate-x-full overflow-y-auto border-l border-white/60 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] transition-transform duration-300">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      <div>
+        <div class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Person Detail</div>
+        <h3 id="personDetailName" class="mt-2 text-lg font-semibold text-slate-900"></h3>
+      </div>
+      <button type="button" onclick="closePersonDetail()" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">关闭</button>
+    </div>
+    <div class="space-y-5 px-5 py-5">
+      <div class="flex items-center gap-4">
+        <div id="personDetailAvatar" class="flex h-16 w-16 items-center justify-center rounded-full bg-teal-100 text-2xl font-bold text-teal-700"></div>
+        <div>
+          <div id="personDetailFullName" class="text-lg font-semibold text-slate-900"></div>
+          <div id="personDetailIdNumber" class="text-sm text-slate-500"></div>
+        </div>
+      </div>
+      <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+        <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">基本信息</div>
+        <div class="mt-3 space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-slate-500">证件类型</span><span id="personDetailIdType" class="font-medium text-slate-900"></span></div>
+          <div class="flex justify-between"><span class="text-slate-500">证件号码</span><span id="personDetailIdNum2" class="font-medium text-slate-900"></span></div>
+          <div class="flex justify-between"><span class="text-slate-500">特征状态</span><span id="personDetailFeature" class="font-medium"></span></div>
+          <div class="flex justify-between"><span class="text-slate-500">底库照片</span><span id="personDetailPhotoStatus" class="font-medium text-slate-900"></span></div>
+        </div>
+      </div>
+      <div>
+        <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">底库照片</div>
+        <div id="personDetailPhoto" class="mt-3 grid grid-cols-2 gap-3"></div>
+      </div>
     </div>
   </aside>
 </body>

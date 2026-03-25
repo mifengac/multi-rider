@@ -16,12 +16,14 @@ from config import (
     model_supports_text_prompt,
     resolve_model_path,
 )
+from db.sqlite import get_job as get_saved_job
 from service.upload_job_service import (
     get_upload_job_snapshot,
     request_upload_cancel,
     start_video_job,
     start_zip_job,
 )
+from utils.ownership import get_request_owner, job_matches_owner
 
 
 upload_bp = Blueprint("upload", __name__, url_prefix="/upload")
@@ -76,31 +78,29 @@ def upload_start():
     if ext not in _ALLOWED_EXTS:
         return jsonify({"ok": False, "error": f"不支持的文件类型 {ext}，请上传 ZIP 或 MP4/AVI/MOV/MKV/MPG/MPEG"}), 400
 
-    owner_ip = (
-        request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        or request.remote_addr
-        or ""
-    )
+    owner_key, owner_ip = get_request_owner(request)
     conf, batch_size, imgsz, classes_raw, model_key, frame_interval = _parse_params(request.form)
     try:
         resolve_model_path(model_key)
     except Exception:
         return jsonify({"ok": False, "error": f"未找到可用模型: {model_key}"}), 400
 
+    temp_dir = os.path.join(UPLOAD_TEMP_DIR, uuid4().hex)
+    os.makedirs(temp_dir, exist_ok=True)
+
     if ext == ".zip":
-        file_bytes = file.read()
+        zip_path = os.path.join(temp_dir, filename)
+        file.save(zip_path)
         job_id, err = start_zip_job(
-            file_bytes, filename, conf, batch_size, imgsz, classes_raw, model_key, owner_ip
+            zip_path, filename, conf, batch_size, imgsz, classes_raw, model_key, owner_key, owner_ip, temp_dir
         )
     else:
         # Video: save to temp dir first so cv2 can open it by path
-        temp_dir = os.path.join(UPLOAD_TEMP_DIR, uuid4().hex)
-        os.makedirs(temp_dir, exist_ok=True)
         video_path = os.path.join(temp_dir, filename)
         file.save(video_path)
         job_id, err = start_video_job(
             video_path, filename, frame_interval, conf, batch_size, imgsz,
-            classes_raw, model_key, owner_ip, temp_dir,
+            classes_raw, model_key, owner_key, owner_ip, temp_dir,
         )
 
     if not job_id:
@@ -111,9 +111,15 @@ def upload_start():
 
 @upload_bp.get("/progress/<job_id>")
 def upload_progress(job_id: str):
+    owner_key, owner_ip = get_request_owner(request)
     job = get_upload_job_snapshot(job_id)
-    if not job:
-        return jsonify({"ok": False, "error": "任务不存在"}), 404
+    if job:
+        if not job_matches_owner(job, owner_key, owner_ip):
+            return jsonify({"ok": False, "error": "任务不存在"}), 404
+    else:
+        job = get_saved_job(job_id)
+        if not job or job.get("job_type") != "upload" or not job_matches_owner(job, owner_key, owner_ip):
+            return jsonify({"ok": False, "error": "任务不存在"}), 404
 
     return jsonify({
         "ok": True,
@@ -130,14 +136,22 @@ def upload_progress(job_id: str):
 
 @upload_bp.post("/cancel/<job_id>")
 def upload_cancel(job_id: str):
-    ok = request_upload_cancel(job_id)
+    owner_key, owner_ip = get_request_owner(request)
+    ok = request_upload_cancel(job_id, owner_key, owner_ip)
     return jsonify({"ok": ok})
 
 
 @upload_bp.get("/download/<job_id>")
 def upload_download(job_id: str):
+    owner_key, owner_ip = get_request_owner(request)
     job = get_upload_job_snapshot(job_id)
-    if not job or job.get("status") != "done":
+    if job is not None and not job_matches_owner(job, owner_key, owner_ip):
+        return "任务未完成或不存在", 404
+    if job is None:
+        job = get_saved_job(job_id)
+        if not job or job.get("job_type") != "upload" or not job_matches_owner(job, owner_key, owner_ip):
+            return "任务未完成或不存在", 404
+    if job.get("status") != "done":
         return "任务未完成或不存在", 404
 
     zip_path = job.get("zip_path")

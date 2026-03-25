@@ -4,10 +4,12 @@ import base64
 import json
 import os
 import pickle
+import shutil
 import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Optional
+from uuid import uuid4
 
 import cv2
 import numpy as np
@@ -47,8 +49,8 @@ SELECT
     bzr."zjhm",
     bzr."xm",
     tdrz."xp"
-FROM "stdata"."bzdry_ryxx" bzr
-LEFT JOIN "tdsfbrk_zpxx" tdrz
+FROM "stdata"."b_zdry_ryxx" bzr
+LEFT JOIN "ywdata"."t_dsfb_rk_zpxx" tdrz
     ON bzr."zjhm" = tdrz."gmsfhm"
 WHERE bzr."sflg" = 1
   AND bzr."deleteflag" = 0
@@ -83,6 +85,76 @@ def _ensure_dirs() -> None:
     os.makedirs(FEATURE_DIR, exist_ok=True)
 
 
+def _cleanup_path(path: str) -> None:
+    if not path:
+        return
+    if os.path.isdir(path):
+        shutil.rmtree(path, ignore_errors=True)
+    elif os.path.exists(path):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+
+
+def _make_stage_root(prefix: str) -> str:
+    stage_root = os.path.join(FACE_DATA_DIR, f"_{prefix}_{uuid4().hex}")
+    os.makedirs(stage_root, exist_ok=True)
+    return stage_root
+
+
+def _save_person_db_to_path(persons: list["PersonRecord"], path: str) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as fh:
+        pickle.dump(persons, fh)
+
+
+def _save_meta_to_path(meta: dict[str, Any], path: str) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(meta, fh, ensure_ascii=False, indent=2)
+
+
+def _commit_face_library_stage(
+    *,
+    stage_photo_dir: str | None = None,
+    stage_feature_dir: str | None = None,
+    stage_db_path: str | None = None,
+    stage_meta_path: str | None = None,
+) -> None:
+    swaps: list[tuple[str, str | None]] = []
+    success = False
+
+    def _swap_path(src: str | None, dst: str) -> None:
+        if not src or not os.path.exists(src):
+            return
+        backup = None
+        if os.path.exists(dst):
+            backup = dst + f".bak_{uuid4().hex}"
+            shutil.move(dst, backup)
+        shutil.move(src, dst)
+        swaps.append((dst, backup))
+
+    try:
+        _swap_path(stage_photo_dir, PHOTO_DIR)
+        _swap_path(stage_feature_dir, FEATURE_DIR)
+        _swap_path(stage_db_path, DB_CACHE_FILE)
+        _swap_path(stage_meta_path, META_FILE)
+        _invalidate_cache()
+        success = True
+    finally:
+        if success:
+            for _dst, backup in swaps:
+                if backup:
+                    _cleanup_path(backup)
+        else:
+            for dst, backup in reversed(swaps):
+                _cleanup_path(dst)
+                if backup and os.path.exists(backup):
+                    shutil.move(backup, dst)
+            _invalidate_cache()
+
+
 def _load_meta() -> dict[str, Any]:
     if not os.path.isfile(META_FILE):
         return {}
@@ -114,8 +186,11 @@ def _load_query_sql() -> str:
                 text = fh.read().strip()
             if text:
                 return text
-        except Exception:
-            pass
+            logger.warning("face SQL query file is empty, falling back to built-in SQL: %s", FACE_SQL_QUERY_PATH)
+        except Exception as exc:
+            logger.warning("failed to read face SQL query file %s, falling back to built-in SQL: %s", FACE_SQL_QUERY_PATH, exc)
+    elif FACE_SQL_QUERY_PATH:
+        logger.warning("face SQL query file not found, falling back to built-in SQL: %s", FACE_SQL_QUERY_PATH)
     return DEFAULT_QUERY_SQL.strip()
 
 
@@ -218,6 +293,41 @@ def get_face_library_status() -> dict[str, Any]:
     }
 
 
+def list_persons(page: int = 1, page_size: int = 12, keyword: str = "") -> dict[str, Any]:
+    """Return a paginated list of persons from the cached person_db."""
+    if not os.path.isfile(DB_CACHE_FILE):
+        return {"items": [], "total": 0, "page": page, "page_size": page_size, "pages": 0}
+    try:
+        persons = _load_person_db()
+    except Exception:
+        return {"items": [], "total": 0, "page": page, "page_size": page_size, "pages": 0}
+
+    keyword = (keyword or "").strip().lower()
+    if keyword:
+        persons = [p for p in persons if keyword in (p.xm or "").lower() or keyword in (p.zjhm or "").lower()]
+
+    total = len(persons)
+    pages = max(1, (total + page_size - 1) // page_size)
+    page = max(1, min(page, pages))
+    start = (page - 1) * page_size
+    sliced = persons[start : start + page_size]
+
+    items = []
+    for p in sliced:
+        has_embedding = getattr(p, "embedding", None) is not None
+        has_photo = bool(p.photo_path and os.path.isfile(p.photo_path))
+        items.append({
+            "id": p.zjhm,
+            "name": p.xm,
+            "id_number": p.zjhm,
+            "id_type": p.zjlx,
+            "has_photo": has_photo,
+            "has_feature": has_embedding,
+            "status": "valid" if has_embedding else "no_feature",
+        })
+    return {"items": items, "total": total, "page": page, "page_size": page_size, "pages": pages}
+
+
 def get_face_library_photo_path(person_id: str) -> str | None:
     person_id = os.path.basename((person_id or "").strip())
     if not person_id:
@@ -232,12 +342,7 @@ def get_face_library_photo_path(person_id: str) -> str | None:
 def rebuild_face_library(progress_cb=None) -> dict[str, Any]:
     _ensure_dirs()
     _report(progress_cb, stage="prepare", message="Preparing local face feature rebuild", processed=0, total=0)
-    for filename in os.listdir(FEATURE_DIR):
-        if filename.lower().endswith(".npy"):
-            try:
-                os.remove(os.path.join(FEATURE_DIR, filename))
-            except Exception:
-                pass
+
     if os.path.isfile(DB_CACHE_FILE):
         persons = _load_person_db()
     else:
@@ -252,40 +357,54 @@ def rebuild_face_library(progress_cb=None) -> dict[str, Any]:
     if not persons:
         raise RuntimeError("no cached face photos found; sync the face library first")
 
+    stage_root = _make_stage_root("face_rebuild")
+    stage_feature_dir = os.path.join(stage_root, "features")
+    os.makedirs(stage_feature_dir, exist_ok=True)
+    stage_db_path = os.path.join(stage_root, "person_db.pkl")
+    stage_meta_path = os.path.join(stage_root, "meta.json")
+
     _report(progress_cb, stage="load_models", message="Loading face models", processed=0, total=len(persons))
     detector, recognizer = get_face_models()
     success = 0
     failed = 0
     total = len(persons)
-    for index, person in enumerate(persons, 1):
-        if not person.photo_path:
-            person.photo_path = get_face_library_photo_path(person.zjhm)
-        if not person.photo_path or not os.path.isfile(person.photo_path):
-            failed += 1
+    try:
+        for index, person in enumerate(persons, 1):
+            if not person.photo_path:
+                person.photo_path = get_face_library_photo_path(person.zjhm)
+            if not person.photo_path or not os.path.isfile(person.photo_path):
+                failed += 1
+                _report(progress_cb, stage="extract", message=f"Rebuilding features {index}/{total}", processed=index, total=total)
+                continue
+            img = load_image(person.photo_path)
+            if img is None:
+                failed += 1
+                _report(progress_cb, stage="extract", message=f"Rebuilding features {index}/{total}", processed=index, total=total)
+                continue
+            embedding, _info = extract_best_face_embedding(img, detector, recognizer, use_enhance=True)
+            if embedding is None:
+                failed += 1
+                _report(progress_cb, stage="extract", message=f"Rebuilding features {index}/{total}", processed=index, total=total)
+                continue
+            person.embedding = embedding
+            np.save(os.path.join(stage_feature_dir, f"{person.zjhm}.npy"), embedding)
+            success += 1
             _report(progress_cb, stage="extract", message=f"Rebuilding features {index}/{total}", processed=index, total=total)
-            continue
-        img = load_image(person.photo_path)
-        if img is None:
-            failed += 1
-            _report(progress_cb, stage="extract", message=f"Rebuilding features {index}/{total}", processed=index, total=total)
-            continue
-        embedding, _info = extract_best_face_embedding(img, detector, recognizer, use_enhance=True)
-        if embedding is None:
-            failed += 1
-            _report(progress_cb, stage="extract", message=f"Rebuilding features {index}/{total}", processed=index, total=total)
-            continue
-        person.embedding = embedding
-        np.save(os.path.join(FEATURE_DIR, f"{person.zjhm}.npy"), embedding)
-        success += 1
-        _report(progress_cb, stage="extract", message=f"Rebuilding features {index}/{total}", processed=index, total=total)
 
-    _save_person_db(persons)
-    meta = _load_meta()
-    meta["last_rebuild_ts"] = int(time.time())
-    meta["valid_person_count"] = success
-    _save_meta(meta)
-    _report(progress_cb, stage="complete", message="Face feature rebuild completed", processed=total, total=total)
-    return {"ok": True, "processed": len(persons), "success": success, "failed": failed}
+        _save_person_db_to_path(persons, stage_db_path)
+        meta = _load_meta()
+        meta["last_rebuild_ts"] = int(time.time())
+        meta["valid_person_count"] = success
+        _save_meta_to_path(meta, stage_meta_path)
+        _commit_face_library_stage(
+            stage_feature_dir=stage_feature_dir,
+            stage_db_path=stage_db_path,
+            stage_meta_path=stage_meta_path,
+        )
+        _report(progress_cb, stage="complete", message="Face feature rebuild completed", processed=total, total=total)
+        return {"ok": True, "processed": len(persons), "success": success, "failed": failed}
+    finally:
+        _cleanup_path(stage_root)
 
 
 def sync_face_library(progress_cb=None) -> dict[str, Any]:
@@ -301,19 +420,17 @@ def sync_face_library(progress_cb=None) -> dict[str, Any]:
         raise RuntimeError(f"psycopg2-binary is not installed: {exc}") from exc
 
     _report(progress_cb, stage="connect", message="Connecting to intranet face SQL", processed=0, total=0)
-    conn = psycopg2.connect(
+    with psycopg2.connect(
         host=FACE_SQL_HOST,
         port=FACE_SQL_PORT,
         dbname=FACE_SQL_DB,
         user=FACE_SQL_USER,
         password=FACE_SQL_PASSWORD,
-    )
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    _report(progress_cb, stage="query", message="Executing face library SQL", processed=0, total=0)
-    cur.execute(_load_query_sql())
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    ) as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            _report(progress_cb, stage="query", message="Executing face library SQL", processed=0, total=0)
+            cur.execute(_load_query_sql())
+            rows = cur.fetchall()
 
     seen: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -326,61 +443,74 @@ def sync_face_library(progress_cb=None) -> dict[str, Any]:
             seen[person_id] = dict(row)
 
     _ensure_dirs()
+    stage_root = _make_stage_root("face_sync")
+    stage_photo_dir = os.path.join(stage_root, "photos")
+    stage_feature_dir = os.path.join(stage_root, "features")
+    os.makedirs(stage_photo_dir, exist_ok=True)
+    os.makedirs(stage_feature_dir, exist_ok=True)
+    stage_db_path = os.path.join(stage_root, "person_db.pkl")
+    stage_meta_path = os.path.join(stage_root, "meta.json")
+
     _report(progress_cb, stage="prepare_files", message="Preparing local face library cache", processed=0, total=len(seen))
-    for directory in (PHOTO_DIR, FEATURE_DIR):
-        for filename in os.listdir(directory):
-            try:
-                os.remove(os.path.join(directory, filename))
-            except Exception:
-                pass
     persons: list[PersonRecord] = []
     saved = 0
     dedup_rows = list(seen.values())
     total = len(dedup_rows)
-    for index, row in enumerate(dedup_rows, 1):
-        person = PersonRecord(zjlx=row.get("zjlx") or "", zjhm=row.get("zjhm") or "", xm=row.get("xm") or "")
-        img = _decode_photo(row.get("xp"))
-        if img is not None:
-            photo_path = os.path.join(PHOTO_DIR, f"{person.zjhm}.jpg")
-            cv2.imwrite(photo_path, img)
-            person.photo_path = photo_path
-            saved += 1
-        persons.append(person)
-        _report(progress_cb, stage="save_photos", message=f"Saving face photos {index}/{total}", processed=index, total=total)
+    try:
+        for index, row in enumerate(dedup_rows, 1):
+            person = PersonRecord(zjlx=row.get("zjlx") or "", zjhm=row.get("zjhm") or "", xm=row.get("xm") or "")
+            img = _decode_photo(row.get("xp"))
+            if img is not None:
+                stage_photo_path = os.path.join(stage_photo_dir, f"{person.zjhm}.jpg")
+                cv2.imwrite(stage_photo_path, img)
+                person.photo_path = os.path.join(PHOTO_DIR, f"{person.zjhm}.jpg")
+                saved += 1
+            persons.append(person)
+            _report(progress_cb, stage="save_photos", message=f"Saving face photos {index}/{total}", processed=index, total=total)
 
-    _report(progress_cb, stage="load_models", message="Loading face models", processed=0, total=len(persons))
-    detector, recognizer = get_face_models()
-    success = 0
-    for index, person in enumerate(persons, 1):
-        if not person.photo_path:
+        _report(progress_cb, stage="load_models", message="Loading face models", processed=0, total=len(persons))
+        detector, recognizer = get_face_models()
+        success = 0
+        for index, person in enumerate(persons, 1):
+            if not person.photo_path:
+                _report(progress_cb, stage="extract", message=f"Extracting face features {index}/{len(persons)}", processed=index, total=len(persons))
+                continue
+            stage_photo_path = os.path.join(stage_photo_dir, f"{person.zjhm}.jpg")
+            img = load_image(stage_photo_path)
+            if img is None:
+                _report(progress_cb, stage="extract", message=f"Extracting face features {index}/{len(persons)}", processed=index, total=len(persons))
+                continue
+            embedding, _info = extract_best_face_embedding(img, detector, recognizer, use_enhance=True)
+            if embedding is None:
+                _report(progress_cb, stage="extract", message=f"Extracting face features {index}/{len(persons)}", processed=index, total=len(persons))
+                continue
+            person.embedding = embedding
+            np.save(os.path.join(stage_feature_dir, f"{person.zjhm}.npy"), embedding)
+            success += 1
             _report(progress_cb, stage="extract", message=f"Extracting face features {index}/{len(persons)}", processed=index, total=len(persons))
-            continue
-        img = load_image(person.photo_path)
-        if img is None:
-            _report(progress_cb, stage="extract", message=f"Extracting face features {index}/{len(persons)}", processed=index, total=len(persons))
-            continue
-        embedding, _info = extract_best_face_embedding(img, detector, recognizer, use_enhance=True)
-        if embedding is None:
-            _report(progress_cb, stage="extract", message=f"Extracting face features {index}/{len(persons)}", processed=index, total=len(persons))
-            continue
-        person.embedding = embedding
-        np.save(os.path.join(FEATURE_DIR, f"{person.zjhm}.npy"), embedding)
-        success += 1
-        _report(progress_cb, stage="extract", message=f"Extracting face features {index}/{len(persons)}", processed=index, total=len(persons))
 
-    _save_person_db(persons)
-    now = int(time.time())
-    _save_meta(
-        {
-            "last_sync_ts": now,
-            "last_rebuild_ts": now,
-            "last_sync_rows": len(rows),
-            "saved_photo_count": saved,
-            "valid_person_count": success,
-        }
-    )
-    _report(progress_cb, stage="complete", message="Face library sync completed", processed=len(persons), total=len(persons))
-    return {"ok": True, "rows": len(rows), "saved_photos": saved, "valid_person_count": success}
+        _save_person_db_to_path(persons, stage_db_path)
+        now = int(time.time())
+        _save_meta_to_path(
+            {
+                "last_sync_ts": now,
+                "last_rebuild_ts": now,
+                "last_sync_rows": len(rows),
+                "saved_photo_count": saved,
+                "valid_person_count": success,
+            },
+            stage_meta_path,
+        )
+        _commit_face_library_stage(
+            stage_photo_dir=stage_photo_dir,
+            stage_feature_dir=stage_feature_dir,
+            stage_db_path=stage_db_path,
+            stage_meta_path=stage_meta_path,
+        )
+        _report(progress_cb, stage="complete", message="Face library sync completed", processed=len(persons), total=len(persons))
+        return {"ok": True, "rows": len(rows), "saved_photos": saved, "valid_person_count": success}
+    finally:
+        _cleanup_path(stage_root)
 
 
 def identify_image_path(image_path: str, top_k: int | None = None) -> dict[str, Any]:

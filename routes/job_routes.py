@@ -16,6 +16,7 @@ from config import (
 from db.oracle import fetch_image_urls
 from db.sqlite import get_job as get_saved_job
 from db.sqlite import list_jobs as list_saved_jobs
+from service.face_library_service import get_face_library_status
 from service.result_store_service import (
     attach_identity_to_manifest_items,
     load_identity_report,
@@ -37,13 +38,10 @@ from utils.helpers import (
     parse_and_normalize_dt,
     to_datetime_local_str,
 )
+from utils.ownership import get_request_owner, job_matches_owner
 
 
 job_bp = Blueprint("job", __name__)
-
-
-def _request_owner_ip() -> str:
-    return request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote_addr or ""
 
 
 def _progress_payload(job: dict) -> dict:
@@ -89,8 +87,8 @@ def _history_summary_payload(record: dict) -> dict:
     }
 
 
-def _is_visible_job(record: dict | None, owner_ip: str) -> bool:
-    return bool(record) and bool(owner_ip) and record.get("owner_ip") == owner_ip
+def _is_visible_job(record: dict | None, owner_key: str, owner_ip: str) -> bool:
+    return job_matches_owner(record, owner_key, owner_ip)
 
 
 @job_bp.route("/", methods=["GET", "POST"])
@@ -178,13 +176,14 @@ def start_job():
     except Exception:
         pass
 
-    owner_ip = _request_owner_ip()
+    owner_key, owner_ip = get_request_owner(request)
     with JOBS_LOCK:
         job = _new_job_record(total=len(url_and_times))
+        job["owner_key"] = owner_key
         job["owner_ip"] = owner_ip
         job["model_key"] = model_key
         for running_job in JOBS.values():
-            if running_job.get("status") == "running" and running_job.get("owner_ip") == owner_ip:
+            if running_job.get("status") == "running" and job_matches_owner(running_job, owner_key, owner_ip):
                 running_job["cancel"].set()
         JOBS[job["id"]] = job
         job_id = job["id"]
@@ -200,39 +199,44 @@ def start_job():
 
 @job_bp.get("/progress/<job_id>")
 def get_progress(job_id: str):
+    owner_key, owner_ip = get_request_owner(request)
     job = get_job_snapshot(job_id)
     if job is not None:
+        if not job_matches_owner(job, owner_key, owner_ip):
+            return jsonify({"ok": False, "error": "job not found"}), 404
         return jsonify({"ok": True, "job": _progress_payload(job)})
 
     saved_job = get_saved_job(job_id)
-    if saved_job is None:
+    if saved_job is None or not job_matches_owner(saved_job, owner_key, owner_ip):
         return jsonify({"ok": False, "error": "job not found"}), 404
     return jsonify({"ok": True, "job": _progress_payload(saved_job)})
 
 
 @job_bp.post("/cancel/<job_id>")
 def cancel_job(job_id: str):
-    if not request_cancel(job_id):
+    owner_key, owner_ip = get_request_owner(request)
+    if not request_cancel(job_id, owner_key, owner_ip):
         return jsonify({"ok": False, "error": "job not found"}), 404
     return jsonify({"ok": True})
 
 
 @job_bp.get("/jobs")
 def list_jobs():
-    running = list_running_jobs()
+    owner_key, owner_ip = get_request_owner(request)
+    running = list_running_jobs(owner_key, owner_ip)
     return jsonify({"ok": True, "running_count": len(running), "running": running})
 
 
 @job_bp.get("/history")
 def history():
-    owner_ip = _request_owner_ip()
+    owner_key, owner_ip = get_request_owner(request)
     limit_raw = request.args.get("limit", "50")
     try:
         limit = int(limit_raw)
     except Exception:
         limit = 50
 
-    records = list_saved_jobs(owner_ip, limit=limit)
+    records = list_saved_jobs(owner_key, owner_ip, limit=limit)
     items = [_history_summary_payload(record) for record in records]
     return jsonify({"ok": True, "jobs": items})
 
@@ -249,9 +253,9 @@ def history_detail_page(job_id: str):
 
 @job_bp.get("/history/<job_id>")
 def history_detail(job_id: str):
-    owner_ip = _request_owner_ip()
+    owner_key, owner_ip = get_request_owner(request)
     record = get_saved_job(job_id)
-    if not _is_visible_job(record, owner_ip):
+    if not job_matches_owner(record, owner_key, owner_ip):
         return jsonify({"ok": False, "error": "job not found"}), 404
 
     manifest = None
@@ -306,5 +310,6 @@ def history_detail(job_id: str):
         },
         "items": items,
         "identity_summary": identity_report.get("summary") or (record.get("identity_summary") or {}),
+        "library": get_face_library_status(),
     }
     return jsonify(payload)

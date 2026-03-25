@@ -10,7 +10,9 @@ PROMPT_MODEL_DEFAULT_CONF = 0.10
 
 
 def _resolve_path(path_value: str) -> str:
-    return path_value if os.path.isabs(path_value) else os.path.abspath(os.path.join(BASE_DIR, path_value))
+    if os.path.isabs(path_value):
+        return path_value
+    return os.path.abspath(os.path.join(BASE_DIR, path_value))
 
 
 def _load_env_file(*paths: str) -> None:
@@ -42,7 +44,6 @@ ORACLE_PORT = int(os.getenv("ORACLE_PORT", "1521"))
 ORACLE_SERVICE = os.getenv("ORACLE_SERVICE", "yfgxpt")
 ORACLE_USER = os.getenv("ORACLE_USER", "yfzagk")
 ORACLE_PASSWORD = os.getenv("ORACLE_PASSWORD", "yfzagk")
-
 INSTANT_CLIENT_DIR = _resolve_path(os.getenv("ORACLE_IC_DIR", os.path.join(BASE_DIR, "instantclient_11_2")))
 
 
@@ -55,7 +56,6 @@ def _resolve_model_path(default_filename: str, *env_names: str) -> str:
         candidate = _resolve_path(env_value)
         if os.path.isfile(candidate):
             return os.path.abspath(candidate)
-
     return os.path.abspath(project_model_path)
 
 
@@ -79,7 +79,7 @@ def _resolve_model_path_candidates(default_filenames: tuple[str, ...], *env_name
 
 MODEL_REGISTRY = {
     "bczj": _resolve_model_path("biaochezhajiev2.pt", "MODEL_PATH_BCZJ", "MODEL_PATH"),
-    "general": _resolve_model_path_candidates(("yoloe-26s-seg.pt", "yoloe-26n-seg.pt"), "MODEL_PATH_GENERAL"),
+    "general": _resolve_model_path_candidates(("yolov8s-worldv2.pt", "yolo26s.pt", "yolo26n.pt"), "MODEL_PATH_GENERAL"),
 }
 MOBILECLIP_TS_PATH = _resolve_model_path("mobileclip_blt.ts", "MOBILECLIP_TS_PATH")
 MOBILECLIP2_TS_PATH = _resolve_model_path("mobileclip2_b.ts", "MOBILECLIP2_TS_PATH")
@@ -99,8 +99,8 @@ SQLITE_DB_PATH = _resolve_path(os.getenv("SQLITE_DB_PATH", os.path.join(BASE_DIR
 RESULTS_DIR = _resolve_path(os.getenv("RESULTS_DIR", os.path.join(OUTPUT_DIR, "_results")))
 
 UPLOAD_TEMP_DIR = _resolve_path(os.getenv("UPLOAD_TEMP_DIR", os.path.join(BASE_DIR, "upload_tmp")))
-MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(1024 * 1024 * 1024)))  # 1 GB
-VIDEO_FRAME_INTERVAL = int(os.getenv("VIDEO_FRAME_INTERVAL", "5"))  # extract 1 frame every N frames
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(1024 * 1024 * 1024)))
+VIDEO_FRAME_INTERVAL = int(os.getenv("VIDEO_FRAME_INTERVAL", "5"))
 
 FACE_MODEL_DET = _resolve_path(os.getenv("FACE_MODEL_DET", os.path.join(MODEL_DIR, "det_10g.onnx")))
 FACE_MODEL_REC = _resolve_path(os.getenv("FACE_MODEL_REC", os.path.join(MODEL_DIR, "w600k_r50.onnx")))
@@ -123,13 +123,13 @@ APP_PORT = int(os.getenv("APP_PORT", "5001"))
 
 def _is_prompt_model_name(model_name: str) -> bool:
     lower = os.path.basename(model_name).lower()
-    return "yoloe" in lower or ("yolo" in lower and "world" in lower)
+    return "yolo" in lower and "world" in lower
 
 
 def model_supports_text_prompt(model_key: str) -> bool:
     key = (model_key or "").strip()
     if key == "general":
-        return True
+        return _is_prompt_model_name(os.path.basename(MODEL_REGISTRY.get("general", "")))
     if key == "bczj":
         return False
     return _is_prompt_model_name(key)
@@ -180,9 +180,9 @@ def get_upload_model_default() -> str:
 
     preferred_names = [
         os.path.basename(MODEL_REGISTRY.get("general", "")),
-        "yoloe-26s-seg.pt",
-        "yoloe-26n-seg.pt",
         "yolov8s-worldv2.pt",
+        "yolo26s.pt",
+        "yolo26n.pt",
         os.path.basename(MODEL_REGISTRY.get("bczj", "")),
     ]
     name_lookup = {name.lower(): name for name in registry}
@@ -199,12 +199,14 @@ def get_upload_model_default() -> str:
 def _upload_model_description(model_name: str) -> str:
     lower = model_name.lower()
     if lower == "biaochezhajiev2.pt":
-        return "飙车炸街专用模型，适合类别过滤。"
-    if "yoloe" in lower:
-        return "YOLOE 开放词表模型，支持英文提示词。"
+        return "Private wheelie detection model for closed-set filtering."
     if "yolo" in lower and "world" in lower:
-        return "YOLO-World 开放词表模型，支持英文提示词。"
-    return "自定义检测模型。"
+        return "YOLO-World open-vocabulary model with English prompts."
+    if lower == "yolo26n.pt":
+        return "YOLO26n base model for low-compute training and deployment."
+    if lower == "yolo26s.pt":
+        return "YOLO26s base model for balanced accuracy and speed."
+    return "Custom detection model."
 
 
 def get_upload_model_options() -> list[dict[str, object]]:
@@ -214,9 +216,9 @@ def get_upload_model_options() -> list[dict[str, object]]:
 
     preferred_rank = {
         os.path.basename(MODEL_REGISTRY.get("general", "")).lower(): 0,
-        "yoloe-26s-seg.pt": 1,
-        "yoloe-26n-seg.pt": 2,
-        "yolov8s-worldv2.pt": 3,
+        "yolov8s-worldv2.pt": 1,
+        "yolo26s.pt": 2,
+        "yolo26n.pt": 3,
         os.path.basename(MODEL_REGISTRY.get("bczj", "")).lower(): 10,
     }
 
@@ -240,20 +242,19 @@ def get_upload_model_options() -> list[dict[str, object]]:
 
     return options
 
+
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(UPLOAD_TEMP_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-# Disable ultralytics telemetry and PyPI version-check network calls.
-# Without this, YOLO() startup will attempt outbound HTTP to PyPI and
-# analytics.ultralytics.com, causing timeout delays on an intranet host.
+# Disable ultralytics telemetry and version checks for intranet hosts.
 os.environ.setdefault("YOLO_TELEMETRY", "false")
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("multi_rider")
 
-if os.path.basename(MODEL_REGISTRY["general"]).lower() != "yoloe-26s-seg.pt":
+if os.path.basename(MODEL_REGISTRY["general"]).lower() != "yolov8s-worldv2.pt":
     logger.warning(
-        "Preferred general model yoloe-26s-seg.pt is not active; currently using %s",
+        "Preferred general model yolov8s-worldv2.pt is not active; currently using %s",
         MODEL_REGISTRY["general"],
     )

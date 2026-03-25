@@ -23,6 +23,7 @@ JOB_COLUMNS = (
     "downloaded",
     "start_ts",
     "end_ts",
+    "owner_key",
     "owner_ip",
     "conf_thresh",
     "batch_size",
@@ -106,6 +107,7 @@ def init_db() -> None:
                 downloaded INTEGER NOT NULL DEFAULT 0,
                 start_ts INTEGER,
                 end_ts INTEGER,
+                owner_key TEXT,
                 owner_ip TEXT,
                 conf_thresh REAL,
                 batch_size INTEGER,
@@ -133,6 +135,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE jobs ADD COLUMN source_name TEXT")
         if "source_type" not in columns:
             conn.execute("ALTER TABLE jobs ADD COLUMN source_type TEXT")
+        if "owner_key" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN owner_key TEXT")
         if "result_dir" not in columns:
             conn.execute("ALTER TABLE jobs ADD COLUMN result_dir TEXT")
         if "result_manifest_path" not in columns:
@@ -142,6 +146,9 @@ def init_db() -> None:
         if "identity_summary_json" not in columns:
             conn.execute("ALTER TABLE jobs ADD COLUMN identity_summary_json TEXT")
 
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jobs_owner_key_start_ts ON jobs(owner_key, start_ts DESC)"
+        )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_jobs_owner_start_ts ON jobs(owner_ip, start_ts DESC)"
         )
@@ -166,6 +173,7 @@ def save_job(job: dict[str, Any]) -> None:
         "downloaded": int(job.get("downloaded") or 0),
         "start_ts": job.get("start_ts"),
         "end_ts": job.get("end_ts"),
+        "owner_key": job.get("owner_key", ""),
         "owner_ip": job.get("owner_ip", ""),
         "conf_thresh": job.get("conf_thresh"),
         "batch_size": job.get("batch_size"),
@@ -185,13 +193,13 @@ def save_job(job: dict[str, Any]) -> None:
             """
             INSERT INTO jobs (
                 job_type, id, source_name, source_type, status, message, total, processed, kept, notfound, failed,
-                downloaded, start_ts, end_ts, owner_ip, conf_thresh, batch_size,
+                downloaded, start_ts, end_ts, owner_key, owner_ip, conf_thresh, batch_size,
                 imgsz, classes_raw, model_key, zip_paths_json, result_dir, result_manifest_path,
                 identity_result_path, identity_summary_json, summary_text
             )
             VALUES (
                 :job_type, :id, :source_name, :source_type, :status, :message, :total, :processed, :kept, :notfound, :failed,
-                :downloaded, :start_ts, :end_ts, :owner_ip, :conf_thresh, :batch_size,
+                :downloaded, :start_ts, :end_ts, :owner_key, :owner_ip, :conf_thresh, :batch_size,
                 :imgsz, :classes_raw, :model_key, :zip_paths_json, :result_dir, :result_manifest_path,
                 :identity_result_path, :identity_summary_json, :summary_text
             )
@@ -209,6 +217,7 @@ def save_job(job: dict[str, Any]) -> None:
                 downloaded = excluded.downloaded,
                 start_ts = excluded.start_ts,
                 end_ts = excluded.end_ts,
+                owner_key = excluded.owner_key,
                 owner_ip = excluded.owner_ip,
                 conf_thresh = excluded.conf_thresh,
                 batch_size = excluded.batch_size,
@@ -233,15 +242,22 @@ def get_job(job_id: str) -> dict[str, Any] | None:
     return _row_to_job(row)
 
 
-def list_jobs(owner_ip: str, limit: int = 50) -> list[dict[str, Any]]:
-    if not owner_ip:
+def list_jobs(owner_key: str, owner_ip: str, limit: int = 50) -> list[dict[str, Any]]:
+    if not owner_key and not owner_ip:
         return []
 
     safe_limit = max(1, min(int(limit or 50), 200))
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM jobs WHERE owner_ip = ? ORDER BY start_ts DESC LIMIT ?",
-            (owner_ip, safe_limit),
+            """
+            SELECT *
+            FROM jobs
+            WHERE owner_key = ?
+               OR (COALESCE(owner_key, '') = '' AND owner_ip = ?)
+            ORDER BY start_ts DESC
+            LIMIT ?
+            """,
+            (owner_key, owner_ip, safe_limit),
         ).fetchall()
     return [_row_to_job(row) for row in rows if row is not None]
 

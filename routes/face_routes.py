@@ -8,10 +8,12 @@ from service.face_library_service import (
     get_face_library_photo_path,
     get_face_library_status,
     identify_image_path,
+    list_persons,
 )
 from service.face_library_task_service import (
     get_face_library_task,
     get_running_face_library_task,
+    list_face_library_tasks,
     start_face_library_task,
 )
 from service.job_service import get_job_snapshot
@@ -23,6 +25,7 @@ from service.result_store_service import (
 )
 from service.upload_job_service import get_upload_job_snapshot
 from config import logger
+from utils.ownership import get_request_owner, job_matches_owner
 
 
 face_bp = Blueprint("face", __name__, url_prefix="/face")
@@ -53,8 +56,9 @@ def _job_manifest(job_id: str) -> tuple[dict | None, dict | None]:
 
 @face_bp.get("/results/<job_id>")
 def list_job_results(job_id: str):
+    owner_key, owner_ip = get_request_owner(request)
     job, manifest = _job_manifest(job_id)
-    if job is None:
+    if job is None or not job_matches_owner(job, owner_key, owner_ip):
         return jsonify({"ok": False, "error": "job not found"}), 404
     if manifest is None:
         return jsonify({"ok": False, "error": "result manifest not found"}), 404
@@ -92,8 +96,9 @@ def list_job_results(job_id: str):
 
 @face_bp.get("/results/<job_id>/asset/<asset_id>")
 def result_asset(job_id: str, asset_id: str):
-    _job, manifest = _job_manifest(job_id)
-    if manifest is None:
+    owner_key, owner_ip = get_request_owner(request)
+    job, manifest = _job_manifest(job_id)
+    if manifest is None or not job_matches_owner(job, owner_key, owner_ip):
         return "result manifest not found", 404
 
     safe_asset_id = os.path.basename(asset_id)
@@ -125,6 +130,28 @@ def face_library_photo(person_id: str):
     return send_file(path)
 
 
+@face_bp.get("/library/persons")
+def face_library_persons():
+    try:
+        page = int(request.args.get("page", 1))
+    except Exception:
+        page = 1
+    try:
+        page_size = int(request.args.get("page_size", 12))
+    except Exception:
+        page_size = 12
+    keyword = (request.args.get("keyword", "") or "").strip()
+    result = list_persons(page=page, page_size=page_size, keyword=keyword)
+    return jsonify({"ok": True, **result})
+
+
+@face_bp.get("/library/tasks")
+def face_library_tasks_list():
+    tasks = list_face_library_tasks()
+    tasks.sort(key=lambda t: t.get("start_ts", 0), reverse=True)
+    return jsonify({"ok": True, "tasks": tasks})
+
+
 @face_bp.post("/library/rebuild")
 def face_library_rebuild():
     task, started = start_face_library_task("rebuild")
@@ -147,6 +174,7 @@ def face_library_task(task_id: str):
 
 @face_bp.post("/identify")
 def identify_faces():
+    owner_key, owner_ip = get_request_owner(request)
     payload = request.get_json(silent=True) or {}
     job_id = (payload.get("job_id", "") or "").strip()
     asset_ids = payload.get("asset_ids") or []
@@ -161,7 +189,7 @@ def identify_faces():
         return jsonify({"ok": False, "error": "asset_ids is required"}), 400
 
     job, manifest = _job_manifest(job_id)
-    if manifest is None:
+    if manifest is None or not job_matches_owner(job, owner_key, owner_ip):
         return jsonify({"ok": False, "error": "result manifest not found"}), 404
 
     selected = []

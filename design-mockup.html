@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multi-Rider Mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(186, 230, 253, 0.85), transparent 30%),
+        radial-gradient(circle at bottom left, rgba(254, 215, 170, 0.7), transparent 28%),
+        linear-gradient(180deg, #f8fafc 0%, #fff7ed 100%);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .card {
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.7);
+      background: rgba(255,255,255,0.88);
+      box-shadow: 0 24px 60px rgba(15,23,42,0.08);
+      backdrop-filter: blur(8px);
+    }
+    .inner-card {
+      border-radius: 22px;
+      border: 1px solid #e2e8f0;
+      background: rgba(248,250,252,0.85);
+    }
+    .tab-btn { transition: all 0.2s ease; }
+  </style>
+</head>
+<body class="min-h-screen text-slate-900">
+  <div class="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-10">
+    <header class="mb-8 grid gap-4 xl:grid-cols-[1.5fr,0.9fr]">
+      <section class="card p-6 md:p-8">
+        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Multi-Rider</div>
+        <h1 class="mt-5 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">检测、身份识别与训练一体化原型</h1>
+        <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
+          面向内网和低算力环境，统一承载 Oracle 检测、本地上传检测、人脸库管理，以及新增的标注与训练模块。
+        </p>
+        <div class="mt-5 flex flex-wrap gap-2">
+          <span class="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-teal-200">内网部署</span>
+          <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-200">低算力优先</span>
+          <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">训练闭环</span>
+        </div>
+      </section>
+      <section class="card bg-slate-900 p-6 text-white">
+        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-200">Overview</div>
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div class="text-sm text-slate-300">运行任务</div>
+            <div class="mt-2 text-3xl font-semibold">1</div>
+          </div>
+          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div class="text-sm text-slate-300">可用模型</div>
+            <div class="mt-2 text-3xl font-semibold">4</div>
+          </div>
+        </div>
+        <div class="mt-5 text-sm leading-7 text-slate-300">
+          默认开放词表模型改为 `yolov8s-worldv2.pt`，训练底模使用 `yolo26n.pt` 和 `yolo26s.pt`。
+        </div>
+      </section>
+    </header>
+
+    <div class="mb-6 flex flex-wrap gap-3" id="tabNav">
+      <button onclick="switchTab('oracle')" id="tabBtn-oracle" class="tab-btn rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">数据库检测</button>
+      <button onclick="switchTab('upload')" id="tabBtn-upload" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">本地上传检测</button>
+      <button onclick="switchTab('train')" id="tabBtn-train" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">Train 模块</button>
+      <button onclick="switchTab('face')" id="tabBtn-face" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">人脸库</button>
+    </div>
+
+    <div id="tab-oracle" class="tab-panel active">
+      <div class="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
+        <section class="card p-5 md:p-8">
+          <div class="space-y-8">
+            <div>
+              <h2 class="text-xl font-semibold text-slate-900">Oracle 检测任务</h2>
+              <p class="mt-3 text-sm leading-7 text-slate-500">按时间范围查询图片 URL，批量下载并推理。适合日常筛查和历史数据回溯。</p>
+            </div>
+            <div class="grid gap-4 md:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">开始时间</span>
+                <input type="datetime-local" value="2026-03-25T00:00:00" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">结束时间</span>
+                <input type="datetime-local" value="2026-03-25T23:59:59" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+            </div>
+            <div class="grid gap-4 md:grid-cols-3">
+              <label class="block inner-card p-4">
+                <span class="mb-2 block text-sm font-medium text-slate-700">模型</span>
+                <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">
+                  <option selected>general / yolov8s-worldv2.pt</option>
+                  <option>bczj / biaochezhajiev2.pt</option>
+                </select>
+              </label>
+              <label class="block inner-card p-4">
+                <span class="mb-2 block text-sm font-medium text-slate-700">Classes</span>
+                <input type="text" value="person,motorcycle" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+              <label class="block inner-card p-4">
+                <span class="mb-2 block text-sm font-medium text-slate-700">阈值</span>
+                <input type="number" value="0.10" step="0.01" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+            </div>
+            <div class="flex justify-end">
+              <button class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white">开始分类并下载 ZIP</button>
+            </div>
+          </div>
+        </section>
+        <section class="space-y-6">
+          <div class="card p-5 md:p-6">
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Progress</div>
+            <h3 class="mt-2 text-xl font-semibold text-slate-900">任务进度</h3>
+            <div class="mt-5 inner-card p-4">
+              <div class="text-sm font-medium text-slate-800">已处理 156 / 500</div>
+              <div class="mt-4 h-3 rounded-full bg-slate-100">
+                <div class="h-3 rounded-full bg-sky-500" style="width:31%"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="tab-upload" class="tab-panel">
+      <div class="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
+        <section class="card p-5 md:p-8">
+          <h2 class="text-xl font-semibold text-slate-900">本地上传检测</h2>
+          <p class="mt-3 text-sm leading-7 text-slate-500">支持 ZIP 图片包和视频文件。适合现场素材快速排查。</p>
+          <div class="mt-6 grid gap-4 md:grid-cols-2">
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">上传文件</span>
+              <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                ZIP / MP4 / AVI / MOV / MKV / MPG / MPEG
+              </div>
+            </label>
+            <div class="space-y-4">
+              <label class="block inner-card p-4">
+                <span class="mb-2 block text-sm font-medium text-slate-700">模型</span>
+                <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">
+                  <option selected>yolov8s-worldv2.pt</option>
+                  <option>yolo26s.pt</option>
+                  <option>yolo26n.pt</option>
+                  <option>biaochezhajiev2.pt</option>
+                </select>
+              </label>
+              <label class="block inner-card p-4">
+                <span class="mb-2 block text-sm font-medium text-slate-700">Classes</span>
+                <input type="text" value="person,motorcycle,reflective vest" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+            </div>
+          </div>
+          <div class="mt-6 flex justify-end">
+            <button class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white">开始检测</button>
+          </div>
+        </section>
+        <section class="space-y-6">
+          <div class="card p-5 md:p-6">
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Result Review</div>
+            <h3 class="mt-2 text-xl font-semibold text-slate-900">结果图与识别记录</h3>
+            <div class="mt-5 grid gap-4 sm:grid-cols-2">
+              <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div class="h-36 bg-slate-100"></div>
+                <div class="p-4 text-sm text-slate-600">IMG_0001.jpg / 已匹配 1 人脸</div>
+              </div>
+              <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div class="h-36 bg-slate-100"></div>
+                <div class="p-4 text-sm text-slate-600">IMG_0002.jpg / 未匹配</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="tab-train" class="tab-panel">
+      <div class="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
+        <section class="card p-5 md:p-8">
+          <div class="space-y-8">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Train Pipeline</div>
+              <h2 class="mt-2 text-2xl font-bold text-slate-900">标注与训练闭环</h2>
+              <p class="mt-3 text-sm leading-7 text-slate-500">
+                训练模块优先服务现有业务模型沉淀：导入数据、预标注、人工修正、训练 YOLO26、评估后发布到当前检测链路。
+              </p>
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-3">
+              <div class="inner-card p-5">
+                <div class="text-sm font-semibold text-slate-900">01 数据集</div>
+                <div class="mt-2 text-sm leading-6 text-slate-500">支持 ZIP 图片、视频抽帧、历史结果图一键回流。</div>
+              </div>
+              <div class="inner-card p-5">
+                <div class="text-sm font-semibold text-slate-900">02 预标注</div>
+                <div class="mt-2 text-sm leading-6 text-slate-500">优先用 `yolov8s-worldv2.pt` 做 prompt 预标注，再人工修正。</div>
+              </div>
+              <div class="inner-card p-5">
+                <div class="text-sm font-semibold text-slate-900">03 训练与发布</div>
+                <div class="mt-2 text-sm leading-6 text-slate-500">用 `yolo26n.pt` / `yolo26s.pt` 训练闭集模型，发布回 `model/`。</div>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-100 pt-8">
+              <div class="grid gap-4 md:grid-cols-2">
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">数据集名称</span>
+                  <input type="text" value="wheelie_train_20260325" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+                </label>
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">类目</span>
+                  <input type="text" value="wheelie,multi_rider,reflective_vest" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+                </label>
+              </div>
+              <div class="mt-5 grid gap-4 lg:grid-cols-[1fr,1fr,0.8fr]">
+                <label class="block inner-card p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">预标注模型</span>
+                  <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">
+                    <option selected>yolov8s-worldv2.pt</option>
+                    <option>biaochezhajiev2.pt</option>
+                  </select>
+                </label>
+                <label class="block inner-card p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">Prompt / Classes</span>
+                  <input type="text" value="motorcycle,person,reflective vest" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+                </label>
+                <label class="block inner-card p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">阈值</span>
+                  <input type="number" value="0.10" step="0.01" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+                </label>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-100 pt-8">
+              <h3 class="text-lg font-semibold text-slate-900">训练预设</h3>
+              <div class="mt-5 grid gap-4 md:grid-cols-3">
+                <div class="inner-card p-5">
+                  <div class="text-sm font-semibold text-slate-900">Quick</div>
+                  <div class="mt-2 text-sm leading-6 text-slate-500">`yolo26n.pt` / `imgsz=640` / `epochs=30`</div>
+                </div>
+                <div class="inner-card p-5">
+                  <div class="text-sm font-semibold text-slate-900">Standard</div>
+                  <div class="mt-2 text-sm leading-6 text-slate-500">`yolo26s.pt` / `imgsz=640` / `epochs=80`</div>
+                </div>
+                <div class="inner-card p-5">
+                  <div class="text-sm font-semibold text-slate-900">Low Memory</div>
+                  <div class="mt-2 text-sm leading-6 text-slate-500">`yolo26n.pt` / `imgsz=512` / small batch</div>
+                </div>
+              </div>
+              <div class="mt-5 grid gap-4 lg:grid-cols-4">
+                <label class="block inner-card p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">Base Model</span>
+                  <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">
+                    <option selected>yolo26n.pt</option>
+                    <option>yolo26s.pt</option>
+                  </select>
+                </label>
+                <label class="block inner-card p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">Image Size</span>
+                  <input type="number" value="640" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+                </label>
+                <label class="block inner-card p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">Epochs</span>
+                  <input type="number" value="80" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+                </label>
+                <label class="block inner-card p-4">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">Batch</span>
+                  <input type="number" value="8" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+                </label>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-4 border-t border-slate-100 pt-8 sm:flex-row sm:items-center sm:justify-between">
+              <div class="text-sm leading-7 text-slate-500">
+                发布后把 `best.pt` 复制到 `model/`，当前上传检测页会自动把新模型加入下拉列表。
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <button class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">保存草稿</button>
+                <button class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white">开始训练</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="space-y-6">
+          <div class="card p-5 md:p-6">
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Dataset Status</div>
+            <h3 class="mt-2 text-xl font-semibold text-slate-900">数据集概览</h3>
+            <div class="mt-5 grid gap-4 sm:grid-cols-2">
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">Images</div>
+                <div class="mt-2 text-2xl font-bold text-slate-900">2,486</div>
+              </div>
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">Labeled</div>
+                <div class="mt-2 text-2xl font-bold text-emerald-600">1,932</div>
+              </div>
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">Review Left</div>
+                <div class="mt-2 text-2xl font-bold text-amber-500">554</div>
+              </div>
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">Classes</div>
+                <div class="mt-2 text-2xl font-bold text-slate-900">3</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Train Queue</div>
+                <h3 class="mt-2 text-xl font-semibold text-slate-900">训练进度</h3>
+              </div>
+              <span class="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-200">running</span>
+            </div>
+            <div class="mt-5 inner-card p-4">
+              <div class="flex items-center justify-between text-sm">
+                <span class="font-medium text-slate-800">wheelie_train_20260325 / yolo26s.pt</span>
+                <span class="text-slate-500">epoch 18 / 80</span>
+              </div>
+              <div class="mt-4 h-3 rounded-full bg-slate-100">
+                <div class="h-3 rounded-full bg-sky-500" style="width:22%"></div>
+              </div>
+              <div class="mt-3 text-xs leading-6 text-slate-500">单机低算力模式下只允许 1 个训练任务并发，避免拖垮当前检测服务。</div>
+            </div>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Publish</div>
+            <h3 class="mt-2 text-xl font-semibold text-slate-900">模型发布</h3>
+            <div class="mt-5 space-y-3">
+              <div class="inner-card p-4">
+                <div class="text-sm font-semibold text-slate-900">best.pt</div>
+                <div class="mt-2 text-sm leading-6 text-slate-500">mAP50 = 0.83 / recall = 0.79 / precision = 0.86</div>
+              </div>
+              <div class="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50 p-4 text-sm leading-7 text-emerald-700">
+                发布后模型直接进入当前系统的模型目录，不需要额外手工接线。
+              </div>
+              <button class="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white">发布为当前业务模型</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="tab-face" class="tab-panel">
+      <div class="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
+        <section class="card p-5 md:p-8">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Face Library</div>
+              <h2 class="mt-2 text-2xl font-bold text-slate-900">人脸库状态</h2>
+              <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-500">
+                管理人脸照片、特征向量和识别结果回写。训练模块不直接替代人脸库，只负责视觉检测模型闭环。
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button class="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">同步人脸库</button>
+              <button class="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700">重建特征</button>
+            </div>
+          </div>
+          <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="inner-card p-4">
+              <div class="text-xs text-slate-500">库状态</div>
+              <div class="mt-2 text-xl font-bold text-emerald-600">ready</div>
+            </div>
+            <div class="inner-card p-4">
+              <div class="text-xs text-slate-500">人员数</div>
+              <div class="mt-2 text-xl font-bold text-slate-900">156</div>
+            </div>
+            <div class="inner-card p-4">
+              <div class="text-xs text-slate-500">照片数</div>
+              <div class="mt-2 text-xl font-bold text-slate-900">212</div>
+            </div>
+            <div class="inner-card p-4">
+              <div class="text-xs text-slate-500">特征状态</div>
+              <div class="mt-2 text-xl font-bold text-emerald-600">valid</div>
+            </div>
+          </div>
+        </section>
+        <section class="space-y-6">
+          <div class="card p-5 md:p-6">
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Operation History</div>
+            <h3 class="mt-2 text-xl font-semibold text-slate-900">操作历史</h3>
+            <div class="mt-5 space-y-3 text-sm text-slate-600">
+              <div class="inner-card p-4">2026-03-25 10:30 / 同步完成 / 156 人</div>
+              <div class="inner-card p-4">2026-03-25 10:32 / 重建完成 / 156 特征</div>
+              <div class="inner-card p-4">2026-03-24 14:20 / 同步失败 / 内网不可达</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tab) {
+      document.querySelectorAll(".tab-panel").forEach(function(panel) {
+        panel.classList.remove("active");
+      });
+      document.getElementById("tab-" + tab).classList.add("active");
+
+      document.querySelectorAll("#tabNav .tab-btn").forEach(function(btn) {
+        btn.classList.remove("bg-slate-900", "text-white");
+        btn.classList.add("bg-white", "text-slate-600", "ring-1", "ring-inset", "ring-slate-200");
+      });
+
+      var activeBtn = document.getElementById("tabBtn-" + tab);
+      activeBtn.classList.add("bg-slate-900", "text-white");
+      activeBtn.classList.remove("bg-white", "text-slate-600", "ring-1", "ring-inset", "ring-slate-200");
+    }
+  </script>
+</body>
+</html>
