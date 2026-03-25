@@ -14,9 +14,9 @@ DATASET_SUBDIRS = ("images", "labels", "splits", "exports")
 def _clean_dataset_name(value: str) -> str:
     name = " ".join((value or "").strip().split())
     if not name:
-        raise ValueError("dataset name is required")
+        raise ValueError("数据集名称不能为空")
     if len(name) > 80:
-        raise ValueError("dataset name is too long")
+        raise ValueError("数据集名称过长")
     return name
 
 
@@ -39,16 +39,16 @@ def _parse_class_names(value) -> list[str]:
         items.append(item)
 
     if not items:
-        raise ValueError("at least one class is required")
+        raise ValueError("至少填写一个类别")
     if len(items) > 50:
-        raise ValueError("too many classes")
+        raise ValueError("类别数量过多")
     return items
 
 
 def _clean_notes(value: str) -> str:
     notes = str(value or "").strip()
     if len(notes) > 500:
-        raise ValueError("notes are too long")
+        raise ValueError("备注内容过长")
     return notes
 
 

@@ -38,4 +38,4 @@ def dataset_create():
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         logger.exception("failed to create dataset: %s", exc)
-        return jsonify({"ok": False, "error": "failed to create dataset"}), 500
+        return jsonify({"ok": False, "error": "创建数据集失败"}), 500
