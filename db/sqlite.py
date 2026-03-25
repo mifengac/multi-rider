@@ -38,6 +38,21 @@ JOB_COLUMNS = (
     "summary_text",
 )
 
+DATASET_COLUMNS = (
+    "id",
+    "name",
+    "notes",
+    "class_names_json",
+    "status",
+    "image_count",
+    "labeled_count",
+    "reviewed_count",
+    "version_count",
+    "root_dir",
+    "created_ts",
+    "updated_ts",
+)
+
 
 def _connect() -> sqlite3.Connection:
     parent = os.path.dirname(SQLITE_DB_PATH)
@@ -86,6 +101,20 @@ def _row_to_job(row: sqlite3.Row | None) -> dict[str, Any] | None:
     job["zip_path"] = zip_paths[0] if len(zip_paths) == 1 else None
     job["identity_summary"] = identity_summary
     return job
+
+
+def _row_to_dataset(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    if row is None:
+        return None
+
+    dataset = {column: row[column] for column in DATASET_COLUMNS}
+    try:
+        class_names = json.loads(dataset.get("class_names_json") or "[]")
+    except Exception:
+        class_names = []
+
+    dataset["class_names"] = class_names
+    return dataset
 
 
 def init_db() -> None:
@@ -153,6 +182,51 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_jobs_owner_start_ts ON jobs(owner_ip, start_ts DESC)"
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_end_ts ON jobs(end_ts)")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS datasets (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                notes TEXT NOT NULL DEFAULT '',
+                class_names_json TEXT NOT NULL DEFAULT '[]',
+                status TEXT NOT NULL DEFAULT 'draft',
+                image_count INTEGER NOT NULL DEFAULT 0,
+                labeled_count INTEGER NOT NULL DEFAULT 0,
+                reviewed_count INTEGER NOT NULL DEFAULT 0,
+                version_count INTEGER NOT NULL DEFAULT 0,
+                root_dir TEXT NOT NULL,
+                created_ts INTEGER NOT NULL,
+                updated_ts INTEGER NOT NULL
+            )
+            """
+        )
+
+        dataset_columns = _existing_columns(conn, "datasets")
+        if "notes" not in dataset_columns:
+            conn.execute("ALTER TABLE datasets ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+        if "class_names_json" not in dataset_columns:
+            conn.execute(
+                "ALTER TABLE datasets ADD COLUMN class_names_json TEXT NOT NULL DEFAULT '[]'"
+            )
+        if "status" not in dataset_columns:
+            conn.execute("ALTER TABLE datasets ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'")
+        if "image_count" not in dataset_columns:
+            conn.execute("ALTER TABLE datasets ADD COLUMN image_count INTEGER NOT NULL DEFAULT 0")
+        if "labeled_count" not in dataset_columns:
+            conn.execute("ALTER TABLE datasets ADD COLUMN labeled_count INTEGER NOT NULL DEFAULT 0")
+        if "reviewed_count" not in dataset_columns:
+            conn.execute("ALTER TABLE datasets ADD COLUMN reviewed_count INTEGER NOT NULL DEFAULT 0")
+        if "version_count" not in dataset_columns:
+            conn.execute("ALTER TABLE datasets ADD COLUMN version_count INTEGER NOT NULL DEFAULT 0")
+        if "root_dir" not in dataset_columns:
+            conn.execute("ALTER TABLE datasets ADD COLUMN root_dir TEXT NOT NULL DEFAULT ''")
+        if "created_ts" not in dataset_columns:
+            conn.execute("ALTER TABLE datasets ADD COLUMN created_ts INTEGER NOT NULL DEFAULT 0")
+        if "updated_ts" not in dataset_columns:
+            conn.execute("ALTER TABLE datasets ADD COLUMN updated_ts INTEGER NOT NULL DEFAULT 0")
+
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_datasets_updated_ts ON datasets(updated_ts DESC)")
         conn.commit()
 
 
@@ -240,6 +314,72 @@ def get_job(job_id: str) -> dict[str, Any] | None:
     with _connect() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
     return _row_to_job(row)
+
+
+def save_dataset(dataset: dict[str, Any]) -> None:
+    payload = {
+        "id": dataset.get("id", ""),
+        "name": dataset.get("name", ""),
+        "notes": dataset.get("notes", ""),
+        "class_names_json": json.dumps(dataset.get("class_names") or [], ensure_ascii=False),
+        "status": dataset.get("status", "draft"),
+        "image_count": int(dataset.get("image_count") or 0),
+        "labeled_count": int(dataset.get("labeled_count") or 0),
+        "reviewed_count": int(dataset.get("reviewed_count") or 0),
+        "version_count": int(dataset.get("version_count") or 0),
+        "root_dir": dataset.get("root_dir", ""),
+        "created_ts": int(dataset.get("created_ts") or 0),
+        "updated_ts": int(dataset.get("updated_ts") or 0),
+    }
+
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO datasets (
+                id, name, notes, class_names_json, status, image_count, labeled_count,
+                reviewed_count, version_count, root_dir, created_ts, updated_ts
+            )
+            VALUES (
+                :id, :name, :notes, :class_names_json, :status, :image_count, :labeled_count,
+                :reviewed_count, :version_count, :root_dir, :created_ts, :updated_ts
+            )
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                notes = excluded.notes,
+                class_names_json = excluded.class_names_json,
+                status = excluded.status,
+                image_count = excluded.image_count,
+                labeled_count = excluded.labeled_count,
+                reviewed_count = excluded.reviewed_count,
+                version_count = excluded.version_count,
+                root_dir = excluded.root_dir,
+                created_ts = excluded.created_ts,
+                updated_ts = excluded.updated_ts
+            """,
+            payload,
+        )
+        conn.commit()
+
+
+def get_dataset(dataset_id: str) -> dict[str, Any] | None:
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM datasets WHERE id = ?", (dataset_id,)).fetchone()
+    return _row_to_dataset(row)
+
+
+def list_datasets(limit: int = 100) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(int(limit or 100), 500))
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM datasets
+            ORDER BY updated_ts DESC, created_ts DESC, id DESC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        ).fetchall()
+    return [_row_to_dataset(row) for row in rows if row is not None]
 
 
 def list_jobs(owner_key: str, owner_ip: str, limit: int = 50) -> list[dict[str, Any]]:

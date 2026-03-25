@@ -8,6 +8,7 @@ dist/
 .remote_check_*/
 
 output/
+datasets/
 *.log
 *.tmp
 app.env

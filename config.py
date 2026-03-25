@@ -97,6 +97,7 @@ IMGSZ = int(os.getenv("IMGSZ", "640"))
 OUTPUT_DIR = _resolve_path(os.getenv("OUTPUT_DIR", os.path.join(BASE_DIR, "output")))
 SQLITE_DB_PATH = _resolve_path(os.getenv("SQLITE_DB_PATH", os.path.join(BASE_DIR, "jobs.sqlite3")))
 RESULTS_DIR = _resolve_path(os.getenv("RESULTS_DIR", os.path.join(OUTPUT_DIR, "_results")))
+DATASETS_DIR = _resolve_path(os.getenv("DATASETS_DIR", os.path.join(BASE_DIR, "datasets")))
 
 UPLOAD_TEMP_DIR = _resolve_path(os.getenv("UPLOAD_TEMP_DIR", os.path.join(BASE_DIR, "upload_tmp")))
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(1024 * 1024 * 1024)))
@@ -246,6 +247,7 @@ def get_upload_model_options() -> list[dict[str, object]]:
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(UPLOAD_TEMP_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
+os.makedirs(DATASETS_DIR, exist_ok=True)
 
 # Disable ultralytics telemetry and version checks for intranet hosts.
 os.environ.setdefault("YOLO_TELEMETRY", "false")

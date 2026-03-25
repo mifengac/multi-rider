@@ -16,6 +16,7 @@ from db.sqlite import cleanup_old_jobs, init_db, mark_running_jobs_interrupted
 from routes.face_routes import face_bp
 from routes.file_routes import file_bp
 from routes.job_routes import job_bp
+from routes.train_routes import train_bp
 from routes.upload_routes import upload_bp
 from service.infer_service import get_model
 
@@ -44,6 +45,7 @@ def create_app() -> Flask:
     app.register_blueprint(file_bp)
     app.register_blueprint(upload_bp)
     app.register_blueprint(face_bp)
+    app.register_blueprint(train_bp)
     return app
 
 
