@@ -2,13 +2,17 @@ import json
 import os
 import sqlite3
 import time
+import shutil
 from typing import Any
 
 from config import MODEL_DEFAULT, SQLITE_DB_PATH, logger
 
 
 JOB_COLUMNS = (
+    "job_type",
     "id",
+    "source_name",
+    "source_type",
     "status",
     "message",
     "total",
@@ -26,6 +30,10 @@ JOB_COLUMNS = (
     "classes_raw",
     "model_key",
     "zip_paths_json",
+    "result_dir",
+    "result_manifest_path",
+    "identity_result_path",
+    "identity_summary_json",
     "summary_text",
 )
 
@@ -67,10 +75,15 @@ def _row_to_job(row: sqlite3.Row | None) -> dict[str, Any] | None:
         zip_paths = json.loads(job.get("zip_paths_json") or "[]")
     except Exception:
         zip_paths = []
+    try:
+        identity_summary = json.loads(job.get("identity_summary_json") or "{}")
+    except Exception:
+        identity_summary = {}
 
     job["zip_paths"] = zip_paths
     job["zip_parts"] = [{"path": path, "name": os.path.basename(path)} for path in zip_paths]
     job["zip_path"] = zip_paths[0] if len(zip_paths) == 1 else None
+    job["identity_summary"] = identity_summary
     return job
 
 
@@ -80,6 +93,9 @@ def init_db() -> None:
             """
             CREATE TABLE IF NOT EXISTS jobs (
                 id TEXT PRIMARY KEY,
+                job_type TEXT NOT NULL DEFAULT 'oracle',
+                source_name TEXT,
+                source_type TEXT,
                 status TEXT NOT NULL,
                 message TEXT,
                 total INTEGER NOT NULL DEFAULT 0,
@@ -97,6 +113,10 @@ def init_db() -> None:
                 classes_raw TEXT,
                 model_key TEXT NOT NULL DEFAULT 'general',
                 zip_paths_json TEXT,
+                result_dir TEXT,
+                result_manifest_path TEXT,
+                identity_result_path TEXT,
+                identity_summary_json TEXT,
                 summary_text TEXT
             )
             """
@@ -107,6 +127,20 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE jobs ADD COLUMN model_key TEXT NOT NULL DEFAULT 'general'"
             )
+        if "job_type" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN job_type TEXT NOT NULL DEFAULT 'oracle'")
+        if "source_name" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN source_name TEXT")
+        if "source_type" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN source_type TEXT")
+        if "result_dir" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN result_dir TEXT")
+        if "result_manifest_path" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN result_manifest_path TEXT")
+        if "identity_result_path" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN identity_result_path TEXT")
+        if "identity_summary_json" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN identity_summary_json TEXT")
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_jobs_owner_start_ts ON jobs(owner_ip, start_ts DESC)"
@@ -118,7 +152,10 @@ def init_db() -> None:
 def save_job(job: dict[str, Any]) -> None:
     zip_paths = _extract_zip_paths(job)
     payload = {
+        "job_type": job.get("job_type", "oracle"),
         "id": job.get("id", ""),
+        "source_name": job.get("source_name", ""),
+        "source_type": job.get("source_type", ""),
         "status": job.get("status", ""),
         "message": job.get("message", ""),
         "total": int(job.get("total") or 0),
@@ -136,6 +173,10 @@ def save_job(job: dict[str, Any]) -> None:
         "classes_raw": job.get("classes_raw", ""),
         "model_key": job.get("model_key", MODEL_DEFAULT),
         "zip_paths_json": json.dumps(zip_paths, ensure_ascii=False),
+        "result_dir": job.get("result_dir", ""),
+        "result_manifest_path": job.get("result_manifest_path", ""),
+        "identity_result_path": job.get("identity_result_path", ""),
+        "identity_summary_json": json.dumps(job.get("identity_summary") or {}, ensure_ascii=False),
         "summary_text": job.get("summary_text", ""),
     }
 
@@ -143,16 +184,21 @@ def save_job(job: dict[str, Any]) -> None:
         conn.execute(
             """
             INSERT INTO jobs (
-                id, status, message, total, processed, kept, notfound, failed,
+                job_type, id, source_name, source_type, status, message, total, processed, kept, notfound, failed,
                 downloaded, start_ts, end_ts, owner_ip, conf_thresh, batch_size,
-                imgsz, classes_raw, model_key, zip_paths_json, summary_text
+                imgsz, classes_raw, model_key, zip_paths_json, result_dir, result_manifest_path,
+                identity_result_path, identity_summary_json, summary_text
             )
             VALUES (
-                :id, :status, :message, :total, :processed, :kept, :notfound, :failed,
+                :job_type, :id, :source_name, :source_type, :status, :message, :total, :processed, :kept, :notfound, :failed,
                 :downloaded, :start_ts, :end_ts, :owner_ip, :conf_thresh, :batch_size,
-                :imgsz, :classes_raw, :model_key, :zip_paths_json, :summary_text
+                :imgsz, :classes_raw, :model_key, :zip_paths_json, :result_dir, :result_manifest_path,
+                :identity_result_path, :identity_summary_json, :summary_text
             )
             ON CONFLICT(id) DO UPDATE SET
+                job_type = excluded.job_type,
+                source_name = excluded.source_name,
+                source_type = excluded.source_type,
                 status = excluded.status,
                 message = excluded.message,
                 total = excluded.total,
@@ -170,6 +216,10 @@ def save_job(job: dict[str, Any]) -> None:
                 classes_raw = excluded.classes_raw,
                 model_key = excluded.model_key,
                 zip_paths_json = excluded.zip_paths_json,
+                result_dir = excluded.result_dir,
+                result_manifest_path = excluded.result_manifest_path,
+                identity_result_path = excluded.identity_result_path,
+                identity_summary_json = excluded.identity_summary_json,
                 summary_text = excluded.summary_text
             """,
             payload,
@@ -200,7 +250,7 @@ def cleanup_old_jobs(days: int = 7) -> int:
     cutoff = int(time.time()) - max(days, 0) * 24 * 60 * 60
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT id, zip_paths_json FROM jobs WHERE end_ts IS NOT NULL AND end_ts < ?",
+            "SELECT id, zip_paths_json, result_dir FROM jobs WHERE end_ts IS NOT NULL AND end_ts < ?",
             (cutoff,),
         ).fetchall()
 
@@ -219,6 +269,14 @@ def cleanup_old_jobs(days: int = 7) -> int:
                         pass
                     except Exception as exc:
                         logger.warning("failed to remove zip file %s: %s", path, exc)
+            result_dir = row["result_dir"]
+            if result_dir and os.path.isdir(result_dir):
+                try:
+                    shutil.rmtree(result_dir, ignore_errors=False)
+                except FileNotFoundError:
+                    pass
+                except Exception as exc:
+                    logger.warning("failed to remove result dir %s: %s", result_dir, exc)
 
         if delete_ids:
             conn.executemany("DELETE FROM jobs WHERE id = ?", [(job_id,) for job_id in delete_ids])

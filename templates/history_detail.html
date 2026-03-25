@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>任务详情</title>
+  <script src="{{ url_for('static', filename='tailwind.min.js') }}"></script>
+  <style>
+    body {
+      font-family: "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(153, 246, 228, 0.55), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(191, 219, 254, 0.7), transparent 28%),
+        linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%);
+    }
+  </style>
+  <script>
+    const JOB_ID = {{ job_id|tojson }};
+    const STATUS_UI = {
+      running: { label: '运行中', badge: 'bg-sky-100 text-sky-700 ring-sky-200' },
+      done: { label: '已完成', badge: 'bg-emerald-100 text-emerald-700 ring-emerald-200' },
+      error: { label: '失败', badge: 'bg-rose-100 text-rose-700 ring-rose-200' },
+      canceled: { label: '已取消', badge: 'bg-slate-200 text-slate-700 ring-slate-300' },
+      interrupted: { label: '已中断', badge: 'bg-amber-100 text-amber-700 ring-amber-200' }
+    };
+    const FACE_STATUS_UI = {
+      matched: { label: '已匹配', badge: 'bg-emerald-100 text-emerald-700 ring-emerald-200' },
+      no_match: { label: '无匹配', badge: 'bg-slate-100 text-slate-700 ring-slate-200' },
+      no_face: { label: '无人脸', badge: 'bg-amber-100 text-amber-700 ring-amber-200' },
+      low_quality: { label: '低质量', badge: 'bg-orange-100 text-orange-700 ring-orange-200' },
+      library_unavailable: { label: '人脸库未就绪', badge: 'bg-rose-100 text-rose-700 ring-rose-200' },
+      error: { label: '识别失败', badge: 'bg-rose-100 text-rose-700 ring-rose-200' }
+    };
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatBytes(size) {
+      const value = Number(size || 0);
+      if (!value) return '0 B';
+      if (value < 1024) return value + ' B';
+      if (value < 1024 * 1024) return (value / 1024).toFixed(1) + ' KB';
+      return (value / 1024 / 1024).toFixed(1) + ' MB';
+    }
+
+    function statusMeta(status) {
+      return STATUS_UI[status] || STATUS_UI.running;
+    }
+
+    function faceStatusMeta(status) {
+      return FACE_STATUS_UI[status] || FACE_STATUS_UI.no_match;
+    }
+
+    function modelDisplay(modelKey) {
+      const map = {
+        bczj: '飙车炸街专用',
+        general: '通用 YOLOE',
+      };
+      return map[modelKey] || modelKey || '未知模型';
+    }
+
+    function sourceDisplay(job) {
+      if (job.job_type === 'upload') {
+        return job.source_type === 'video' ? '本地上传 / 视频' : '本地上传 / ZIP';
+      }
+      return '数据库检测 / Oracle';
+    }
+
+    function renderJob(job, identitySummary) {
+      const meta = statusMeta(job.status);
+      document.getElementById('jobId').textContent = job.id || '';
+      document.getElementById('jobStatus').className = 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ' + meta.badge;
+      document.getElementById('jobStatus').textContent = meta.label;
+      document.getElementById('jobSource').textContent = sourceDisplay(job);
+      document.getElementById('jobModel').textContent = modelDisplay(job.model_key);
+      document.getElementById('jobTime').textContent = (job.start_ts || '-') + ' 至 ' + (job.end_ts || '进行中');
+      document.getElementById('jobSummary').textContent = job.summary_text || job.message || '暂无摘要';
+      document.getElementById('jobCounts').textContent = '保留 ' + (job.kept || 0) + ' / 总数 ' + (job.total || 0) + ' / 失败 ' + (job.failed || 0);
+      document.getElementById('jobFaces').textContent =
+        '已识别 ' + (identitySummary.recognized_asset_count || 0) + ' 张，命中 ' + (identitySummary.matched_asset_count || 0) + ' 张，人脸 ' + (identitySummary.total_face_count || 0) + ' 张';
+
+      const actions = document.getElementById('jobActions');
+      const buttons = [];
+      if (job.status === 'done' && job.download_url) {
+        buttons.push('<a class="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700" href="' + job.download_url + '" target="_blank">下载结果</a>');
+      }
+      if (job.summary_url) {
+        buttons.push('<a class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href="' + job.summary_url + '" target="_blank">下载摘要</a>');
+      }
+      (job.download_parts || []).forEach(function (part) {
+        buttons.push('<a class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href="' + part.url + '" target="_blank">' + escapeHtml(part.name) + '</a>');
+      });
+      actions.innerHTML = buttons.join('');
+    }
+
+    function renderResults(items) {
+      const root = document.getElementById('resultGrid');
+      const empty = document.getElementById('resultEmpty');
+      if (!items || !items.length) {
+        root.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      root.innerHTML = items.map(function (item) {
+        const identity = item.identity || null;
+        let statusHtml = '<div class="text-xs text-slate-400">尚未识别</div>';
+        let detailHtml = '<div class="mt-2 text-xs text-slate-500">文件大小：' + formatBytes(item.size_bytes) + '</div>';
+        if (identity) {
+          const meta = faceStatusMeta(identity.status);
+          statusHtml = '<span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ' + meta.badge + '">' + meta.label + '</span>';
+          if (identity.status === 'matched' && identity.faces && identity.faces[0] && identity.faces[0].top_matches && identity.faces[0].top_matches[0]) {
+            const top = identity.faces[0].top_matches[0];
+            detailHtml += '<div class="mt-2 text-xs leading-5 text-emerald-700">命中：' + escapeHtml(top.name || '') + ' / ' + escapeHtml(top.id_number || '') + ' / ' + escapeHtml(top.score || '') + '</div>';
+          } else if (identity.error) {
+            detailHtml += '<div class="mt-2 text-xs leading-5 text-rose-600">' + escapeHtml(identity.error) + '</div>';
+          } else {
+            detailHtml += '<div class="mt-2 text-xs leading-5 text-slate-500">检测到人脸 ' + escapeHtml(identity.face_count || 0) + ' 张</div>';
+          }
+        }
+        return (
+          '<div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/60">' +
+            '<a class="block" href="' + item.asset_url + '" target="_blank">' +
+              '<img src="' + item.asset_url + '" alt="' + escapeHtml(item.name) + '" class="h-48 w-full bg-slate-100 object-cover" />' +
+            '</a>' +
+            '<div class="p-4">' +
+              '<div class="truncate text-sm font-semibold text-slate-800">' + escapeHtml(item.origin_name || item.name) + '</div>' +
+              '<div class="mt-1 text-xs text-slate-400">' + escapeHtml(item.name) + '</div>' +
+              '<div class="mt-3">' + statusHtml + '</div>' +
+              detailHtml +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function loadDetail() {
+      fetch('{{ url_for("job.history_detail", job_id=job_id) }}')
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+          if (!data.ok) {
+            document.getElementById('errorBox').classList.remove('hidden');
+            document.getElementById('errorText').textContent = data.error || '加载失败';
+            return;
+          }
+          renderJob(data.job || {}, data.identity_summary || {});
+          renderResults(data.items || []);
+        })
+        .catch(function () {
+          document.getElementById('errorBox').classList.remove('hidden');
+          document.getElementById('errorText').textContent = '加载详情失败，请稍后重试。';
+        });
+    }
+
+    window.addEventListener('load', loadDetail);
+  </script>
+</head>
+<body class="min-h-screen text-slate-900">
+  <div class="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-10">
+    <header class="mb-8 grid gap-4 xl:grid-cols-[1.35fr,1fr]">
+      <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-600">Detail</div>
+        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">任务详情</h1>
+        <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
+          这里会展示任务基础信息、下载入口、身份识别摘要，以及每一张结果图的识别状态。刷新页面后仍可回看已保存的识别结果。
+        </p>
+      </section>
+
+      <section class="rounded-[32px] border border-slate-200/70 bg-slate-900 p-6 text-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-200">Task</div>
+        <div class="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div class="text-sm text-slate-300">任务 ID</div>
+          <div id="jobId" class="mt-2 break-all text-lg font-semibold text-white"></div>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <a href="{{ url_for('job.history_page') }}" class="inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100">
+            返回历史
+          </a>
+          <a href="{{ url_for('job.index') }}" class="inline-flex items-center justify-center rounded-full border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
+            返回首页
+          </a>
+        </div>
+      </section>
+    </header>
+
+    <div id="errorBox" class="mb-6 hidden rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+      <span id="errorText"></span>
+    </div>
+
+    <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6">
+      <div class="flex flex-col gap-4 border-b border-slate-100 pb-5 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Overview</div>
+          <h2 class="mt-2 text-xl font-semibold text-slate-900">任务概览</h2>
+        </div>
+        <span id="jobStatus" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset bg-slate-100 text-slate-700 ring-slate-200">加载中</span>
+      </div>
+
+      <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+          <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">来源</div>
+          <div id="jobSource" class="mt-2 text-sm font-semibold text-slate-800"></div>
+        </div>
+        <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+          <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">模型</div>
+          <div id="jobModel" class="mt-2 text-sm font-semibold text-slate-800"></div>
+        </div>
+        <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+          <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">时间</div>
+          <div id="jobTime" class="mt-2 text-sm font-semibold text-slate-800"></div>
+        </div>
+        <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+          <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">识别摘要</div>
+          <div id="jobFaces" class="mt-2 text-sm font-semibold text-slate-800"></div>
+        </div>
+      </div>
+
+      <div class="mt-5 grid gap-4 xl:grid-cols-[1.2fr,1fr]">
+        <div class="rounded-3xl border border-slate-200 bg-white p-5">
+          <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">任务统计</div>
+          <div id="jobCounts" class="mt-3 text-sm leading-7 text-slate-700"></div>
+          <div class="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">任务摘要</div>
+          <pre id="jobSummary" class="mt-3 whitespace-pre-wrap rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-600"></pre>
+        </div>
+        <div class="rounded-3xl border border-slate-200 bg-white p-5">
+          <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">下载与导出</div>
+          <div id="jobActions" class="mt-4 flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-6 rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6">
+      <div class="flex items-end justify-between gap-4 border-b border-slate-100 pb-5">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Results</div>
+          <h2 class="mt-2 text-xl font-semibold text-slate-900">结果图与识别记录</h2>
+        </div>
+      </div>
+
+      <div id="resultGrid" class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"></div>
+      <div id="resultEmpty" class="mt-6 hidden rounded-3xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-10 text-center text-sm text-slate-500">
+        当前任务没有可展示的结果图。
+      </div>
+    </section>
+  </div>
+</body>
+</html>

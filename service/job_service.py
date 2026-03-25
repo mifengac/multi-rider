@@ -21,6 +21,7 @@ from config import (
 )
 from db.sqlite import save_job
 from service.infer_service import _predict_batch, download_image_with_status, get_model
+from service.result_store_service import add_result_bytes, create_result_store, finalize_result_store
 from utils.helpers import filename_from_url, format_timestamp, infer_ext_from_bytes
 
 
@@ -78,7 +79,10 @@ def _save_terminal_job(snapshot: dict) -> None:
 
 def _new_job_record(total: int) -> dict:
     return {
+        "job_type": "oracle",
         "id": uuid4().hex,
+        "source_name": "oracle",
+        "source_type": "oracle",
         "status": "running",
         "message": "",
         "total": total,
@@ -93,6 +97,8 @@ def _new_job_record(total: int) -> dict:
         "zip_path": None,
         "zip_parts": [],
         "summary_text": "",
+        "result_dir": "",
+        "result_manifest_path": "",
         "conf_thresh": CONF_THRESH,
         "batch_size": BATCH_SIZE,
         "imgsz": IMGSZ,
@@ -138,6 +144,7 @@ def _run_job(
 ) -> None:
     try:
         model = get_model(model_key)
+        result_store = create_result_store(job_id, "oracle", "oracle", "oracle")
         allowed_classes: Optional[Set[int]] = None
         prompt_classes: list[str] | None = None
 
@@ -280,6 +287,12 @@ def _run_job(
                         output_name = f"{sequence:07d}_{filename}"
                         zip_file = get_zip_for_key(bins[index])
                         zip_file.writestr(output_name, payload)
+                        add_result_bytes(
+                            result_store,
+                            output_name,
+                            payload,
+                            extra={"origin_name": filename, "group_key": bins[index]},
+                        )
                         with JOBS_LOCK:
                             JOBS[job_id]["kept"] += 1
 
@@ -314,6 +327,12 @@ def _run_job(
                     output_name = f"{sequence:07d}_{filename}"
                     zip_file = get_zip_for_key(bins[index])
                     zip_file.writestr(output_name, payload)
+                    add_result_bytes(
+                        result_store,
+                        output_name,
+                        payload,
+                        extra={"origin_name": filename, "group_key": bins[index]},
+                    )
                     with JOBS_LOCK:
                         JOBS[job_id]["kept"] += 1
 
@@ -345,10 +364,14 @@ def _run_job(
                 pass
             zip_parts.append(path)
 
+        manifest_path = finalize_result_store(result_store)
+
         with JOBS_LOCK:
             current = JOBS[job_id]
             current["zip_parts"] = [{"path": path, "name": os.path.basename(path)} for path in zip_parts]
             current["zip_path"] = zip_parts[0] if len(zip_parts) == 1 else None
+            current["result_dir"] = result_store["result_dir"]
+            current["result_manifest_path"] = manifest_path
             if current["status"] == "running":
                 current["status"] = "done"
             snapshot = _job_snapshot(current)

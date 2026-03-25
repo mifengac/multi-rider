@@ -6,6 +6,7 @@ import requests
 from PIL import Image
 
 from config import (
+    CLIP_VIT_B32_PATH,
     MOBILECLIP_TS_PATH,
     MOBILECLIP2_TS_PATH,
     logger,
@@ -38,6 +39,7 @@ session.headers.update(
 )
 
 _DOWNLOAD_PATCHED = False
+_CLIP_PATCHED = False
 
 
 def _model_cache_key(model_key: str) -> str:
@@ -119,6 +121,35 @@ def _patch_ultralytics_asset_downloads() -> None:
     _DOWNLOAD_PATCHED = True
 
 
+def _patch_clip_asset_downloads() -> None:
+    """Resolve OpenAI CLIP weights from local files before falling back to user cache/download."""
+    global _CLIP_PATCHED
+    if _CLIP_PATCHED:
+        return
+
+    try:
+        import clip
+    except Exception:
+        return
+
+    original_load = clip.load
+    local_assets = {
+        "ViT-B/32": CLIP_VIT_B32_PATH,
+        "ViT-B-32.pt": CLIP_VIT_B32_PATH,
+    }
+
+    def _load_offline_first(name, *args, **kwargs):
+        asset_name = str(name)
+        local_path = local_assets.get(asset_name) or local_assets.get(os.path.basename(asset_name))
+        if local_path and os.path.isfile(local_path):
+            logger.info("Using local CLIP asset: %s", local_path)
+            return original_load(local_path, *args, **kwargs)
+        return original_load(name, *args, **kwargs)
+
+    clip.load = _load_offline_first
+    _CLIP_PATCHED = True
+
+
 def _normalize_names(names) -> list[str]:
     if isinstance(names, dict):
         return [str(names[index]) for index in sorted(names)]
@@ -157,6 +188,7 @@ def get_model(model_key: str):
             )
 
         _patch_ultralytics_asset_downloads()
+        _patch_clip_asset_downloads()
         _patch_ultralytics_head_compat()
         _patch_ultralytics_block_compat()
 

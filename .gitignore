@@ -14,6 +14,7 @@ app.env
 offline_bundle/
 wheels/
 pkgs/
+vendor/wheels/
 
 META-INF/
 

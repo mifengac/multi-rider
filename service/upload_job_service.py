@@ -21,7 +21,9 @@ from config import (
     logger,
     model_supports_text_prompt,
 )
+from db.sqlite import save_job
 from service.infer_service import _predict_batch, get_model
+from service.result_store_service import add_result_bytes, create_result_store, finalize_result_store
 
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
@@ -49,8 +51,8 @@ def request_upload_cancel(job_id: str) -> bool:
 
 def _new_upload_job(total: int, source_name: str, source_type: str) -> dict:
     return {
-        "id": uuid4().hex,
         "job_type": "upload",
+        "id": uuid4().hex,
         "source_name": source_name,
         "source_type": source_type,
         "status": "running",
@@ -62,6 +64,9 @@ def _new_upload_job(total: int, source_name: str, source_type: str) -> dict:
         "start_ts": int(time.time()),
         "end_ts": None,
         "zip_path": None,
+        "zip_parts": [],
+        "result_dir": "",
+        "result_manifest_path": "",
         "conf_thresh": CONF_THRESH,
         "batch_size": BATCH_SIZE,
         "imgsz": IMGSZ,
@@ -73,6 +78,7 @@ def _new_upload_job(total: int, source_name: str, source_type: str) -> dict:
 
 
 def _finish_upload_job(job_id: str, status: str, message: str = "") -> None:
+    snapshot = None
     with UPLOAD_JOBS_LOCK:
         job = UPLOAD_JOBS.get(job_id)
         if job is None:
@@ -80,6 +86,13 @@ def _finish_upload_job(job_id: str, status: str, message: str = "") -> None:
         job["status"] = status
         job["message"] = message
         job["end_ts"] = int(time.time())
+        if status in {"done", "error", "canceled"}:
+            snapshot = {k: v for k, v in job.items() if k != "cancel"}
+    if snapshot is not None:
+        try:
+            save_job(snapshot)
+        except Exception as exc:
+            logger.exception("failed to persist upload job %s: %s", job_id, exc)
 
 
 def _run_upload_job(
@@ -95,6 +108,11 @@ def _run_upload_job(
     """Background thread: run detection on pre-loaded images, write kept ones to result ZIP."""
     try:
         model = get_model(model_key)
+        with UPLOAD_JOBS_LOCK:
+            job_meta = UPLOAD_JOBS.get(job_id) or {}
+            source_name = job_meta.get("source_name", "")
+            source_type = job_meta.get("source_type", "upload")
+        result_store = create_result_store(job_id, "upload", source_type, source_name)
         allowed_classes: Optional[Set[int]] = None
         prompt_classes: list[str] | None = None
 
@@ -118,8 +136,7 @@ def _run_upload_job(
                 if indexes:
                     allowed_classes = indexes
 
-        kept_names: list[str] = []
-        kept_imgs: list[Image.Image] = []
+        kept_files: list[tuple[str, bytes]] = []
 
         for i in range(0, len(images), batch_size):
             with UPLOAD_JOBS_LOCK:
@@ -137,8 +154,12 @@ def _run_upload_job(
                 )
                 for name, img, hit in zip(batch_names, batch_imgs, hits):
                     if hit:
-                        kept_names.append(name)
-                        kept_imgs.append(img)
+                        buf = io.BytesIO()
+                        img.save(buf, format="JPEG", quality=90)
+                        payload = buf.getvalue()
+                        kept_name = os.path.splitext(name)[0] + ".jpg"
+                        kept_files.append((kept_name, payload))
+                        add_result_bytes(result_store, kept_name, payload, extra={"origin_name": name})
             except Exception:
                 pass
 
@@ -146,7 +167,7 @@ def _run_upload_job(
                 job = UPLOAD_JOBS.get(job_id)
                 if job is not None:
                     job["processed"] = min(i + batch_size, len(images))
-                    job["kept"] = len(kept_imgs)
+                    job["kept"] = len(kept_files)
 
         # Check cancel state after loop
         with UPLOAD_JOBS_LOCK:
@@ -160,17 +181,20 @@ def _run_upload_job(
         # Pack detected images into result ZIP
         zip_path = os.path.join(OUTPUT_DIR, f"upload_{job_id}.zip")
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            for name, img in zip(kept_names, kept_imgs):
-                buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=90)
-                zf.writestr(name, buf.getvalue())
+            for name, payload in kept_files:
+                zf.writestr(name, payload)
+
+        manifest_path = finalize_result_store(result_store)
 
         with UPLOAD_JOBS_LOCK:
             job = UPLOAD_JOBS.get(job_id)
             if job is not None:
                 job["zip_path"] = zip_path
-                job["kept"] = len(kept_imgs)
+                job["zip_parts"] = [{"path": zip_path, "name": os.path.basename(zip_path)}]
+                job["kept"] = len(kept_files)
                 job["processed"] = len(images)
+                job["result_dir"] = result_store["result_dir"]
+                job["result_manifest_path"] = manifest_path
 
         _finish_upload_job(job_id, "done")
 

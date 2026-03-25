@@ -1,3 +1,4 @@
+import os
 import threading
 from datetime import datetime
 
@@ -15,6 +16,11 @@ from config import (
 from db.oracle import fetch_image_urls
 from db.sqlite import get_job as get_saved_job
 from db.sqlite import list_jobs as list_saved_jobs
+from service.result_store_service import (
+    attach_identity_to_manifest_items,
+    load_identity_report,
+    load_result_manifest,
+)
 from service.job_service import (
     JOBS,
     JOBS_LOCK,
@@ -61,6 +67,30 @@ def _progress_payload(job: dict) -> dict:
     }
     data["zip_parts_count"] = len(job.get("zip_parts") or [])
     return data
+
+
+def _history_summary_payload(record: dict) -> dict:
+    identity_summary = record.get("identity_summary") or {}
+    return {
+        "id": record.get("id"),
+        "job_type": record.get("job_type", "oracle"),
+        "source_name": record.get("source_name", ""),
+        "source_type": record.get("source_type", ""),
+        "start_ts": format_timestamp(record.get("start_ts")),
+        "end_ts": format_timestamp(record.get("end_ts")),
+        "status": record.get("status"),
+        "kept": record.get("kept", 0),
+        "total": record.get("total", 0),
+        "zip_parts_count": len(record.get("zip_parts") or []),
+        "model_key": record.get("model_key", MODEL_DEFAULT),
+        "identity_summary": identity_summary,
+        "detail_url": url_for("job.history_detail_page", job_id=record.get("id")),
+        "download_url": url_for("file.download_zip", job_id=record.get("id")),
+    }
+
+
+def _is_visible_job(record: dict | None, owner_ip: str) -> bool:
+    return bool(record) and bool(owner_ip) and record.get("owner_ip") == owner_ip
 
 
 @job_bp.route("/", methods=["GET", "POST"])
@@ -203,22 +233,78 @@ def history():
         limit = 50
 
     records = list_saved_jobs(owner_ip, limit=limit)
-    items = []
-    for record in records:
-        items.append(
-            {
-                "id": record.get("id"),
-                "start_ts": format_timestamp(record.get("start_ts")),
-                "status": record.get("status"),
-                "kept": record.get("kept", 0),
-                "total": record.get("total", 0),
-                "zip_parts_count": len(record.get("zip_parts") or []),
-                "model_key": record.get("model_key", MODEL_DEFAULT),
-            }
-        )
+    items = [_history_summary_payload(record) for record in records]
     return jsonify({"ok": True, "jobs": items})
 
 
 @job_bp.get("/history-page")
 def history_page():
     return render_template("history.html")
+
+
+@job_bp.get("/history-page/<job_id>")
+def history_detail_page(job_id: str):
+    return render_template("history_detail.html", job_id=job_id)
+
+
+@job_bp.get("/history/<job_id>")
+def history_detail(job_id: str):
+    owner_ip = _request_owner_ip()
+    record = get_saved_job(job_id)
+    if not _is_visible_job(record, owner_ip):
+        return jsonify({"ok": False, "error": "job not found"}), 404
+
+    manifest = None
+    manifest_path = record.get("result_manifest_path")
+    if manifest_path and os.path.isfile(manifest_path):
+        try:
+            manifest = load_result_manifest(manifest_path)
+        except Exception:
+            manifest = None
+
+    identity_report = {"summary": {}, "items": []}
+    identity_path = record.get("identity_result_path")
+    if identity_path and os.path.isfile(identity_path):
+        try:
+            identity_report = load_identity_report(identity_path)
+        except Exception:
+            identity_report = {"summary": {}, "items": []}
+
+    items = []
+    if manifest is not None:
+        for item in attach_identity_to_manifest_items(manifest, identity_report):
+            items.append(
+                {
+                    "id": item.get("id"),
+                    "name": item.get("name"),
+                    "origin_name": item.get("origin_name") or item.get("name"),
+                    "size_bytes": item.get("size_bytes", 0),
+                    "asset_url": url_for("face.result_asset", job_id=job_id, asset_id=item.get("id")),
+                    "identity": item.get("identity"),
+                }
+            )
+
+    payload = {
+        "ok": True,
+        "job": {
+            **_history_summary_payload(record),
+            "message": record.get("message", ""),
+            "downloaded": record.get("downloaded", 0),
+            "notfound": record.get("notfound", 0),
+            "failed": record.get("failed", 0),
+            "summary_text": record.get("summary_text", ""),
+            "result_count": len(items),
+            "summary_url": url_for("file.download_summary", job_id=job_id),
+            "download_parts": [
+                {
+                    "name": part.get("name"),
+                    "url": url_for("file.download_zip_part", job_id=job_id, part=part.get("name")),
+                }
+                for part in (record.get("zip_parts") or [])
+                if part.get("name")
+            ] if len(record.get("zip_parts") or []) > 1 else [],
+        },
+        "items": items,
+        "identity_summary": identity_report.get("summary") or (record.get("identity_summary") or {}),
+    }
+    return jsonify(payload)

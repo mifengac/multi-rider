@@ -83,6 +83,7 @@ MODEL_REGISTRY = {
 }
 MOBILECLIP_TS_PATH = _resolve_model_path("mobileclip_blt.ts", "MOBILECLIP_TS_PATH")
 MOBILECLIP2_TS_PATH = _resolve_model_path("mobileclip2_b.ts", "MOBILECLIP2_TS_PATH")
+CLIP_VIT_B32_PATH = _resolve_model_path("ViT-B-32.pt", "CLIP_VIT_B32_PATH")
 
 MODEL_DEFAULT = (os.getenv("MODEL_DEFAULT", "general") or "general").strip()
 if MODEL_DEFAULT not in MODEL_REGISTRY:
@@ -95,10 +96,25 @@ IMGSZ = int(os.getenv("IMGSZ", "640"))
 
 OUTPUT_DIR = _resolve_path(os.getenv("OUTPUT_DIR", os.path.join(BASE_DIR, "output")))
 SQLITE_DB_PATH = _resolve_path(os.getenv("SQLITE_DB_PATH", os.path.join(BASE_DIR, "jobs.sqlite3")))
+RESULTS_DIR = _resolve_path(os.getenv("RESULTS_DIR", os.path.join(OUTPUT_DIR, "_results")))
 
 UPLOAD_TEMP_DIR = _resolve_path(os.getenv("UPLOAD_TEMP_DIR", os.path.join(BASE_DIR, "upload_tmp")))
-MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(500 * 1024 * 1024)))  # 500 MB
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(1024 * 1024 * 1024)))  # 1 GB
 VIDEO_FRAME_INTERVAL = int(os.getenv("VIDEO_FRAME_INTERVAL", "5"))  # extract 1 frame every N frames
+
+FACE_MODEL_DET = _resolve_path(os.getenv("FACE_MODEL_DET", os.path.join(MODEL_DIR, "det_10g.onnx")))
+FACE_MODEL_REC = _resolve_path(os.getenv("FACE_MODEL_REC", os.path.join(MODEL_DIR, "w600k_r50.onnx")))
+FACE_DATA_DIR = _resolve_path(os.getenv("FACE_DATA_DIR", os.path.join(BASE_DIR, "face_data")))
+FACE_SIMILARITY_THR = float(os.getenv("FACE_SIMILARITY_THR", "0.35"))
+FACE_MATCH_TOP_K = max(1, int(os.getenv("FACE_MATCH_TOP_K", "5")))
+FACE_BLUR_THRESH = float(os.getenv("FACE_BLUR_THRESH", "60.0"))
+FACE_SQL_ENABLED = (os.getenv("FACE_SQL_ENABLED", "true") or "true").strip().lower() not in {"0", "false", "no"}
+FACE_SQL_HOST = os.getenv("FACE_SQL_HOST", "")
+FACE_SQL_PORT = int(os.getenv("FACE_SQL_PORT", "5432"))
+FACE_SQL_DB = os.getenv("FACE_SQL_DB", "")
+FACE_SQL_USER = os.getenv("FACE_SQL_USER", "")
+FACE_SQL_PASSWORD = os.getenv("FACE_SQL_PASSWORD", "")
+FACE_SQL_QUERY_PATH = _resolve_path(os.getenv("FACE_SQL_QUERY_PATH", os.path.join(BASE_DIR, "face_library.sql")))
 
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
@@ -226,6 +242,7 @@ def get_upload_model_options() -> list[dict[str, object]]:
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(UPLOAD_TEMP_DIR, exist_ok=True)
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # Disable ultralytics telemetry and PyPI version-check network calls.
 # Without this, YOLO() startup will attempt outbound HTTP to PyPI and

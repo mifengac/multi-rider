@@ -1,6 +1,7 @@
 import os
 
-from flask import Flask
+from flask import Flask, jsonify
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from config import (
     APP_HOST,
@@ -12,6 +13,7 @@ from config import (
     logger,
 )
 from db.sqlite import cleanup_old_jobs, init_db, mark_running_jobs_interrupted
+from routes.face_routes import face_bp
 from routes.file_routes import file_bp
 from routes.job_routes import job_bp
 from routes.upload_routes import upload_bp
@@ -22,9 +24,26 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = FLASK_SECRET_KEY
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_file_too_large(exc):
+        limit_mb = max(1, MAX_UPLOAD_BYTES // (1024 * 1024))
+        logger.warning("Request too large: %s", exc)
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": f"上传文件过大，当前上限约为 {limit_mb} MB，请压缩后重试或调大 MAX_UPLOAD_BYTES。",
+                    "code": 413,
+                }
+            ),
+            413,
+        )
+
     app.register_blueprint(job_bp)
     app.register_blueprint(file_bp)
     app.register_blueprint(upload_bp)
+    app.register_blueprint(face_bp)
     return app
 
 
