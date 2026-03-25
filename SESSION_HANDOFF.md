@@ -4,84 +4,96 @@
 
 ## Current Status
 
-- Date: 2026-03-25
-- Device: office
+- Date: 2026-03-26
+- Device: current machine before switching
 - Branch: `codex/face-identity-integration`
-- Last commit before this handoff: `8887b0d`
-- Workspace path: `C:\Users\So\Desktop\project\multi-rider`
+- Latest feature commit before this handoff refresh: `5f7116a`
+- Workspace path: `C:\Users\So\Desktop\project\multi-rider-repo`
 
 ## What Was Finished
 
-- 新增训练模块开发清单，明确了数据集、预标注、训练、评估和发布的第一版范围。
-- 重建了 [design-mockup.html](C:/Users/So/Desktop/project/multi-rider/design-mockup.html)，加入 `Train` 页签原型。
-- 删除了两个 `YOLOE` 权重，默认通用模型切换为 `yolov8s-worldv2.pt`。
-- 新建了跨电脑协作用的 `SESSION_HANDOFF.md`、`WORKLOG.md`、`HANDOFF_CHECKLIST.md`。
+- `Train` 已从 mockup 推进到真实首页页签，支持真实数据集创建。
+- 已完成 ZIP 导入到数据集的第一版能力：
+  - 图片解压到 `datasets/<dataset_id>/images/`
+  - 图片元数据写入 SQLite `dataset_assets`
+  - 数据集统计和“最近导入”缩略图预览联动更新
+- [templates/index.html](C:/Users/So/Desktop/project/multi-rider-repo/templates/index.html) 里的大段业务 JS 已抽离到 [static/js/index-page.js](C:/Users/So/Desktop/project/multi-rider-repo/static/js/index-page.js)，模板现在只保留服务端 bootstrap 配置和脚本引用。
+- 本地已完成 Train 回归：
+  - 页面可正常加载外链 JS
+  - 可创建数据集
+  - 可导入一个包含 2 张图片和 1 个非图片文件的 ZIP
+  - 最近导入缩略图、图片数和图片链接都正常
+  - smoke test 数据已清理
 
 ## What Was Changed
 
-- Files touched:
-  - `config.py`
-  - `design-mockup.html`
-  - `deploy/app.env.example`
-  - `Dockerfile`
-  - `README.md`
-  - `.gitignore`
-  - `model/README.md`
-  - `0325_train_module_checklist.md`
-  - `0325_model_directory_strategy.md`
-  - `SESSION_HANDOFF.md`
+- Files touched in the current train phase:
+  - `db/sqlite.py`
+  - `routes/train_routes.py`
+  - `service/dataset_service.py`
+  - `templates/index.html`
+  - `static/js/index-page.js`
   - `WORKLOG.md`
+  - `SESSION_HANDOFF.md`
   - `HANDOFF_CHECKLIST.md`
 - Key behavior changes:
-  - 通用模型默认路径改为 `model/yolov8s-worldv2.pt`
-  - 上传模型列表优先级改为 `yolov8s-worldv2.pt`、`yolo26s.pt`、`yolo26n.pt`、`biaochezhajiev2.pt`
-  - Docker 构建检查不再依赖 `YOLOE` 权重
+  - `Train` 页现在有“创建数据集”和“导入 ZIP”两个真实入口
+  - SQLite 新增 `dataset_assets` 表，记录数据集图片资产
+  - 首页 JS 不再内嵌在模板中，后续继续维护首页逻辑时应优先改 `static/js/index-page.js`
 
 ## What Is In Progress
 
-- Current task: 切换电脑前整理 handoff 并推送当前代码
-- Current step: 更新交接文件、整理 `.gitignore`、提交并推送
-- Current blocker: Oracle 和内网人脸库联调仍需在内网环境继续做
+- Current task: 训练模块第一阶段继续落地
+- Current step: 换电脑前补齐 handoff 文档并提交当前状态
+- Current blocker:
+  - Oracle 链路和内网人脸库链路仍需要在对应环境继续回归
+  - `index-page.js` 已从模板中抽离，但还没有按 feature 再拆细
 
 ## What Still Needs To Be Done
 
-1. 把 `Train` 模块从 mockup 落到真实路由和页面
-2. 第一阶段优先实现数据集管理、ZIP 导入、历史结果加入数据集
-3. 后续如需重整 `model/` 目录，再做一次受控迁移，不要直接移动现有运行路径
+1. 实现“历史结果加入数据集”，把已有 Oracle / Upload 检测结果回流到 `Train`
+2. 在数据集里继续补图片浏览、标注和复核入口
+3. 再往后接训练任务、版本管理和模型发布
+4. 如首页继续演进，把 `static/js/index-page.js` 按 `job / upload / train / face` 再拆分
 
 ## Risks / Notes
 
-- 当前仓库里有较多已修改代码，训练模块本身还没有真实实现
-- 本次推送不应包含本地数据：`face_data/`、`test/`、`jobs.sqlite3`、`vendor/wheels.7z`
-- `README.md` 历史上有编码问题，这次只做了必要替换，没有整体重写
+- `jobs.sqlite3`、`datasets/`、`.venv/` 都是本地态，不会跟随 Git 走；换电脑后需要重新准备运行环境
+- 当前本地 Flask 服务仍可以用 `.venv\Scripts\python.exe app.py` 在 `5001` 端口启动
+- 这次重构主要影响首页模板和前端脚本组织方式；Train 功能 smoke test 已过，但 Oracle / Upload / Face 本轮没有做全回归
+- 当前仓库已经移除了本仓库 Git 代理配置，不再依赖 `127.0.0.1:7890`
 
 ## Commands To Resume
 
 ```powershell
 git pull
 git branch --show-current
+git log --oneline -5
 git status
-python app.py
+.venv\Scripts\python.exe app.py
 ```
 
 ## Verification Status
 
 - Tested:
-  - `config.py` 语法检查通过
-  - `design-mockup.html` 已确认包含 `tabBtn-train`、`tab-train`、`yolo26n.pt`、`yolo26s.pt`
-  - 默认 `general` 模型已解析为 `model/yolov8s-worldv2.pt`
+  - 浏览器打开首页后，外链 `static/js/index-page.js` 正常加载
+  - `refreshTrainTab`、`createTrainDataset` 和 `PERSON_STATE` 在页面上下文中可访问
+  - Train 页真实创建数据集成功
+  - Train 页真实导入 ZIP 成功，导入结果为 `2` 张图片、`1` 项跳过
+  - 数据集图片数、最近导入预览、图片访问链接都已验证
 - Not tested:
-  - 训练模块目前只有文档和 mockup，没有真实路由和服务
-  - Oracle 和内网人脸库联调未在这次 handoff 前重跑
+  - Oracle 检测主流程未在这次 handoff 前重跑
+  - Upload 检测主流程未在这次 handoff 前重跑
+  - Face Library 的同步 / 重建 / 名录浏览未在这次 handoff 前重跑
 - Known broken:
-  - 无新的明确坏点，但训练模块尚未开始真实实现
+  - 没有发现新的明确坏点
 
 ## Next Direct Instruction For Codex
 
 ```text
-先读取项目根目录的 SESSION_HANDOFF.md 和 WORKLOG.md，再继续当前任务。重点看 Current Status、What Was Finished、What Is In Progress、What Still Needs To Be Done。
+先读取项目根目录的 SESSION_HANDOFF.md 和 WORKLOG.md，再继续训练模块。下一步优先做“历史结果加入数据集”，不要重复从 Train mockup 开始。
 ```
 
 ## History Notes
 
-- 本次 handoff 的重点是保证换电脑后可以继续接着做训练模块。
+- 这次 handoff 的重点不是新增文档，而是把“Train 第一阶段已经真实做到哪一步”写清楚，让下一台电脑能直接继续开发。
