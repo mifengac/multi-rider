@@ -9,6 +9,8 @@ dist/
 
 output/
 datasets/
+train_runs/
+upload_tmp/
 *.log
 *.tmp
 app.env

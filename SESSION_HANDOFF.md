@@ -1,67 +1,102 @@
 # Session Handoff
 
-> 用途：切换电脑前快速记录当前项目状态，保证下一台电脑可以直接继续。
+> 用途：切换电脑前，快速记录当前项目状态，保证下一台电脑可以直接继续。
 
 ## Current Status
 
 - Date: 2026-03-26
-- Device: current machine before switching
+- Device: current machine
 - Branch: `codex/face-identity-integration`
-- Latest feature commit before this handoff refresh: `5f7116a`
-- Workspace path: `C:\Users\So\Desktop\project\multi-rider-repo`
+- Latest committed revision: `ddcda47`
+- Workspace path: `C:\Users\So\Desktop\project\multi-rider`
 
 ## What Was Finished
 
-- `Train` 已从 mockup 推进到真实首页页签，支持真实数据集创建。
-- 已完成 ZIP 导入到数据集的第一版能力：
-  - 图片解压到 `datasets/<dataset_id>/images/`
-  - 图片元数据写入 SQLite `dataset_assets`
-  - 数据集统计和“最近导入”缩略图预览联动更新
-- [templates/index.html](C:/Users/So/Desktop/project/multi-rider-repo/templates/index.html) 里的大段业务 JS 已抽离到 [static/js/index-page.js](C:/Users/So/Desktop/project/multi-rider-repo/static/js/index-page.js)，模板现在只保留服务端 bootstrap 配置和脚本引用。
-- 本地已完成 Train 回归：
-  - 页面可正常加载外链 JS
-  - 可创建数据集
-  - 可导入一个包含 2 张图片和 1 个非图片文件的 ZIP
-  - 最近导入缩略图、图片数和图片链接都正常
-  - smoke test 数据已清理
+- `Train` 模块已经从 mockup 推进到真实首页骨架。
+- 已支持创建数据集、导入本地图片 ZIP、浏览数据集图片。
+- 已支持把 Oracle / Upload 结果图回流到 `Train` 数据集。
+- 已支持第一版框标注：
+  - 单图拖拽画框
+  - 选择类别
+  - 删除选中框
+  - 保存 YOLO 标签
+  - 上一张 / 下一张切图
+  - `Ctrl+S`、`Delete`、`←/→`、`Esc` 快捷键
+- 已补充标注效率功能：
+  - 仅看未标注
+  - 跳到上一张未标注
+  - 跳到下一张未标注
+  - 标注状态统计
+- 已新增训练任务页：
+  - 选择数据集
+  - 选择 `yolo26n.pt / yolo26s.pt`
+  - 选择预设
+  - 创建训练任务
+  - 查看最近训练任务
+- 训练任务已经不再只是骨架，当前可以真实调用 Ultralytics 执行训练。
+- 当前项目依赖已升级到 `ultralytics==8.4.27`，`YOLO26` 训练已验证可运行。
+- 已补齐离线依赖：
+  - `requirements.txt`
+  - `requirements.lock`
+  - `vendor/wheels/`
+- 已把 `train_runs/` 加入 `.gitignore`，避免误提交训练产物。
 
 ## What Was Changed
 
-- Files touched in the current train phase:
+- 本轮核心文件：
+  - `requirements.txt`
+  - `requirements.lock`
+  - `.gitignore`
+  - `app.py`
   - `db/sqlite.py`
   - `routes/train_routes.py`
   - `service/dataset_service.py`
+  - `service/train_task_service.py`
   - `templates/index.html`
-  - `static/js/index-page.js`
-  - `WORKLOG.md`
-  - `SESSION_HANDOFF.md`
-  - `HANDOFF_CHECKLIST.md`
-- Key behavior changes:
-  - `Train` 页现在有“创建数据集”和“导入 ZIP”两个真实入口
-  - SQLite 新增 `dataset_assets` 表，记录数据集图片资产
-  - 首页 JS 不再内嵌在模板中，后续继续维护首页逻辑时应优先改 `static/js/index-page.js`
+  - `templates/index/_train_tab.html`
+  - `templates/index/_dataset_workspace_drawer.html`
+  - `static/js/index-page/dataset.js`
+  - `static/js/index-page/training.js`
+  - `static/js/index-page/annotation.js`
+  - `static/js/index-page/bootstrap.js`
+  - `templates/history_detail.html`
 
 ## What Is In Progress
 
 - Current task: 训练模块第一阶段继续落地
-- Current step: 换电脑前补齐 handoff 文档并提交当前状态
+- Current step: 训练任务已能真实启动，接下来要把训练结果管理做完整
 - Current blocker:
-  - Oracle 链路和内网人脸库链路仍需要在对应环境继续回归
-  - `index-page.js` 已从模板中抽离，但还没有按 feature 再拆细
+  - Oracle 检测链路和内网人脸库链路这轮没有回归
+  - 训练结果还没有“发布为线上模型”的完整 UI
+  - 标注页还没有“仅看已标注 / 批量复核 / 快捷类别切换”这些更细的效率能力
 
 ## What Still Needs To Be Done
 
-1. 实现“历史结果加入数据集”，把已有 Oracle / Upload 检测结果回流到 `Train`
-2. 在数据集里继续补图片浏览、标注和复核入口
-3. 再往后接训练任务、版本管理和模型发布
-4. 如首页继续演进，把 `static/js/index-page.js` 按 `job / upload / train / face` 再拆分
+1. 训练任务结果管理：
+   - 查看训练日志
+   - 查看指标摘要
+   - 查看 `best.pt / last.pt / results.csv / args.yaml`
+2. 模型发布：
+   - 把训练产物发布到 `model/`
+   - 写入模型元数据
+   - 让上传检测页直接可选
+3. 标注效率增强：
+   - 仅看已标注
+   - 类别快捷键
+   - 图片列表筛选
+   - 标注统计面板
+4. 训练页增强：
+   - 训练中的轮询刷新
+   - 错误日志展示
+   - 训练完成后的下载 / 打开目录入口
+5. 最后再做 Oracle / Face 模块的联动回归
 
 ## Risks / Notes
 
-- `jobs.sqlite3`、`datasets/`、`.venv/` 都是本地态，不会跟随 Git 走；换电脑后需要重新准备运行环境
-- 当前本地 Flask 服务仍可以用 `.venv\Scripts\python.exe app.py` 在 `5001` 端口启动
-- 这次重构主要影响首页模板和前端脚本组织方式；Train 功能 smoke test 已过，但 Oracle / Upload / Face 本轮没有做全回归
-- 当前仓库已经移除了本仓库 Git 代理配置，不再依赖 `127.0.0.1:7890`
+- `jobs.sqlite3`、`datasets/`、`train_runs/`、`.venv/` 都是本地态，不会随 Git 走。
+- 当前训练 smoke test 使用的是极小数据集，仅用于证明训练链路可跑通，不代表模型效果。
+- `vendor/wheels/` 是本地离线依赖目录，当前已补齐到新的锁文件版本，但目录本身仍被 `.gitignore` 忽略。
+- 工作区里目前有未提交改动；如果要切电脑，建议先 `git status` 看清楚。
 
 ## Commands To Resume
 
@@ -76,24 +111,23 @@ git status
 ## Verification Status
 
 - Tested:
-  - 浏览器打开首页后，外链 `static/js/index-page.js` 正常加载
-  - `refreshTrainTab`、`createTrainDataset` 和 `PERSON_STATE` 在页面上下文中可访问
-  - Train 页真实创建数据集成功
-  - Train 页真实导入 ZIP 成功，导入结果为 `2` 张图片、`1` 项跳过
-  - 数据集图片数、最近导入预览、图片访问链接都已验证
+  - 首页 `/` 正常渲染
+  - `Train` 页可创建数据集
+  - 可导入本地 ZIP
+  - 可保存单图框标注
+  - 可创建真实训练任务
+  - `YOLO26n` 在 `1 epoch` smoke test 下训练完成
+  - 训练结果已生成 `best.pt / last.pt / results.csv / args.yaml`
+  - `requirements.lock` 与 `vendor/wheels/` 已同步更新
 - Not tested:
-  - Oracle 检测主流程未在这次 handoff 前重跑
-  - Upload 检测主流程未在这次 handoff 前重跑
-  - Face Library 的同步 / 重建 / 名录浏览未在这次 handoff 前重跑
+  - Oracle 检测主流程
+  - Oracle 结果回流联调
+  - 内网人脸库同步 / 重建 / 识别联调
 - Known broken:
-  - 没有发现新的明确坏点
+  - 当前没有发现新的明确坏点
 
 ## Next Direct Instruction For Codex
 
 ```text
-先读取项目根目录的 SESSION_HANDOFF.md 和 WORKLOG.md，再继续训练模块。下一步优先做“历史结果加入数据集”，不要重复从 Train mockup 开始。
+先读取项目根目录的 SESSION_HANDOFF.md 和 WORKLOG.md，再继续训练模块。优先做训练结果管理和模型发布，不要回退到 mockup 阶段。
 ```
-
-## History Notes
-
-- 这次 handoff 的重点不是新增文档，而是把“Train 第一阶段已经真实做到哪一步”写清楚，让下一台电脑能直接继续开发。

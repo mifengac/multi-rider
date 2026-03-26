@@ -263,3 +263,79 @@ def _predict_batch(
         except Exception:
             output.append(False)
     return output
+
+
+def predict_image_boxes_batch(
+    images: list[Image.Image],
+    model_key: str,
+    conf_thresh: float,
+    imgsz: int,
+    prompt_classes: list[str] | None = None,
+) -> list[list[dict]]:
+    if not images:
+        return []
+
+    prepared_images: list[Image.Image] = []
+    for image in images:
+        if image.mode != "RGB":
+            prepared_images.append(image.convert("RGB"))
+        else:
+            prepared_images.append(image)
+
+    model = get_model(model_key)
+    model_lock = _MODEL_LOCKS.setdefault(_model_cache_key(model_key), threading.Lock())
+    with model_lock:
+        if model_supports_text_prompt(model_key):
+            _ensure_general_prompt_state(model, prompt_classes)
+            predict_conf = max(0.001, min(float(conf_thresh), 0.25))
+        else:
+            predict_conf = max(0.001, float(conf_thresh))
+
+        results = model.predict(prepared_images, conf=predict_conf, imgsz=imgsz, verbose=False)
+
+    outputs: list[list[dict]] = []
+    for result in results:
+        items: list[dict] = []
+        boxes = getattr(result, "boxes", None)
+        names = getattr(result, "names", None) or getattr(model, "names", None) or {}
+        if boxes is None or boxes.xyxy is None:
+            outputs.append(items)
+            continue
+
+        try:
+            xyxy_list = boxes.xyxy.tolist()
+            conf_list = boxes.conf.tolist() if boxes.conf is not None else [0.0] * len(xyxy_list)
+            cls_list = boxes.cls.tolist() if boxes.cls is not None else [0] * len(xyxy_list)
+        except Exception:
+            outputs.append(items)
+            continue
+
+        for coords, conf_value, cls_value in zip(xyxy_list, conf_list, cls_list):
+            try:
+                class_index = int(cls_value)
+                x1, y1, x2, y2 = [float(value) for value in coords[:4]]
+            except Exception:
+                continue
+            if float(conf_value) < float(conf_thresh):
+                continue
+
+            class_name = ""
+            if isinstance(names, dict):
+                class_name = str(names.get(class_index, ""))
+            elif isinstance(names, (list, tuple)) and 0 <= class_index < len(names):
+                class_name = str(names[class_index])
+
+            items.append(
+                {
+                    "class_index": class_index,
+                    "class_name": class_name,
+                    "confidence": round(float(conf_value), 4),
+                    "x1": round(x1, 2),
+                    "y1": round(y1, 2),
+                    "x2": round(x2, 2),
+                    "y2": round(y2, 2),
+                }
+            )
+
+        outputs.append(items)
+    return outputs

@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request, send_file, url_for
 
 from db.sqlite import get_job as get_saved_job
 from db.sqlite import save_job
+from service.dispatch_queue_service import ingest_identity_results
 from service.face_library_service import (
     get_face_library_photo_path,
     get_face_library_status,
@@ -232,6 +233,12 @@ def identify_faces():
             except Exception as exc:
                 logger.exception("failed to persist identity summary for job %s: %s", job_id, exc)
 
+    dispatch_flow = {"created": 0, "updated": 0, "items": []}
+    try:
+        dispatch_flow = ingest_identity_results(owner_key, owner_ip, job, items)
+    except Exception as exc:
+        logger.exception("failed to flow identity results into dispatch queue for job %s: %s", job_id, exc)
+
     return jsonify(
         {
             "ok": True,
@@ -239,5 +246,9 @@ def identify_faces():
             "library": get_face_library_status(),
             "identity_summary": identity_report.get("summary") or {},
             "identity_result_path": identity_report_path,
+            "dispatch_flow": {
+                "created": dispatch_flow.get("created", 0),
+                "updated": dispatch_flow.get("updated", 0),
+            },
         }
     )

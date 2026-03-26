@@ -59,11 +59,61 @@ DATASET_ASSET_COLUMNS = (
     "filename",
     "origin_name",
     "source_type",
+    "source_job_id",
+    "source_asset_id",
     "file_path",
     "width",
     "height",
     "size_bytes",
     "created_ts",
+)
+
+TRAIN_JOB_COLUMNS = (
+    "id",
+    "dataset_id",
+    "dataset_name",
+    "status",
+    "message",
+    "base_model",
+    "base_model_path",
+    "preset_key",
+    "epochs",
+    "imgsz",
+    "batch_size",
+    "confirmed_only",
+    "run_dir",
+    "log_path",
+    "manifest_path",
+    "artifact_dir",
+    "created_ts",
+    "start_ts",
+    "end_ts",
+    "owner_key",
+    "owner_ip",
+)
+
+AUTO_ANNOTATE_JOB_COLUMNS = (
+    "id",
+    "dataset_id",
+    "dataset_name",
+    "status",
+    "message",
+    "model_key",
+    "conf_thresh",
+    "imgsz",
+    "prompt_classes",
+    "class_mapping",
+    "overwrite",
+    "total",
+    "processed",
+    "updated",
+    "skipped_existing",
+    "no_detection",
+    "created_ts",
+    "start_ts",
+    "end_ts",
+    "owner_key",
+    "owner_ip",
 )
 
 
@@ -134,6 +184,18 @@ def _row_to_dataset_asset(row: sqlite3.Row | None) -> dict[str, Any] | None:
     if row is None:
         return None
     return {column: row[column] for column in DATASET_ASSET_COLUMNS}
+
+
+def _row_to_train_job(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    if row is None:
+        return None
+    return {column: row[column] for column in TRAIN_JOB_COLUMNS}
+
+
+def _row_to_auto_annotate_job(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    if row is None:
+        return None
+    return {column: row[column] for column in AUTO_ANNOTATE_JOB_COLUMNS}
 
 
 def init_db() -> None:
@@ -255,6 +317,8 @@ def init_db() -> None:
                 filename TEXT NOT NULL,
                 origin_name TEXT NOT NULL,
                 source_type TEXT NOT NULL DEFAULT 'zip',
+                source_job_id TEXT NOT NULL DEFAULT '',
+                source_asset_id TEXT NOT NULL DEFAULT '',
                 file_path TEXT NOT NULL,
                 width INTEGER NOT NULL DEFAULT 0,
                 height INTEGER NOT NULL DEFAULT 0,
@@ -270,6 +334,10 @@ def init_db() -> None:
             conn.execute("ALTER TABLE dataset_assets ADD COLUMN origin_name TEXT NOT NULL DEFAULT ''")
         if "source_type" not in asset_columns:
             conn.execute("ALTER TABLE dataset_assets ADD COLUMN source_type TEXT NOT NULL DEFAULT 'zip'")
+        if "source_job_id" not in asset_columns:
+            conn.execute("ALTER TABLE dataset_assets ADD COLUMN source_job_id TEXT NOT NULL DEFAULT ''")
+        if "source_asset_id" not in asset_columns:
+            conn.execute("ALTER TABLE dataset_assets ADD COLUMN source_asset_id TEXT NOT NULL DEFAULT ''")
         if "file_path" not in asset_columns:
             conn.execute("ALTER TABLE dataset_assets ADD COLUMN file_path TEXT NOT NULL DEFAULT ''")
         if "width" not in asset_columns:
@@ -283,6 +351,268 @@ def init_db() -> None:
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_dataset_assets_dataset_created_ts ON dataset_assets(dataset_id, created_ts DESC)"
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS train_jobs (
+                id TEXT PRIMARY KEY,
+                dataset_id TEXT NOT NULL,
+                dataset_name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                message TEXT NOT NULL DEFAULT '',
+                base_model TEXT NOT NULL,
+                base_model_path TEXT NOT NULL,
+                preset_key TEXT NOT NULL,
+                epochs INTEGER NOT NULL DEFAULT 0,
+                imgsz INTEGER NOT NULL DEFAULT 0,
+                batch_size INTEGER NOT NULL DEFAULT 0,
+                confirmed_only INTEGER NOT NULL DEFAULT 0,
+                run_dir TEXT NOT NULL,
+                log_path TEXT NOT NULL,
+                manifest_path TEXT NOT NULL,
+                artifact_dir TEXT NOT NULL,
+                created_ts INTEGER NOT NULL,
+                start_ts INTEGER,
+                end_ts INTEGER,
+                owner_key TEXT,
+                owner_ip TEXT
+            )
+            """
+        )
+
+        train_columns = _existing_columns(conn, "train_jobs")
+        if "dataset_name" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN dataset_name TEXT NOT NULL DEFAULT ''")
+        if "status" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN status TEXT NOT NULL DEFAULT 'queued'")
+        if "message" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN message TEXT NOT NULL DEFAULT ''")
+        if "base_model" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN base_model TEXT NOT NULL DEFAULT ''")
+        if "base_model_path" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN base_model_path TEXT NOT NULL DEFAULT ''")
+        if "preset_key" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN preset_key TEXT NOT NULL DEFAULT 'quick'")
+        if "epochs" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN epochs INTEGER NOT NULL DEFAULT 0")
+        if "imgsz" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN imgsz INTEGER NOT NULL DEFAULT 0")
+        if "batch_size" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN batch_size INTEGER NOT NULL DEFAULT 0")
+        if "confirmed_only" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN confirmed_only INTEGER NOT NULL DEFAULT 0")
+        if "run_dir" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN run_dir TEXT NOT NULL DEFAULT ''")
+        if "log_path" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN log_path TEXT NOT NULL DEFAULT ''")
+        if "manifest_path" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN manifest_path TEXT NOT NULL DEFAULT ''")
+        if "artifact_dir" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN artifact_dir TEXT NOT NULL DEFAULT ''")
+        if "created_ts" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN created_ts INTEGER NOT NULL DEFAULT 0")
+        if "start_ts" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN start_ts INTEGER")
+        if "end_ts" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN end_ts INTEGER")
+        if "owner_key" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN owner_key TEXT")
+        if "owner_ip" not in train_columns:
+            conn.execute("ALTER TABLE train_jobs ADD COLUMN owner_ip TEXT")
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_train_jobs_owner_key_created_ts ON train_jobs(owner_key, created_ts DESC)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_train_jobs_owner_ip_created_ts ON train_jobs(owner_ip, created_ts DESC)"
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auto_annotate_jobs (
+                id TEXT PRIMARY KEY,
+                dataset_id TEXT NOT NULL,
+                dataset_name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                message TEXT NOT NULL DEFAULT '',
+                model_key TEXT NOT NULL,
+                conf_thresh REAL NOT NULL DEFAULT 0.25,
+                imgsz INTEGER NOT NULL DEFAULT 640,
+                prompt_classes TEXT NOT NULL DEFAULT '',
+                class_mapping TEXT NOT NULL DEFAULT '',
+                overwrite INTEGER NOT NULL DEFAULT 0,
+                total INTEGER NOT NULL DEFAULT 0,
+                processed INTEGER NOT NULL DEFAULT 0,
+                updated INTEGER NOT NULL DEFAULT 0,
+                skipped_existing INTEGER NOT NULL DEFAULT 0,
+                no_detection INTEGER NOT NULL DEFAULT 0,
+                created_ts INTEGER NOT NULL,
+                start_ts INTEGER,
+                end_ts INTEGER,
+                owner_key TEXT,
+                owner_ip TEXT
+            )
+            """
+        )
+
+        auto_columns = _existing_columns(conn, "auto_annotate_jobs")
+        if "dataset_name" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN dataset_name TEXT NOT NULL DEFAULT ''")
+        if "status" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN status TEXT NOT NULL DEFAULT 'queued'")
+        if "message" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN message TEXT NOT NULL DEFAULT ''")
+        if "model_key" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN model_key TEXT NOT NULL DEFAULT ''")
+        if "conf_thresh" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN conf_thresh REAL NOT NULL DEFAULT 0.25")
+        if "imgsz" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN imgsz INTEGER NOT NULL DEFAULT 640")
+        if "prompt_classes" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN prompt_classes TEXT NOT NULL DEFAULT ''")
+        if "class_mapping" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN class_mapping TEXT NOT NULL DEFAULT ''")
+        if "overwrite" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN overwrite INTEGER NOT NULL DEFAULT 0")
+        if "total" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN total INTEGER NOT NULL DEFAULT 0")
+        if "processed" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN processed INTEGER NOT NULL DEFAULT 0")
+        if "updated" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN updated INTEGER NOT NULL DEFAULT 0")
+        if "skipped_existing" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN skipped_existing INTEGER NOT NULL DEFAULT 0")
+        if "no_detection" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN no_detection INTEGER NOT NULL DEFAULT 0")
+        if "created_ts" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN created_ts INTEGER NOT NULL DEFAULT 0")
+        if "start_ts" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN start_ts INTEGER")
+        if "end_ts" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN end_ts INTEGER")
+        if "owner_key" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN owner_key TEXT")
+        if "owner_ip" not in auto_columns:
+            conn.execute("ALTER TABLE auto_annotate_jobs ADD COLUMN owner_ip TEXT")
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_auto_annotate_jobs_owner_key_created_ts ON auto_annotate_jobs(owner_key, created_ts DESC)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_auto_annotate_jobs_owner_ip_created_ts ON auto_annotate_jobs(owner_ip, created_ts DESC)"
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dispatch_auth_sessions (
+                owner_key TEXT PRIMARY KEY,
+                owner_ip TEXT,
+                username TEXT NOT NULL DEFAULT '',
+                access_token TEXT NOT NULL DEFAULT '',
+                refresh_token TEXT NOT NULL DEFAULT '',
+                token_type TEXT NOT NULL DEFAULT 'Bearer',
+                expires_in INTEGER NOT NULL DEFAULT 0,
+                expires_at INTEGER,
+                authenticated_ts INTEGER,
+                updated_ts INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'pending',
+                is_mock INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dispatch_auth_owner_ip_updated_ts ON dispatch_auth_sessions(owner_ip, updated_ts DESC)"
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dispatch_queue (
+                id TEXT PRIMARY KEY,
+                owner_key TEXT,
+                owner_ip TEXT,
+                source_job_id TEXT NOT NULL DEFAULT '',
+                source_asset_id TEXT NOT NULL DEFAULT '',
+                source_job_type TEXT NOT NULL DEFAULT '',
+                source_name TEXT NOT NULL DEFAULT '',
+                source_type TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                face_index INTEGER NOT NULL DEFAULT 0,
+                person_name TEXT NOT NULL DEFAULT '',
+                person_id_no TEXT NOT NULL DEFAULT '',
+                person_phone TEXT NOT NULL DEFAULT '',
+                similarity_score REAL NOT NULL DEFAULT 0,
+                illegal_type TEXT NOT NULL DEFAULT '',
+                sssj_dm TEXT NOT NULL DEFAULT '',
+                sssj_mc TEXT NOT NULL DEFAULT '',
+                ssfj_dm TEXT NOT NULL DEFAULT '',
+                ssfj_mc TEXT NOT NULL DEFAULT '',
+                zbpcs_dm TEXT NOT NULL DEFAULT '',
+                zbpcs_mc TEXT NOT NULL DEFAULT '',
+                dzmc TEXT NOT NULL DEFAULT '',
+                rwdyid TEXT NOT NULL DEFAULT '',
+                sjcsly TEXT NOT NULL DEFAULT '',
+                dispatch_status TEXT NOT NULL DEFAULT 'pending',
+                sms_status TEXT NOT NULL DEFAULT 'pending',
+                last_error TEXT NOT NULL DEFAULT '',
+                draft_payload_json TEXT NOT NULL DEFAULT '',
+                identity_payload_json TEXT NOT NULL DEFAULT '',
+                dispatch_response_json TEXT NOT NULL DEFAULT '',
+                sms_preview TEXT NOT NULL DEFAULT '',
+                created_ts INTEGER NOT NULL DEFAULT 0,
+                updated_ts INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dispatch_queue_owner_created_ts ON dispatch_queue(owner_key, created_ts DESC)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dispatch_queue_owner_ip_created_ts ON dispatch_queue(owner_ip, created_ts DESC)"
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_dispatch_queue_owner_source_face_person ON dispatch_queue(owner_key, source_job_id, source_asset_id, face_index, person_id_no)"
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dispatch_records (
+                id TEXT PRIMARY KEY,
+                queue_id TEXT NOT NULL,
+                owner_key TEXT,
+                owner_ip TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                request_payload_json TEXT NOT NULL DEFAULT '',
+                response_payload_json TEXT NOT NULL DEFAULT '',
+                error_message TEXT NOT NULL DEFAULT '',
+                created_ts INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dispatch_records_owner_created_ts ON dispatch_records(owner_key, created_ts DESC)"
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dispatch_sms_records (
+                id TEXT PRIMARY KEY,
+                queue_id TEXT NOT NULL,
+                owner_key TEXT,
+                owner_ip TEXT,
+                mobile TEXT NOT NULL DEFAULT '',
+                content TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                request_payload_json TEXT NOT NULL DEFAULT '',
+                response_payload_json TEXT NOT NULL DEFAULT '',
+                error_message TEXT NOT NULL DEFAULT '',
+                created_ts INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dispatch_sms_records_owner_created_ts ON dispatch_sms_records(owner_key, created_ts DESC)"
         )
         conn.commit()
 
@@ -431,6 +761,8 @@ def save_dataset_asset(asset: dict[str, Any]) -> None:
         "filename": asset.get("filename", ""),
         "origin_name": asset.get("origin_name", ""),
         "source_type": asset.get("source_type", "zip"),
+        "source_job_id": asset.get("source_job_id", ""),
+        "source_asset_id": asset.get("source_asset_id", ""),
         "file_path": asset.get("file_path", ""),
         "width": int(asset.get("width") or 0),
         "height": int(asset.get("height") or 0),
@@ -442,11 +774,11 @@ def save_dataset_asset(asset: dict[str, Any]) -> None:
         conn.execute(
             """
             INSERT INTO dataset_assets (
-                id, dataset_id, filename, origin_name, source_type, file_path,
+                id, dataset_id, filename, origin_name, source_type, source_job_id, source_asset_id, file_path,
                 width, height, size_bytes, created_ts
             )
             VALUES (
-                :id, :dataset_id, :filename, :origin_name, :source_type, :file_path,
+                :id, :dataset_id, :filename, :origin_name, :source_type, :source_job_id, :source_asset_id, :file_path,
                 :width, :height, :size_bytes, :created_ts
             )
             ON CONFLICT(id) DO UPDATE SET
@@ -454,6 +786,8 @@ def save_dataset_asset(asset: dict[str, Any]) -> None:
                 filename = excluded.filename,
                 origin_name = excluded.origin_name,
                 source_type = excluded.source_type,
+                source_job_id = excluded.source_job_id,
+                source_asset_id = excluded.source_asset_id,
                 file_path = excluded.file_path,
                 width = excluded.width,
                 height = excluded.height,
@@ -490,6 +824,20 @@ def list_dataset_assets(dataset_id: str, limit: int = 100) -> list[dict[str, Any
     return [_row_to_dataset_asset(row) for row in rows if row is not None]
 
 
+def get_dataset_asset(dataset_id: str, asset_id: str) -> dict[str, Any] | None:
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM dataset_assets
+            WHERE dataset_id = ? AND id = ?
+            LIMIT 1
+            """,
+            (dataset_id, asset_id),
+        ).fetchone()
+    return _row_to_dataset_asset(row)
+
+
 def list_datasets(limit: int = 100) -> list[dict[str, Any]]:
     safe_limit = max(1, min(int(limit or 100), 500))
     with _connect() as conn:
@@ -503,6 +851,188 @@ def list_datasets(limit: int = 100) -> list[dict[str, Any]]:
             (safe_limit,),
         ).fetchall()
     return [_row_to_dataset(row) for row in rows if row is not None]
+
+
+def save_train_job(job: dict[str, Any]) -> None:
+    payload = {
+        "id": job.get("id", ""),
+        "dataset_id": job.get("dataset_id", ""),
+        "dataset_name": job.get("dataset_name", ""),
+        "status": job.get("status", "queued"),
+        "message": job.get("message", ""),
+        "base_model": job.get("base_model", ""),
+        "base_model_path": job.get("base_model_path", ""),
+        "preset_key": job.get("preset_key", "quick"),
+        "epochs": int(job.get("epochs") or 0),
+        "imgsz": int(job.get("imgsz") or 0),
+        "batch_size": int(job.get("batch_size") or 0),
+        "confirmed_only": 1 if job.get("confirmed_only") else 0,
+        "run_dir": job.get("run_dir", ""),
+        "log_path": job.get("log_path", ""),
+        "manifest_path": job.get("manifest_path", ""),
+        "artifact_dir": job.get("artifact_dir", ""),
+        "created_ts": int(job.get("created_ts") or 0),
+        "start_ts": job.get("start_ts"),
+        "end_ts": job.get("end_ts"),
+        "owner_key": job.get("owner_key", ""),
+        "owner_ip": job.get("owner_ip", ""),
+    }
+
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO train_jobs (
+                id, dataset_id, dataset_name, status, message, base_model, base_model_path, preset_key,
+                epochs, imgsz, batch_size, confirmed_only, run_dir, log_path, manifest_path, artifact_dir,
+                created_ts, start_ts, end_ts, owner_key, owner_ip
+            )
+            VALUES (
+                :id, :dataset_id, :dataset_name, :status, :message, :base_model, :base_model_path, :preset_key,
+                :epochs, :imgsz, :batch_size, :confirmed_only, :run_dir, :log_path, :manifest_path, :artifact_dir,
+                :created_ts, :start_ts, :end_ts, :owner_key, :owner_ip
+            )
+            ON CONFLICT(id) DO UPDATE SET
+                dataset_id = excluded.dataset_id,
+                dataset_name = excluded.dataset_name,
+                status = excluded.status,
+                message = excluded.message,
+                base_model = excluded.base_model,
+                base_model_path = excluded.base_model_path,
+                preset_key = excluded.preset_key,
+                epochs = excluded.epochs,
+                imgsz = excluded.imgsz,
+                batch_size = excluded.batch_size,
+                confirmed_only = excluded.confirmed_only,
+                run_dir = excluded.run_dir,
+                log_path = excluded.log_path,
+                manifest_path = excluded.manifest_path,
+                artifact_dir = excluded.artifact_dir,
+                created_ts = excluded.created_ts,
+                start_ts = excluded.start_ts,
+                end_ts = excluded.end_ts,
+                owner_key = excluded.owner_key,
+                owner_ip = excluded.owner_ip
+            """,
+            payload,
+        )
+        conn.commit()
+
+
+def get_train_job(job_id: str) -> dict[str, Any] | None:
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM train_jobs WHERE id = ?", (job_id,)).fetchone()
+    return _row_to_train_job(row)
+
+
+def list_train_jobs(owner_key: str, owner_ip: str, limit: int = 20) -> list[dict[str, Any]]:
+    if not owner_key and not owner_ip:
+        return []
+
+    safe_limit = max(1, min(int(limit or 20), 200))
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM train_jobs
+            WHERE owner_key = ?
+               OR (COALESCE(owner_key, '') = '' AND owner_ip = ?)
+            ORDER BY created_ts DESC, id DESC
+            LIMIT ?
+            """,
+            (owner_key, owner_ip, safe_limit),
+        ).fetchall()
+    return [_row_to_train_job(row) for row in rows if row is not None]
+
+
+def save_auto_annotate_job(job: dict[str, Any]) -> None:
+    payload = {
+        "id": job.get("id", ""),
+        "dataset_id": job.get("dataset_id", ""),
+        "dataset_name": job.get("dataset_name", ""),
+        "status": job.get("status", "queued"),
+        "message": job.get("message", ""),
+        "model_key": job.get("model_key", ""),
+        "conf_thresh": float(job.get("conf_thresh") or 0.25),
+        "imgsz": int(job.get("imgsz") or 640),
+        "prompt_classes": job.get("prompt_classes", ""),
+        "class_mapping": job.get("class_mapping", ""),
+        "overwrite": 1 if job.get("overwrite") else 0,
+        "total": int(job.get("total") or 0),
+        "processed": int(job.get("processed") or 0),
+        "updated": int(job.get("updated") or 0),
+        "skipped_existing": int(job.get("skipped_existing") or 0),
+        "no_detection": int(job.get("no_detection") or 0),
+        "created_ts": int(job.get("created_ts") or 0),
+        "start_ts": job.get("start_ts"),
+        "end_ts": job.get("end_ts"),
+        "owner_key": job.get("owner_key", ""),
+        "owner_ip": job.get("owner_ip", ""),
+    }
+
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO auto_annotate_jobs (
+                id, dataset_id, dataset_name, status, message, model_key, conf_thresh, imgsz,
+                prompt_classes, class_mapping, overwrite, total, processed, updated,
+                skipped_existing, no_detection, created_ts, start_ts, end_ts, owner_key, owner_ip
+            )
+            VALUES (
+                :id, :dataset_id, :dataset_name, :status, :message, :model_key, :conf_thresh, :imgsz,
+                :prompt_classes, :class_mapping, :overwrite, :total, :processed, :updated,
+                :skipped_existing, :no_detection, :created_ts, :start_ts, :end_ts, :owner_key, :owner_ip
+            )
+            ON CONFLICT(id) DO UPDATE SET
+                dataset_id = excluded.dataset_id,
+                dataset_name = excluded.dataset_name,
+                status = excluded.status,
+                message = excluded.message,
+                model_key = excluded.model_key,
+                conf_thresh = excluded.conf_thresh,
+                imgsz = excluded.imgsz,
+                prompt_classes = excluded.prompt_classes,
+                class_mapping = excluded.class_mapping,
+                overwrite = excluded.overwrite,
+                total = excluded.total,
+                processed = excluded.processed,
+                updated = excluded.updated,
+                skipped_existing = excluded.skipped_existing,
+                no_detection = excluded.no_detection,
+                created_ts = excluded.created_ts,
+                start_ts = excluded.start_ts,
+                end_ts = excluded.end_ts,
+                owner_key = excluded.owner_key,
+                owner_ip = excluded.owner_ip
+            """,
+            payload,
+        )
+        conn.commit()
+
+
+def get_auto_annotate_job(job_id: str) -> dict[str, Any] | None:
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM auto_annotate_jobs WHERE id = ?", (job_id,)).fetchone()
+    return _row_to_auto_annotate_job(row)
+
+
+def list_auto_annotate_jobs(owner_key: str, owner_ip: str, limit: int = 20) -> list[dict[str, Any]]:
+    if not owner_key and not owner_ip:
+        return []
+
+    safe_limit = max(1, min(int(limit or 20), 200))
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM auto_annotate_jobs
+            WHERE owner_key = ?
+               OR (COALESCE(owner_key, '') = '' AND owner_ip = ?)
+            ORDER BY created_ts DESC, id DESC
+            LIMIT ?
+            """,
+            (owner_key, owner_ip, safe_limit),
+        ).fetchall()
+    return [_row_to_auto_annotate_job(row) for row in rows if row is not None]
 
 
 def list_jobs(owner_key: str, owner_ip: str, limit: int = 50) -> list[dict[str, Any]]:

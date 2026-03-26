@@ -10,6 +10,7 @@ from config import (
     IMGSZ,
     MODEL_DEFAULT,
     MODEL_REGISTRY,
+    get_train_base_model_options,
     get_upload_model_default,
     get_upload_model_options,
 )
@@ -117,6 +118,7 @@ def index():
         model_default=MODEL_DEFAULT,
         upload_model_default=get_upload_model_default(),
         upload_models=get_upload_model_options(),
+        train_base_models=get_train_base_model_options(),
     )
 
 

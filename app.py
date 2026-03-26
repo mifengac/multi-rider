@@ -13,6 +13,7 @@ from config import (
     logger,
 )
 from db.sqlite import cleanup_old_jobs, init_db, mark_running_jobs_interrupted
+from routes.dispatch_routes import dispatch_bp
 from routes.face_routes import face_bp
 from routes.file_routes import file_bp
 from routes.job_routes import job_bp
@@ -22,6 +23,7 @@ from service.infer_service import get_model
 
 
 def create_app() -> Flask:
+    init_db()
     app = Flask(__name__)
     app.secret_key = FLASK_SECRET_KEY
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
@@ -46,6 +48,7 @@ def create_app() -> Flask:
     app.register_blueprint(upload_bp)
     app.register_blueprint(face_bp)
     app.register_blueprint(train_bp)
+    app.register_blueprint(dispatch_bp)
     return app
 
 

@@ -1,0 +1,229 @@
+<div id="tabDispatch" class="hidden">
+  <div class="grid gap-6 xl:grid-cols-[1.15fr,1.05fr]">
+    <section class="space-y-6">
+      <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Task Dispatch</div>
+            <h2 class="mt-2 text-2xl font-bold text-slate-900">任务平台认证</h2>
+            <p class="mt-3 text-sm leading-7 text-slate-500">
+              使用任务平台账号认证后，才能执行任务下发。系统会缓存 token，并在这里显示当前有效状态。
+            </p>
+          </div>
+          <div id="dispatchAuthStatusBadge" class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">未认证</div>
+        </div>
+
+        <div id="dispatchAuthStatusText" class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-7 text-slate-600">
+          当前尚未认证任务平台。
+        </div>
+
+        <form id="dispatchAuthForm" onsubmit="return authenticateDispatch(event)" class="mt-6 grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">账号</span>
+            <input id="dispatchUsername" type="text" placeholder="请输入任务平台账号"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+          </label>
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">密码</span>
+            <input id="dispatchPassword" type="password" placeholder="请输入任务平台密码"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+          </label>
+          <div class="md:col-span-2 flex flex-wrap justify-end gap-3">
+            <button type="button" onclick="refreshDispatchTab()"
+              class="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+              刷新状态
+            </button>
+            <button id="dispatchAuthSubmit" type="submit"
+              class="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700">
+              认证并缓存 Token
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Dispatch Queue</div>
+            <h2 class="mt-2 text-2xl font-bold text-slate-900">待下发对象</h2>
+            <p class="mt-3 text-sm leading-7 text-slate-500">
+              人脸识别命中后会自动进入本队列。可多选后统一预览 payload、下发任务或发送短信提醒。
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="refreshDispatchQueue()"
+              class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+              刷新显示
+            </button>
+            <button type="button" onclick="refreshDispatchRegionContext()"
+              class="rounded-full border border-teal-200 bg-white px-4 py-2 text-xs font-semibold text-teal-700 transition hover:bg-teal-50">
+              重查属地
+            </button>
+          </div>
+        </div>
+        <div id="dispatchQueueSummary" class="mt-4 text-sm text-slate-500">正在加载待下发队列...</div>
+        <div id="dispatchQueueList" class="mt-5 space-y-4">
+          <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">正在加载待下发队列...</div>
+        </div>
+      </section>
+    </section>
+
+    <section class="space-y-6">
+      <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Dispatch Draft</div>
+        <h2 class="mt-2 text-2xl font-bold text-slate-900">任务平台下发配置</h2>
+        <div id="dispatchSelectedHint" class="mt-3 text-sm leading-7 text-slate-500">请选择左侧待下发对象后再编辑下发草稿。</div>
+
+        <div class="mt-6 grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">指令标题</span>
+            <input id="dispatchTitle" type="text"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+          </label>
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">业务负责人</span>
+            <input id="dispatchManager" type="text"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+          </label>
+        </div>
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">负责人电话</span>
+            <input id="dispatchManagerPhone" type="text" oninput="renderDispatchSmsLocally()"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+          </label>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-7 text-slate-600">
+            当前支持多选后统一下发。主办单位与人员基础信息默认由自动流转结果和 FACE_SQL 配置的人大金仓 V8 库回填。
+            “刷新显示”只重拉当前队列，“重查属地”会按证件号重新查询属地信息。
+          </div>
+        </div>
+        <label class="mt-4 block">
+          <span class="mb-2 block text-sm font-medium text-slate-700">指令内容</span>
+          <textarea id="dispatchContent" rows="3"
+            class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"></textarea>
+        </label>
+        <div class="mt-4 grid gap-4 lg:grid-cols-4">
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">开始时间</span>
+            <input id="dispatchStartTime" type="text"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+          </label>
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">结束时间</span>
+            <input id="dispatchEndTime" type="text" oninput="renderDispatchSmsLocally()"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+          </label>
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">签收时限</span>
+            <input id="dispatchQssx" type="text"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+          </label>
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">反馈时限</span>
+            <input id="dispatchFksx" type="text"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+          </label>
+        </div>
+
+        <div class="mt-5 grid gap-4 lg:grid-cols-3">
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">市局代码 / 名称</span>
+            <input id="dispatchCity" type="text"
+              class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 outline-none" />
+          </label>
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">分局代码 / 名称</span>
+            <input id="dispatchBranch" type="text"
+              class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 outline-none" />
+          </label>
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">派出所代码 / 名称</span>
+            <input id="dispatchStation" type="text"
+              class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 outline-none" />
+          </label>
+        </div>
+
+        <label class="mt-4 block">
+          <span class="mb-2 block text-sm font-medium text-slate-700">地址</span>
+          <input id="dispatchAddress" type="text"
+            class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+        </label>
+
+        <div class="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 text-slate-100 shadow-sm">
+          <div class="border-b border-white/10 px-5 py-3 text-xs font-semibold uppercase tracking-[0.35em] text-sky-200">Editable Payload</div>
+          <div class="border-b border-white/10 px-5 py-3 text-xs leading-6 text-slate-300">
+            默认生成接近成功脚本样例的最小字段集。你可以直接修改 JSON，再逐一测试不同字段组合。
+          </div>
+          <textarea id="dispatchPayloadEditor" rows="16"
+            class="block h-[360px] w-full resize-y border-0 bg-slate-950 px-5 py-4 font-mono text-xs leading-6 text-slate-100 outline-none focus:ring-0">请选择左侧待下发对象后生成 payload 预览</textarea>
+        </div>
+
+        <div class="mt-5 flex flex-wrap justify-end gap-3">
+          <button type="button" onclick="restoreDispatchMinimalPayload()"
+            class="rounded-full border border-sky-200 bg-sky-50 px-5 py-2.5 text-sm font-semibold text-sky-700 transition hover:bg-sky-100">
+            恢复精简默认
+          </button>
+          <button type="button" onclick="formatDispatchPayloadEditor()"
+            class="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+            格式化 JSON
+          </button>
+          <button type="button" onclick="previewDispatchPayload()"
+            class="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+            生成精简 Payload
+          </button>
+          <button type="button" onclick="sendDispatchTasks()"
+            class="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700">
+            通过任务平台下发
+          </button>
+        </div>
+      </section>
+
+      <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">SMS Reminder</div>
+        <h2 class="mt-2 text-2xl font-bold text-slate-900">短信提醒</h2>
+        <div class="mt-5 grid gap-4">
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">短信号码</span>
+            <input id="dispatchSmsMobile" type="text" oninput="renderDispatchSmsLocally()"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
+          </label>
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-slate-700">短信模板</span>
+            <textarea id="dispatchSmsTemplate" rows="4" oninput="renderDispatchSmsLocally()"
+              class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"></textarea>
+          </label>
+          <div class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-sm leading-7 text-sky-800">
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-500">Live Preview</div>
+            <div id="dispatchSmsPreviewText" class="mt-3">请选择左侧待下发对象后预览短信内容</div>
+          </div>
+          <div class="flex flex-wrap justify-end gap-3">
+            <button type="button" onclick="previewDispatchSms()"
+              class="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+              预览短信
+            </button>
+            <button type="button" onclick="sendDispatchSms()"
+              class="rounded-full bg-sky-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500">
+              发送短信提醒
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Audit Trail</div>
+            <h2 class="mt-2 text-2xl font-bold text-slate-900">下发记录与短信记录</h2>
+          </div>
+          <button type="button" onclick="refreshDispatchTab()"
+            class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+            刷新
+          </button>
+        </div>
+        <div id="dispatchHistoryRecords" class="mt-5 space-y-4">
+          <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">暂无记录</div>
+        </div>
+      </section>
+    </section>
+  </div>
+</div>

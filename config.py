@@ -1,9 +1,11 @@
 import logging
+import json
 import os
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "model")
+DEPLOYMENT_SLOTS_PATH = os.path.join(MODEL_DIR, "deployment_slots.json")
 UPLOAD_MODEL_EXTS = {".pt"}
 PROMPT_MODEL_DEFAULT_CLASSES = "person,motorcycle,bicycle,car,bus,truck"
 PROMPT_MODEL_DEFAULT_CONF = 0.10
@@ -45,6 +47,11 @@ ORACLE_SERVICE = os.getenv("ORACLE_SERVICE", "yfgxpt")
 ORACLE_USER = os.getenv("ORACLE_USER", "yfzagk")
 ORACLE_PASSWORD = os.getenv("ORACLE_PASSWORD", "yfzagk")
 INSTANT_CLIENT_DIR = _resolve_path(os.getenv("ORACLE_IC_DIR", os.path.join(BASE_DIR, "instantclient_11_2")))
+SMS_ORACLE_HOST = os.getenv("SMS_ORACLE_HOST", ORACLE_HOST)
+SMS_ORACLE_PORT = int(os.getenv("SMS_ORACLE_PORT", str(ORACLE_PORT)))
+SMS_ORACLE_SERVICE = os.getenv("SMS_ORACLE_SERVICE", ORACLE_SERVICE)
+SMS_ORACLE_USER = os.getenv("SMS_ORACLE_USER", ORACLE_USER)
+SMS_ORACLE_PASSWORD = os.getenv("SMS_ORACLE_PASSWORD", ORACLE_PASSWORD)
 
 
 def _resolve_model_path(default_filename: str, *env_names: str) -> str:
@@ -84,6 +91,9 @@ MODEL_REGISTRY = {
 MOBILECLIP_TS_PATH = _resolve_model_path("mobileclip_blt.ts", "MOBILECLIP_TS_PATH")
 MOBILECLIP2_TS_PATH = _resolve_model_path("mobileclip2_b.ts", "MOBILECLIP2_TS_PATH")
 CLIP_VIT_B32_PATH = _resolve_model_path("ViT-B-32.pt", "CLIP_VIT_B32_PATH")
+MODEL_ASSET_FILENAMES = {
+    os.path.basename(CLIP_VIT_B32_PATH).lower(),
+}
 
 MODEL_DEFAULT = (os.getenv("MODEL_DEFAULT", "general") or "general").strip()
 if MODEL_DEFAULT not in MODEL_REGISTRY:
@@ -98,6 +108,7 @@ OUTPUT_DIR = _resolve_path(os.getenv("OUTPUT_DIR", os.path.join(BASE_DIR, "outpu
 SQLITE_DB_PATH = _resolve_path(os.getenv("SQLITE_DB_PATH", os.path.join(BASE_DIR, "jobs.sqlite3")))
 RESULTS_DIR = _resolve_path(os.getenv("RESULTS_DIR", os.path.join(OUTPUT_DIR, "_results")))
 DATASETS_DIR = _resolve_path(os.getenv("DATASETS_DIR", os.path.join(BASE_DIR, "datasets")))
+TRAIN_RUNS_DIR = _resolve_path(os.getenv("TRAIN_RUNS_DIR", os.path.join(BASE_DIR, "train_runs")))
 
 UPLOAD_TEMP_DIR = _resolve_path(os.getenv("UPLOAD_TEMP_DIR", os.path.join(BASE_DIR, "upload_tmp")))
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(1024 * 1024 * 1024)))
@@ -117,6 +128,46 @@ FACE_SQL_USER = os.getenv("FACE_SQL_USER", "")
 FACE_SQL_PASSWORD = os.getenv("FACE_SQL_PASSWORD", "")
 FACE_SQL_QUERY_PATH = _resolve_path(os.getenv("FACE_SQL_QUERY_PATH", os.path.join(BASE_DIR, "face_library.sql")))
 
+DISPATCH_AUTH_URL = os.getenv(
+    "DISPATCH_AUTH_URL",
+    "http://68.26.6.231:7204/rzzx_beta/oauth/token",
+)
+DISPATCH_TASK_URL = os.getenv(
+    "DISPATCH_TASK_URL",
+    "http://68.26.6.231:7204/xbrwzx_beta/api/WxtdjModule/receiveAndCreateRw",
+)
+DISPATCH_CLIENT_ID = os.getenv("DISPATCH_CLIENT_ID", "jcgkpt")
+DISPATCH_CLIENT_SECRET = os.getenv("DISPATCH_CLIENT_SECRET", "123456")
+DISPATCH_GRANT_TYPE = os.getenv("DISPATCH_GRANT_TYPE", "password")
+DISPATCH_RWYID = os.getenv("DISPATCH_RWYID", "ecfffc32c9aa4aabb75541cb23a3270f")
+DISPATCH_SJCSLY = os.getenv("DISPATCH_SJCSLY", "yfdjzldxwlxxwffzzx")
+DISPATCH_QSSX = os.getenv("DISPATCH_QSSX", "06")
+DISPATCH_FKSX = os.getenv("DISPATCH_FKSX", "08")
+DISPATCH_GJDQ = os.getenv("DISPATCH_GJDQ", "CHN")
+DISPATCH_ZJLX = os.getenv("DISPATCH_ZJLX", "111")
+DISPATCH_XFDW = os.getenv("DISPATCH_XFDW", "")
+DISPATCH_YWFZR = os.getenv("DISPATCH_YWFZR", "")
+DISPATCH_YWFZRLXDH = os.getenv("DISPATCH_YWFZRLXDH", "")
+DISPATCH_DEFAULT_TITLE = os.getenv("DISPATCH_DEFAULT_TITLE", "违法行为核查任务")
+DISPATCH_DEFAULT_CONTENT = os.getenv(
+    "DISPATCH_DEFAULT_CONTENT",
+    "请核查该对象近期涉嫌违法行为并反馈处置情况。",
+)
+DISPATCH_DEFAULT_NOTE = os.getenv(
+    "DISPATCH_DEFAULT_NOTE",
+    "由 Multi-Rider 自动识别并流转生成，请结合实际情况核查。",
+)
+DISPATCH_MOCK_MODE = (os.getenv("DISPATCH_MOCK_MODE", "false") or "false").strip().lower() in {"1", "true", "yes", "on"}
+DISPATCH_QUEUE_LIMIT = max(10, int(os.getenv("DISPATCH_QUEUE_LIMIT", "100")))
+DISPATCH_SMS_DEFAULT_MOBILE = os.getenv("DISPATCH_SMS_DEFAULT_MOBILE", "")
+DISPATCH_SMS_DEFAULT_TEMPLATE = os.getenv(
+    "DISPATCH_SMS_DEFAULT_TEMPLATE",
+    "【治安基础管控中心】{xm}，系统识别到您涉及“{illegal_type}”线索，请于{deadline}前主动配合核查。联系单位：{zbpcsmc}，联系电话：{ywfzrlxdh}。",
+)
+DISPATCH_SMS_USERID = os.getenv("DISPATCH_SMS_USERID", "admin")
+DISPATCH_SMS_PASSWORD = os.getenv("DISPATCH_SMS_PASSWORD", "yfga8130018")
+DISPATCH_SMS_USERPORT = os.getenv("DISPATCH_SMS_USERPORT", "0006")
+
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
 APP_PORT = int(os.getenv("APP_PORT", "5001"))
@@ -127,12 +178,41 @@ def _is_prompt_model_name(model_name: str) -> bool:
     return "yolo" in lower and "world" in lower
 
 
+def _load_deployment_slots() -> dict:
+    if not os.path.isfile(DEPLOYMENT_SLOTS_PATH):
+        return {"slots": {}, "updated_ts": None}
+    try:
+        with open(DEPLOYMENT_SLOTS_PATH, "r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+        if isinstance(payload, dict):
+            slots = payload.get("slots")
+            if not isinstance(slots, dict):
+                payload["slots"] = {}
+            payload.setdefault("updated_ts", None)
+            return payload
+    except Exception:
+        pass
+    return {"slots": {}, "updated_ts": None}
+
+
+def get_deployment_slot_model_name(slot_key: str) -> str:
+    payload = _load_deployment_slots()
+    slot = (payload.get("slots") or {}).get(str(slot_key or "").strip(), {})
+    if not isinstance(slot, dict):
+        return ""
+    model_name = os.path.basename(str(slot.get("model_name") or "").strip())
+    if not model_name:
+        return ""
+    if os.path.splitext(model_name)[1].lower() not in UPLOAD_MODEL_EXTS:
+        return ""
+    candidate = os.path.join(MODEL_DIR, model_name)
+    return model_name if os.path.isfile(candidate) else ""
+
+
 def model_supports_text_prompt(model_key: str) -> bool:
     key = (model_key or "").strip()
-    if key == "general":
-        return _is_prompt_model_name(os.path.basename(MODEL_REGISTRY.get("general", "")))
-    if key == "bczj":
-        return False
+    if key in MODEL_REGISTRY:
+        return _is_prompt_model_name(os.path.basename(resolve_model_path(key)))
     return _is_prompt_model_name(key)
 
 
@@ -144,6 +224,8 @@ def list_upload_model_paths() -> dict[str, str]:
             return
         model_name = os.path.basename(path)
         if os.path.splitext(model_name)[1].lower() not in UPLOAD_MODEL_EXTS:
+            return
+        if model_name.lower() in MODEL_ASSET_FILENAMES:
             return
         registry.setdefault(model_name, os.path.abspath(path))
 
@@ -160,6 +242,11 @@ def list_upload_model_paths() -> dict[str, str]:
 def resolve_model_path(model_key: str) -> str:
     key = (model_key or "").strip()
     if key in MODEL_REGISTRY:
+        override_name = get_deployment_slot_model_name(key)
+        if override_name:
+            override_path = os.path.join(MODEL_DIR, override_name)
+            if os.path.isfile(override_path):
+                return os.path.abspath(override_path)
         return MODEL_REGISTRY[key]
 
     registry = list_upload_model_paths()
@@ -178,6 +265,10 @@ def get_upload_model_default() -> str:
     registry = list_upload_model_paths()
     if not registry:
         return ""
+
+    override_name = get_deployment_slot_model_name("upload_default")
+    if override_name and override_name in registry:
+        return override_name
 
     preferred_names = [
         os.path.basename(MODEL_REGISTRY.get("general", "")),
@@ -244,10 +335,29 @@ def get_upload_model_options() -> list[dict[str, object]]:
     return options
 
 
+def get_train_base_model_options() -> list[dict[str, str]]:
+    registry = list_upload_model_paths()
+    preferred = ["yolo26n.pt", "yolo26s.pt"]
+    items: list[dict[str, str]] = []
+    for model_name in preferred:
+        model_path = registry.get(model_name)
+        if not model_path:
+            continue
+        items.append(
+            {
+                "value": model_name,
+                "label": model_name,
+                "description": _upload_model_description(model_name),
+            }
+        )
+    return items
+
+
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(UPLOAD_TEMP_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 os.makedirs(DATASETS_DIR, exist_ok=True)
+os.makedirs(TRAIN_RUNS_DIR, exist_ok=True)
 
 # Disable ultralytics telemetry and version checks for intranet hosts.
 os.environ.setdefault("YOLO_TELEMETRY", "false")

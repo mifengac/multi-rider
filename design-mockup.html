@@ -67,6 +67,7 @@
       <button onclick="switchTab('oracle')" id="tabBtn-oracle" class="tab-btn rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">数据库检测</button>
       <button onclick="switchTab('upload')" id="tabBtn-upload" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">本地上传检测</button>
       <button onclick="switchTab('train')" id="tabBtn-train" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">Train 模块</button>
+      <button onclick="switchTab('dispatch')" id="tabBtn-dispatch" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">任务下发</button>
       <button onclick="switchTab('face')" id="tabBtn-face" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">人脸库</button>
     </div>
 
@@ -340,6 +341,256 @@
                 发布后模型直接进入当前系统的模型目录，不需要额外手工接线。
               </div>
               <button class="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white">发布为当前业务模型</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="tab-dispatch" class="tab-panel">
+      <div class="grid gap-6 xl:grid-cols-[1.45fr,0.95fr]">
+        <section class="space-y-6">
+          <div class="card p-5 md:p-8">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Task Dispatch</div>
+                <h2 class="mt-2 text-2xl font-bold text-slate-900">任务平台认证</h2>
+                <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-500">
+                  使用派出所一平台提供的账号和密码先认证获取 token。token 缓存成功后，后续任务下发统一携带 `Authorization: Bearer &lt;token&gt;`。
+                </p>
+              </div>
+              <span class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">已认证 / token 有效 41825 秒</span>
+            </div>
+            <div class="mt-6 grid gap-4 md:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">账号 / username</span>
+                <input type="text" value="dispatch_admin" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">密码 / password</span>
+                <input type="password" value="******" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+            </div>
+            <div class="mt-5 grid gap-4 md:grid-cols-3">
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">认证接口</div>
+                <div class="mt-2 text-sm font-semibold text-slate-900">/oauth/token</div>
+                <div class="mt-1 text-xs leading-6 text-slate-500">client_id=jcgkpt / client_secret=123456 / grant_type=password</div>
+              </div>
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">Token 类型</div>
+                <div class="mt-2 text-sm font-semibold text-slate-900">Bearer</div>
+                <div class="mt-1 text-xs leading-6 text-slate-500">过期后自动提示重新认证，不直接丢弃待下发队列。</div>
+              </div>
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">本地缓存</div>
+                <div class="mt-2 text-sm font-semibold text-slate-900">状态 + 过期时间</div>
+                <div class="mt-1 text-xs leading-6 text-slate-500">便于页面显示“已认证 / 待认证 / 已过期”。</div>
+              </div>
+            </div>
+            <div class="mt-6 flex flex-wrap justify-end gap-3">
+              <button class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">刷新 Token</button>
+              <button class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white">认证并缓存 Token</button>
+            </div>
+          </div>
+
+          <div class="card p-5 md:p-8">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Dispatch Queue</div>
+                <h3 class="mt-2 text-xl font-semibold text-slate-900">待下发对象</h3>
+                <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-500">
+                  人脸识别完成后，识别成功的违法人员自动流转至本模块。用户可多选人员，统一生成“任务平台”下发草稿，或直接发送短信提醒。
+                </p>
+              </div>
+              <button class="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white">批量生成下发草稿</button>
+            </div>
+            <div class="mt-6 space-y-4">
+              <div class="inner-card p-4">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div class="flex items-center gap-4">
+                    <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-500">照片</div>
+                    <div>
+                      <div class="text-sm font-semibold text-slate-900">莫镇禧 / 445302201209120617</div>
+                      <div class="mt-1 text-xs leading-6 text-slate-500">来源：人脸识别 face_20260326_001 · 违法行为：飙车炸街（翘车头） · 相似度 0.4284</div>
+                      <div class="mt-1 text-xs leading-6 text-slate-500">联系电话：18807661151 · 检测来源：本地上传视频 20260324090623.mpg</div>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">可下发</span>
+                    <button class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">查看来源</button>
+                    <button class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">加入本次下发</button>
+                  </div>
+                </div>
+              </div>
+              <div class="inner-card p-4">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div class="flex items-center gap-4">
+                    <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-500">照片</div>
+                    <div>
+                      <div class="text-sm font-semibold text-slate-900">李某某 / 440123199808081234</div>
+                      <div class="mt-1 text-xs leading-6 text-slate-500">来源：Oracle 检测 oracle_20260326_008 · 违法行为：多人骑乘 · 相似度 0.5031</div>
+                      <div class="mt-1 text-xs leading-6 text-slate-500">联系电话缺失，可先推送任务平台，短信提醒待补录号码后再执行。</div>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">待补充手机号</span>
+                    <button class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">补录信息</button>
+                    <button class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">加入本次下发</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-5 md:p-8">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Task Platform</div>
+                <h3 class="mt-2 text-xl font-semibold text-slate-900">任务平台下发配置</h3>
+                <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-500">
+                  系统根据 `ywdata.t_ap_czrk_jbxx` 自动回填行政区划，按接口文档组装 payload。用户重点确认标题、内容、时限、负责人和地址后再下发。
+                </p>
+              </div>
+              <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">rwdyid = ecfffc32c9aa4aabb75541cb23a3270f</span>
+            </div>
+            <div class="mt-6 grid gap-4 md:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">指令标题 / zlbt</span>
+                <input type="text" value="飙车炸街违法人员核查" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">指令内容 / zlnr</span>
+                <input type="text" value="请核查该对象近期涉嫌飙车炸街违法行为并反馈处置情况。" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+            </div>
+            <div class="mt-4 grid gap-4 lg:grid-cols-4">
+              <label class="block inner-card p-4">
+                <span class="mb-2 block text-sm font-medium text-slate-700">开始时间 / kssj</span>
+                <input type="text" value="2026-03-26 09:30:00" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+              <label class="block inner-card p-4">
+                <span class="mb-2 block text-sm font-medium text-slate-700">结束时间 / jzsj</span>
+                <input type="text" value="2026-03-29 09:30:00" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+              <label class="block inner-card p-4">
+                <span class="mb-2 block text-sm font-medium text-slate-700">签收时限 / qssx</span>
+                <input type="text" value="06" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+              <label class="block inner-card p-4">
+                <span class="mb-2 block text-sm font-medium text-slate-700">反馈时限 / fksx</span>
+                <input type="text" value="08" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+            </div>
+            <div class="mt-5 grid gap-4 lg:grid-cols-3">
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">行政区划映射</div>
+                <div class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                  <div><span class="font-semibold">sssjDm / sssjMc</span> ← ds||'000000' / dsmc</div>
+                  <div><span class="font-semibold">ssfjDm / ssfjMc</span> ← ssxq||'000000' / ssxqmc</div>
+                  <div><span class="font-semibold">zbpcsdm / zbpcsmc</span> ← pcs / pcsmc</div>
+                  <div><span class="font-semibold">dzmc</span> ← dz</div>
+                </div>
+              </div>
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">人员变量</div>
+                <div class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                  <div><span class="font-semibold">zjhm</span> = 445302201209120617</div>
+                  <div><span class="font-semibold">lxdh</span> = 18807661151</div>
+                  <div><span class="font-semibold">xm</span> = 莫镇禧</div>
+                  <div><span class="font-semibold">sjcsly</span> = yfdjzldxwlxxwffzzx</div>
+                </div>
+              </div>
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">业务负责人</div>
+                <label class="mt-3 block">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">ywfzr / ywfzrlxdh</span>
+                  <input type="text" value="张三 / 17246390519" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+                </label>
+              </div>
+            </div>
+            <div class="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 text-slate-100 shadow-sm">
+              <div class="border-b border-white/10 px-5 py-3 text-xs font-semibold uppercase tracking-[0.35em] text-sky-200">Payload Preview</div>
+              <pre class="overflow-x-auto px-5 py-4 text-xs leading-6">{
+  "rwdyid": "ecfffc32c9aa4aabb75541cb23a3270f",
+  "zlbt": "飙车炸街违法人员核查",
+  "zlnr": "请核查该对象近期涉嫌飙车炸街违法行为并反馈处置情况。",
+  "kssj": "2026-03-26 09:30:00",
+  "jzsj": "2026-03-29 09:30:00",
+  "qssx": "06",
+  "fksx": "08",
+  "sssjDm": "440100000000",
+  "sssjMc": "广州市公安局",
+  "ssfjDm": "440106000000",
+  "ssfjMc": "天河区分局",
+  "zbpcsdm": "440106590000",
+  "zbpcsmc": "棠下派出所",
+  "zjhm": "445302201209120617",
+  "lxdh": "18807661151",
+  "xm": "莫镇禧",
+  "dzmc": "广州市海珠区赤岗街道...",
+  "sjcsly": "yfdjzldxwlxxwffzzx",
+  "wxtid": "AUTO-UUID-20260326-0001"
+}</pre>
+            </div>
+            <div class="mt-6 flex flex-wrap justify-end gap-3">
+              <button class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">保存草稿</button>
+              <button class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white">通过任务平台下发</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="space-y-6">
+          <div class="card p-5 md:p-6">
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">SMS Reminder</div>
+            <h3 class="mt-2 text-xl font-semibold text-slate-900">短信提醒</h3>
+            <p class="mt-3 text-sm leading-7 text-slate-500">
+              默认手机号码和模板来自当前模块配置，用户可以临时修改。修改后实时预览实际发送内容，再决定是否写入短信表。
+            </p>
+            <div class="mt-5 space-y-4">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">短信号码 / mobile</span>
+                <input type="text" value="18807661151" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">短信模板 / content</span>
+                <textarea rows="5" class="w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">【治安基础管控中心】{xm}，系统识别到您涉及“{illegalType}”线索，请于{deadline}前主动配合核查。联系单位：{pcsmc}，联系电话：{ywfzrlxdh}。</textarea>
+              </label>
+              <div class="inner-card p-4">
+                <div class="text-xs text-slate-500">短信库写入参数</div>
+                <div class="mt-3 grid gap-3 text-sm text-slate-700">
+                  <div><span class="font-semibold">userid / password</span> = admin / yfga8130018</div>
+                  <div><span class="font-semibold">userport</span> = 0006</div>
+                  <div><span class="font-semibold">eid</span> = 业务主键 / 任务唯一编号</div>
+                  <div><span class="font-semibold">deadtime</span> = sysdate</div>
+                </div>
+              </div>
+              <div class="rounded-3xl border border-sky-200 bg-sky-50 p-4 text-sm leading-7 text-sky-800">
+                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-500">Live Preview</div>
+                <div class="mt-3">【治安基础管控中心】莫镇禧，系统识别到您涉及“飙车炸街（翘车头）”线索，请于 2026-03-29 09:30 前主动配合核查。联系单位：棠下派出所，联系电话：17246390519。</div>
+              </div>
+              <div class="flex justify-end">
+                <button class="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white">发送短信提醒</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Audit Trail</div>
+            <h3 class="mt-2 text-xl font-semibold text-slate-900">下发记录与审计</h3>
+            <div class="mt-5 space-y-3 text-sm text-slate-600">
+              <div class="inner-card p-4">
+                <div class="font-semibold text-slate-900">2026-03-26 10:08 / 平台下发成功</div>
+                <div class="mt-2 leading-6">莫镇禧 · wxtid=AUTO-UUID-20260326-0001 · 棠下派出所</div>
+              </div>
+              <div class="inner-card p-4">
+                <div class="font-semibold text-slate-900">2026-03-26 10:11 / 短信写库成功</div>
+                <div class="mt-2 leading-6">mobile=18807661151 · userport=0006 · status=0</div>
+              </div>
+              <div class="inner-card p-4">
+                <div class="font-semibold text-slate-900">2026-03-26 10:13 / 下发失败待重试</div>
+                <div class="mt-2 leading-6">Authorization 失效，已提示重新认证，队列数据未丢弃。</div>
+              </div>
             </div>
           </div>
         </section>

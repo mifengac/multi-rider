@@ -19,5 +19,9 @@ Recommended logical groups:
 Current decision:
 - Keep files in the root `model/` directory for now to avoid breaking existing `app.env` paths.
 - Use `0325_model_directory_strategy.md` in the project root as the source of truth for future reorganization.
+- Runtime slot overrides are stored in `deployment_slots.json`, which controls:
+  - `upload_default`
+  - `general`
+  - `bczj`
 
 These binaries are intentionally not tracked in Git.

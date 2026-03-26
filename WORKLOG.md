@@ -11,9 +11,7 @@
 - Goal:
 - Done:
   - 
-  - 
 - Files:
-  - 
   - 
 - Decision:
   - 
@@ -34,9 +32,9 @@
 - Done:
   - 新增训练模块开发清单，明确 `YOLO26` 为主训练路线，`YOLO-World` 为预标注路线
   - 重建 `design-mockup.html`，加入 `Train` 页签原型
-  - 删除 `yoloe-26n-seg.pt`、`yoloe-26s-seg.pt`，默认通用模型切到 `yolov8s-worldv2.pt`
+  - 删除 `yoloe-26n-seg.pt`、`yoloe-26s-seg.pt`
   - 新建 `SESSION_HANDOFF.md`、`WORKLOG.md`、`HANDOFF_CHECKLIST.md`
-  - 调整 `.gitignore`，避免把本地数据和离线大文件推上远程
+  - 调整 `.gitignore`，避免把本地数据和离线大文件推上仓库
 - Files:
   - `config.py`
   - `design-mockup.html`
@@ -47,39 +45,99 @@
   - `WORKLOG.md`
   - `HANDOFF_CHECKLIST.md`
 - Decision:
-  - 先不重排 `model/` 目录物理路径，只先做规范文档和默认模型切换，避免打断当前运行配置
+  - 先不调整 `model/` 目录物理结构，先做文档规范和默认模型切换，避免打断现有运行链路
 - Risk:
-  - 训练模块目前还是设计态，没有真实后端和前端实现
-  - 仓库里已有部分较大改动，需要后续继续回归验证
+  - 训练模块当时还停留在设计态，没有真实前后端实现
 - Next:
-  - 下一台电脑接手后，优先实现 `Train` 页面的真实路由和“数据集管理”骨架
+  - 下一台电脑接手后，优先落地 `Train` 页和数据集管理
 
 ### 2026-03-26 07:50
 
-- Device: current machine before switching
+- Device: current machine
 - Branch: `codex/face-identity-integration`
-- Goal: 继续落地训练模块第一阶段，并在换电脑前把 Train 当前状态和交接信息补齐
+- Goal: 把训练模块从 mockup 推进到真实页面骨架
 - Done:
-  - 把 `Train` 从 mockup 推进到真实页面骨架，补上数据集创建、SQLite 落库和本地目录初始化
-  - 实现 ZIP 导入流程，新增 `dataset_assets` 持久化、图片元数据记录、最近导入预览和图片访问接口
-  - 将 [index.html](C:/Users/So/Desktop/project/multi-rider-repo/templates/index.html) 内联的大段业务 JS 抽到 [index-page.js](C:/Users/So/Desktop/project/multi-rider-repo/static/js/index-page.js)，模板只保留 bootstrap 配置
-  - 本地完成两轮 smoke test：真实创建数据集、导入包含 2 张图片和 1 个非图片文件的 ZIP，并确认测试数据已清理
+  - 实现真实数据集创建
+  - 实现 ZIP 导入
+  - 新增 `dataset_assets` 落库
+  - 把首页大段 JS 拆出模板
+  - 首轮 smoke test 跑通
 - Files:
   - `db/sqlite.py`
   - `routes/train_routes.py`
   - `service/dataset_service.py`
   - `templates/index.html`
   - `static/js/index-page.js`
-  - `WORKLOG.md`
-  - `SESSION_HANDOFF.md`
-  - `HANDOFF_CHECKLIST.md`
 - Decision:
-  - 页面脚本先按“模板配置内联、业务逻辑外链”拆分，优先解决 `index.html` 过重的问题；这一轮不继续细拆成多份 feature 文件
-  - 训练模块优先继续做“历史结果回流到数据集”，暂不提前碰训练任务编排和模型发布
+  - 先解决首页模板过重问题，再继续做 Train 真实功能
 - Risk:
-  - [index-page.js](C:/Users/So/Desktop/project/multi-rider-repo/static/js/index-page.js) 虽然已从模板中抽离，但文件仍然很大，后续还需要按功能继续拆
-  - Oracle 检测链路和内网人脸库链路这次没有做全量回归，切到新电脑后仍要在对应环境重测
+  - Oracle / Face 模块这轮没有做完整回归
 - Next:
-  - 实现“历史结果加入数据集”，把已有 Oracle / Upload 检测结果回流到 `Train`
-  - 继续补数据集内图片管理、标注入口和复核流程
-  - 如后续继续改首页交互，再考虑把 [index-page.js](C:/Users/So/Desktop/project/multi-rider-repo/static/js/index-page.js) 按 `job/upload/train/face` 拆成多文件
+  - 把历史结果回流到数据集，并补标注入口
+
+### 2026-03-26 10:20
+
+- Device: current machine
+- Branch: `codex/face-identity-integration`
+- Goal: 跑通训练模块主链路，让 `YOLO26` 能真实开始训练
+- Done:
+  - 把首页脚本继续拆成：
+    - `dataset.js`
+    - `training.js`
+    - `annotation.js`
+    - `results.js`
+    - `face-library.js`
+    - `bootstrap.js`
+  - 补回第一版真实框标注交互
+  - 补上标注效率功能：
+    - 仅看未标注
+    - 上一张 / 下一张未标注
+    - 标注统计
+  - 训练页增加真实表单和最近任务列表
+  - 重写 `service/train_task_service.py`，训练任务改为真实调用 `yolo.exe detect train`
+  - 定位 `YOLO26` 训练失败根因：
+    - `ultralytics==8.3.226` 不支持当前 `yolo26*.pt`
+  - 升级依赖到 `ultralytics==8.4.27`
+  - 重新生成 `requirements.lock`
+  - 补齐 `vendor/wheels/` 到新的锁文件版本
+  - 真实 smoke test 跑通：
+    - 创建数据集
+    - 导入 `test/xp.jpg`
+    - 保存 1 个框标注
+    - 创建 `YOLO26n` 训练任务
+    - `1 epoch` 训练成功完成
+    - 生成 `best.pt / last.pt / results.csv / args.yaml`
+  - 将 `train_runs/` 加入 `.gitignore`
+- Files:
+  - `.gitignore`
+  - `requirements.txt`
+  - `requirements.lock`
+  - `app.py`
+  - `db/sqlite.py`
+  - `routes/train_routes.py`
+  - `service/dataset_service.py`
+  - `service/train_task_service.py`
+  - `templates/index.html`
+  - `templates/index/_train_tab.html`
+  - `templates/index/_dataset_workspace_drawer.html`
+  - `static/js/index-page/dataset.js`
+  - `static/js/index-page/training.js`
+  - `static/js/index-page/annotation.js`
+  - `static/js/index-page/results.js`
+  - `static/js/index-page/face-library.js`
+  - `static/js/index-page/bootstrap.js`
+  - `templates/history_detail.html`
+  - `SESSION_HANDOFF.md`
+  - `WORKLOG.md`
+- Decision:
+  - 训练基座先稳定在 `YOLO26n / YOLO26s`
+  - 先证明“能真实起训练”，再补训练结果管理和模型发布
+  - 离线 wheel 目录继续保留并同步维护
+- Risk:
+  - 当前 smoke test 只证明训练链路可跑通，不代表训练效果已经可靠
+  - Oracle / 内网人脸库这轮仍未回归
+  - 工作区仍有未提交改动
+- Next:
+  - 做训练结果管理页
+  - 做模型发布到 `model/`
+  - 再补标注效率功能和更多筛选能力

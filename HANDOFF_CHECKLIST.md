@@ -7,8 +7,8 @@
 
 - Date: 2026-03-26
 - Branch: `codex/face-identity-integration`
-- Latest feature commit before handoff doc: `5f7116a`
-- Current focus: `Train` 第一阶段，下一步做“历史结果加入数据集”
+- Latest committed revision: `ddcda47`
+- Current focus: 训练结果管理和模型发布
 
 ## 30-Second Checklist
 
@@ -20,8 +20,8 @@
 - [x] 已写清楚下一步做什么
 - [x] 已写清楚未测试项
 - [x] 已写清楚风险项
-- [x] 已写明 `Train` 当前已做到数据集创建、ZIP 导入和首页 JS 拆分
-- [x] 完成 `commit + push`
+- [x] 已记录训练模块已经跑通真实 `YOLO26` smoke test
+- [ ] 如需切电脑，决定是否先 `commit + push`
 
 ## Minimum Version
 
@@ -35,5 +35,5 @@
 ## Copy-Paste Prompt
 
 ```text
-先读取项目根目录的 SESSION_HANDOFF.md 和 WORKLOG.md，再继续当前任务。优先总结 Train 当前真实进度、未完成事项、风险和下一步，并直接从“历史结果加入数据集”继续。
+先读取项目根目录的 SESSION_HANDOFF.md 和 WORKLOG.md，再继续当前任务。先总结训练模块当前状态、已完成事项、风险和下一步，然后优先推进训练结果管理和模型发布。
 ```

@@ -7,7 +7,7 @@ Flask==3.0.0
 requests==2.31.0
 
 # YOLO inference engine
-ultralytics==8.3.226
+ultralytics==8.4.27
 torch==2.11.0
 torchvision==0.26.0
 
