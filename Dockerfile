@@ -45,7 +45,7 @@ COPY model ./model
 COPY instantclient_11_2 ./instantclient
 
 RUN test -f /app/model/biaochezhajiev2.pt || (echo "Missing model/biaochezhajiev2.pt" >&2; exit 1) \
-    && test -f /app/model/yoloe-26n-seg.pt  || (echo "Missing model/yoloe-26n-seg.pt"  >&2; exit 1) \
+    && test -f /app/model/yolov8s-worldv2.pt || (echo "Missing model/yolov8s-worldv2.pt" >&2; exit 1) \
     && test -f /app/instantclient/libclntsh.so.11.1 || (echo "Missing Oracle Instant Client files under instantclient_11_2/" >&2; exit 1) \
     && mkdir -p /app/output /app/upload_tmp
 

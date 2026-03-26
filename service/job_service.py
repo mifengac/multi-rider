@@ -21,7 +21,9 @@ from config import (
 )
 from db.sqlite import save_job
 from service.infer_service import _predict_batch, download_image_with_status, get_model
+from service.result_store_service import add_result_bytes, create_result_store, finalize_result_store
 from utils.helpers import filename_from_url, format_timestamp, infer_ext_from_bytes
+from utils.ownership import job_matches_owner
 
 
 JOBS: dict[str, dict] = {}
@@ -43,12 +45,11 @@ def get_job_snapshot(job_id: str) -> dict | None:
         return _job_snapshot(job)
 
 
-def list_running_jobs() -> list[dict]:
+def list_running_jobs(owner_key: str = "", owner_ip: str = "") -> list[dict]:
     with JOBS_LOCK:
         return [
             {
                 "id": job.get("id"),
-                "owner_ip": job.get("owner_ip"),
                 "start_ts": job.get("start_ts"),
                 "total": job.get("total"),
                 "processed": job.get("processed"),
@@ -57,13 +58,14 @@ def list_running_jobs() -> list[dict]:
             }
             for job in JOBS.values()
             if job.get("status") == "running"
+            and job_matches_owner(job, owner_key, owner_ip)
         ]
 
 
-def request_cancel(job_id: str) -> bool:
+def request_cancel(job_id: str, owner_key: str = "", owner_ip: str = "") -> bool:
     with JOBS_LOCK:
         job = JOBS.get(job_id)
-        if job is None:
+        if job is None or not job_matches_owner(job, owner_key, owner_ip):
             return False
         job["cancel"].set()
         return True
@@ -78,7 +80,10 @@ def _save_terminal_job(snapshot: dict) -> None:
 
 def _new_job_record(total: int) -> dict:
     return {
+        "job_type": "oracle",
         "id": uuid4().hex,
+        "source_name": "oracle",
+        "source_type": "oracle",
         "status": "running",
         "message": "",
         "total": total,
@@ -89,10 +94,13 @@ def _new_job_record(total: int) -> dict:
         "failed": 0,
         "start_ts": int(time.time()),
         "end_ts": None,
+        "owner_key": "",
         "zip_bytes": None,
         "zip_path": None,
         "zip_parts": [],
         "summary_text": "",
+        "result_dir": "",
+        "result_manifest_path": "",
         "conf_thresh": CONF_THRESH,
         "batch_size": BATCH_SIZE,
         "imgsz": IMGSZ,
@@ -138,6 +146,7 @@ def _run_job(
 ) -> None:
     try:
         model = get_model(model_key)
+        result_store = create_result_store(job_id, "oracle", "oracle", "oracle")
         allowed_classes: Optional[Set[int]] = None
         prompt_classes: list[str] | None = None
 
@@ -280,6 +289,12 @@ def _run_job(
                         output_name = f"{sequence:07d}_{filename}"
                         zip_file = get_zip_for_key(bins[index])
                         zip_file.writestr(output_name, payload)
+                        add_result_bytes(
+                            result_store,
+                            output_name,
+                            payload,
+                            extra={"origin_name": filename, "group_key": bins[index]},
+                        )
                         with JOBS_LOCK:
                             JOBS[job_id]["kept"] += 1
 
@@ -314,6 +329,12 @@ def _run_job(
                     output_name = f"{sequence:07d}_{filename}"
                     zip_file = get_zip_for_key(bins[index])
                     zip_file.writestr(output_name, payload)
+                    add_result_bytes(
+                        result_store,
+                        output_name,
+                        payload,
+                        extra={"origin_name": filename, "group_key": bins[index]},
+                    )
                     with JOBS_LOCK:
                         JOBS[job_id]["kept"] += 1
 
@@ -345,10 +366,14 @@ def _run_job(
                 pass
             zip_parts.append(path)
 
+        manifest_path = finalize_result_store(result_store)
+
         with JOBS_LOCK:
             current = JOBS[job_id]
             current["zip_parts"] = [{"path": path, "name": os.path.basename(path)} for path in zip_parts]
             current["zip_path"] = zip_parts[0] if len(zip_parts) == 1 else None
+            current["result_dir"] = result_store["result_dir"]
+            current["result_manifest_path"] = manifest_path
             if current["status"] == "running":
                 current["status"] = "done"
             snapshot = _job_snapshot(current)

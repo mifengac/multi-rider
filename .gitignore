@@ -8,12 +8,21 @@ dist/
 .remote_check_*/
 
 output/
+datasets/
+train_runs/
+upload_tmp/
 *.log
 *.tmp
 app.env
+face_data/
+test/
+jobs.sqlite3
+_edit_html.py
+vendor/wheels.7z
 offline_bundle/
 wheels/
 pkgs/
+vendor/wheels/
 
 META-INF/
 

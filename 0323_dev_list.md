@@ -1,8 +1,8 @@
-# 任务:现在改造当前系统,请你按照我的需求生成开发清单,写入multi-rider\0323_dev_list.md中,如有疑问或更好的意见则向我提出
+﻿# 任务:现在改造当前系统,请你按照我的需求生成开发清单,写入multi-rider\0323_dev_list.md中,如有疑问或更好的意见则向我提出
 ## 1. 所有代码注释全部使用英文
-## 2. 增加下拉列表可以选择模型"飙车炸街"和"通用"两个模型,"飙车炸街"对应"biaochezhajiev2.pt","通用"对应"yoloe-26n-seg.pt"("biaochezhajiev2.pt"我到时会放到目录中,现在暂时没有)
+## 2. 增加下拉列表可以选择模型"飙车炸街"和"通用"两个模型,"飙车炸街"对应"biaochezhajiev2.pt","通用"对应"yolov8s-worldv2.pt"("biaochezhajiev2.pt"我到时会放到目录中,现在暂时没有)
 ## 3. 当选择"飙车炸街"时SQL条件后面加个`AND 1=1`(方便我加其他条件),当选择"通用"模型时,使用原来的SQL
-## 4. 选择"通用"模型时是用的"yoloe-26n-seg.pt"意味着可以根据提示词检测图片,你帮我设计下选择"通用"模型时"类别过滤"用什么方式检测图片好些
+## 4. 选择"通用"模型时是用的"yolov8s-worldv2.pt"意味着可以根据提示词检测图片,你帮我设计下选择"通用"模型时"类别过滤"用什么方式检测图片好些
 ## 5.使用mcp工具figma优化前端页面
 
 ---
@@ -105,7 +105,7 @@ multi-rider/
 
 | # | 任务 | 说明 |
 |---|---|---|
-| 3.1.1 | 改造 `config.py` | 新增 `MODEL_REGISTRY` 字典：`{"bczj": "model/biaochezhajiev2.pt", "general": "model/yoloe-26n-seg.pt"}`；新增 `MODEL_DEFAULT = "general"` |
+| 3.1.1 | 改造 `config.py` | 新增 `MODEL_REGISTRY` 字典：`{"bczj": "model/biaochezhajiev2.pt", "general": "model/yolov8s-worldv2.pt"}`；新增 `MODEL_DEFAULT = "general"` |
 | 3.1.2 | 改造 `service/infer_service.py` | `get_model()` 改为 `get_model(model_key: str)`，按 key 加载对应文件；用字典缓存已加载的模型实例，避免重复加载 |
 | 3.1.3 | 改造 `service/job_service.py` | `_run_job()` 新增参数 `model_key: str`；透传给 `get_model(model_key)` |
 | 3.1.4 | 改造 `db/sqlite.py` 表结构 | `jobs` 表新增 `model_key` 字段（VARCHAR，默认 `'general'`） |

@@ -6,6 +6,7 @@ import requests
 from PIL import Image
 
 from config import (
+    CLIP_VIT_B32_PATH,
     MOBILECLIP_TS_PATH,
     MOBILECLIP2_TS_PATH,
     logger,
@@ -38,6 +39,7 @@ session.headers.update(
 )
 
 _DOWNLOAD_PATCHED = False
+_CLIP_PATCHED = False
 
 
 def _model_cache_key(model_key: str) -> str:
@@ -119,6 +121,35 @@ def _patch_ultralytics_asset_downloads() -> None:
     _DOWNLOAD_PATCHED = True
 
 
+def _patch_clip_asset_downloads() -> None:
+    """Resolve OpenAI CLIP weights from local files before falling back to user cache/download."""
+    global _CLIP_PATCHED
+    if _CLIP_PATCHED:
+        return
+
+    try:
+        import clip
+    except Exception:
+        return
+
+    original_load = clip.load
+    local_assets = {
+        "ViT-B/32": CLIP_VIT_B32_PATH,
+        "ViT-B-32.pt": CLIP_VIT_B32_PATH,
+    }
+
+    def _load_offline_first(name, *args, **kwargs):
+        asset_name = str(name)
+        local_path = local_assets.get(asset_name) or local_assets.get(os.path.basename(asset_name))
+        if local_path and os.path.isfile(local_path):
+            logger.info("Using local CLIP asset: %s", local_path)
+            return original_load(local_path, *args, **kwargs)
+        return original_load(name, *args, **kwargs)
+
+    clip.load = _load_offline_first
+    _CLIP_PATCHED = True
+
+
 def _normalize_names(names) -> list[str]:
     if isinstance(names, dict):
         return [str(names[index]) for index in sorted(names)]
@@ -157,6 +188,7 @@ def get_model(model_key: str):
             )
 
         _patch_ultralytics_asset_downloads()
+        _patch_clip_asset_downloads()
         _patch_ultralytics_head_compat()
         _patch_ultralytics_block_compat()
 
@@ -231,3 +263,79 @@ def _predict_batch(
         except Exception:
             output.append(False)
     return output
+
+
+def predict_image_boxes_batch(
+    images: list[Image.Image],
+    model_key: str,
+    conf_thresh: float,
+    imgsz: int,
+    prompt_classes: list[str] | None = None,
+) -> list[list[dict]]:
+    if not images:
+        return []
+
+    prepared_images: list[Image.Image] = []
+    for image in images:
+        if image.mode != "RGB":
+            prepared_images.append(image.convert("RGB"))
+        else:
+            prepared_images.append(image)
+
+    model = get_model(model_key)
+    model_lock = _MODEL_LOCKS.setdefault(_model_cache_key(model_key), threading.Lock())
+    with model_lock:
+        if model_supports_text_prompt(model_key):
+            _ensure_general_prompt_state(model, prompt_classes)
+            predict_conf = max(0.001, min(float(conf_thresh), 0.25))
+        else:
+            predict_conf = max(0.001, float(conf_thresh))
+
+        results = model.predict(prepared_images, conf=predict_conf, imgsz=imgsz, verbose=False)
+
+    outputs: list[list[dict]] = []
+    for result in results:
+        items: list[dict] = []
+        boxes = getattr(result, "boxes", None)
+        names = getattr(result, "names", None) or getattr(model, "names", None) or {}
+        if boxes is None or boxes.xyxy is None:
+            outputs.append(items)
+            continue
+
+        try:
+            xyxy_list = boxes.xyxy.tolist()
+            conf_list = boxes.conf.tolist() if boxes.conf is not None else [0.0] * len(xyxy_list)
+            cls_list = boxes.cls.tolist() if boxes.cls is not None else [0] * len(xyxy_list)
+        except Exception:
+            outputs.append(items)
+            continue
+
+        for coords, conf_value, cls_value in zip(xyxy_list, conf_list, cls_list):
+            try:
+                class_index = int(cls_value)
+                x1, y1, x2, y2 = [float(value) for value in coords[:4]]
+            except Exception:
+                continue
+            if float(conf_value) < float(conf_thresh):
+                continue
+
+            class_name = ""
+            if isinstance(names, dict):
+                class_name = str(names.get(class_index, ""))
+            elif isinstance(names, (list, tuple)) and 0 <= class_index < len(names):
+                class_name = str(names[class_index])
+
+            items.append(
+                {
+                    "class_index": class_index,
+                    "class_name": class_name,
+                    "confidence": round(float(conf_value), 4),
+                    "x1": round(x1, 2),
+                    "y1": round(y1, 2),
+                    "x2": round(x2, 2),
+                    "y2": round(y2, 2),
+                }
+            )
+
+        outputs.append(items)
+    return outputs

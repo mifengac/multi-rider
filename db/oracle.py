@@ -9,6 +9,11 @@ from config import (
     ORACLE_PORT,
     ORACLE_SERVICE,
     ORACLE_USER,
+    SMS_ORACLE_HOST,
+    SMS_ORACLE_PASSWORD,
+    SMS_ORACLE_PORT,
+    SMS_ORACLE_SERVICE,
+    SMS_ORACLE_USER,
     logger,
 )
 
@@ -64,13 +69,27 @@ def init_oracle_client_if_needed() -> None:
             logger.warning("cx_Oracle init failed: %s", exc)
 
 
-def get_oracle_connection():
-    dsn = f"{ORACLE_HOST}:{ORACLE_PORT}/{ORACLE_SERVICE}"
+def _connect_oracle(host: str, port: int, service: str, user: str, password: str):
+    dsn = f"{host}:{port}/{service}"
     if oracledb is not None:
-        return oracledb.connect(user=ORACLE_USER, password=ORACLE_PASSWORD, dsn=dsn)
+        return oracledb.connect(user=user, password=password, dsn=dsn)
     if cx_oracle is not None:
-        return cx_oracle.connect(user=ORACLE_USER, password=ORACLE_PASSWORD, dsn=dsn)
+        return cx_oracle.connect(user=user, password=password, dsn=dsn)
     raise RuntimeError("Oracle driver not available")
+
+
+def get_oracle_connection():
+    return _connect_oracle(ORACLE_HOST, ORACLE_PORT, ORACLE_SERVICE, ORACLE_USER, ORACLE_PASSWORD)
+
+
+def get_sms_oracle_connection():
+    return _connect_oracle(
+        SMS_ORACLE_HOST,
+        SMS_ORACLE_PORT,
+        SMS_ORACLE_SERVICE,
+        SMS_ORACLE_USER,
+        SMS_ORACLE_PASSWORD,
+    )
 
 
 def build_query_and_binds(
@@ -128,3 +147,73 @@ def fetch_image_urls(
             time_str = str(value) if value else ""
         output.append((url, time_str))
     return output
+
+
+def fetch_dispatch_person_context(id_number: str) -> dict:
+    safe_id_number = str(id_number or "").strip()
+    if not safe_id_number:
+        return {}
+
+    sql = """
+        SELECT
+            xm,
+            lxdh,
+            ds,
+            dsmc,
+            ssxq,
+            ssxqmc,
+            pcs,
+            pcsmc,
+            dz
+        FROM ywdata.t_ap_czrk_jbxx
+        WHERE gmsfhm = :id_number
+          AND ROWNUM = 1
+    """
+    init_oracle_client_if_needed()
+    with get_oracle_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(sql, {"id_number": safe_id_number})
+            row = cursor.fetchone()
+
+    if not row:
+        return {}
+
+    keys = [
+        "xm",
+        "lxdh",
+        "ds",
+        "dsmc",
+        "ssxq",
+        "ssxqmc",
+        "pcs",
+        "pcsmc",
+        "dz",
+    ]
+    return {
+        key: (str(value).strip() if value is not None else "")
+        for key, value in zip(keys, row)
+    }
+
+
+def insert_sms_queue_record(payload: dict) -> None:
+    sql = """
+        INSERT INTO yfgadb.dfsdl (
+            id, mobile, content, deadtime, status, eid, userid, password, userport
+        ) VALUES (
+            yfgadb.seq_sendsms.nextval, :mobile, :content, SYSDATE, :status, :eid, :userid, :password, :userport
+        )
+    """
+    binds = {
+        "mobile": str(payload.get("mobile", "") or "").strip(),
+        "content": str(payload.get("content", "") or "").strip(),
+        "status": str(payload.get("status", "0") or "0").strip(),
+        "eid": str(payload.get("eid", "") or "").strip(),
+        "userid": str(payload.get("userid", "") or "").strip(),
+        "password": str(payload.get("password", "") or "").strip(),
+        "userport": str(payload.get("userport", "") or "").strip(),
+    }
+    init_oracle_client_if_needed()
+    with get_sms_oracle_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(sql, binds)
+        conn.commit()
