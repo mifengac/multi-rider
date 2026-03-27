@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.sqlite3
 
 dist/
 .remote_check_*/
@@ -31,3 +32,11 @@ instantclient_11_2/*
 
 model/*
 !model/README.md
+
+datasets/
+face_data/
+train_runs/
+upload_tmp/
+vendor/
+test/
+_edit_html.py
