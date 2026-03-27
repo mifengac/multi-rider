@@ -1,4 +1,7 @@
     window.addEventListener('load', function () {
+      if (typeof initAppAuth === 'function') {
+        initAppAuth();
+      }
       document.getElementById('model_key').addEventListener('change', applyModelUI);
       document.getElementById('confRange').addEventListener('input', syncConfValue);
       applyModelUI();

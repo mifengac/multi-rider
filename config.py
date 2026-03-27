@@ -289,6 +289,9 @@ def get_upload_model_default() -> str:
 
 
 def _upload_model_description(model_name: str) -> str:
+    meta = _friendly_model_meta(model_name)
+    if meta and meta.get("description"):
+        return str(meta["description"])
     lower = model_name.lower()
     if lower == "biaochezhajiev2.pt":
         return "Private wheelie detection model for closed-set filtering."
@@ -299,6 +302,39 @@ def _upload_model_description(model_name: str) -> str:
     if lower == "yolo26s.pt":
         return "YOLO26s base model for balanced accuracy and speed."
     return "Custom detection model."
+
+
+def _friendly_model_meta(model_name: str) -> dict[str, str]:
+    lower = (model_name or "").strip().lower()
+    friendly_map: dict[str, dict[str, str]] = {
+        "biaochezhajiev2.pt": {
+            "label": "专项违法行为识别",
+            "short_label": "专项违法行为识别",
+            "description": "用于飙车炸街、翘头等专项违法行为快速筛查。",
+        },
+        "yolov8s-worldv2.pt": {
+            "label": "通用人车要素识别",
+            "short_label": "通用要素识别",
+            "description": "适合按提示词检出人员、车辆、摩托车等通用目标。",
+        },
+        "yolo26n.pt": {
+            "label": "快速版训练底模",
+            "short_label": "快速版底模",
+            "description": "适合低算力环境快速验证数据集和训练流程。",
+        },
+        "yolo26s.pt": {
+            "label": "标准版训练底模",
+            "short_label": "标准版底模",
+            "description": "适合在速度和精度之间取得更均衡的训练效果。",
+        },
+    }
+    if lower in friendly_map:
+        return friendly_map[lower]
+    return {
+        "label": f"自定义识别模型（{model_name}）",
+        "short_label": "自定义识别模型",
+        "description": "本地自定义识别模型，可用于专项筛查或预标注。",
+    }
 
 
 def get_upload_model_options() -> list[dict[str, object]]:
@@ -323,8 +359,8 @@ def get_upload_model_options() -> list[dict[str, object]]:
         options.append(
             {
                 "value": model_name,
-                "label": model_name,
-                "short_label": model_name,
+                "label": _friendly_model_meta(model_name)["label"],
+                "short_label": _friendly_model_meta(model_name)["short_label"],
                 "description": _upload_model_description(model_name),
                 "ui_mode": "prompt" if is_prompt else "filter",
                 "default_conf": PROMPT_MODEL_DEFAULT_CONF if is_prompt else CONF_THRESH,
@@ -346,7 +382,7 @@ def get_train_base_model_options() -> list[dict[str, str]]:
         items.append(
             {
                 "value": model_name,
-                "label": model_name,
+                "label": _friendly_model_meta(model_name)["label"],
                 "description": _upload_model_description(model_name),
             }
         )
