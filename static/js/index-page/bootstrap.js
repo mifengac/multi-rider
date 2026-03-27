@@ -1,4 +1,7 @@
     window.addEventListener('load', function () {
+      if (typeof initAppAuth === 'function') {
+        initAppAuth();
+      }
       document.getElementById('model_key').addEventListener('change', applyModelUI);
       document.getElementById('confRange').addEventListener('input', syncConfValue);
       applyModelUI();
@@ -38,6 +41,7 @@
       var annotationOnlyLowQuality = document.getElementById('annotationOnlyLowQuality');
       var annotationReviewFilter = document.getElementById('annotationReviewFilter');
       var annotationZoomSelect = document.getElementById('annotationZoomSelect');
+      var annotationFitBtn = document.getElementById('annotationFitBtn');
       var annotationAutoModel = document.getElementById('annotationAutoModel');
       var annotationAutoConf = document.getElementById('annotationAutoConf');
       var annotationKeepConf = document.getElementById('annotationKeepConf');
@@ -124,8 +128,11 @@
       }
       if (annotationZoomSelect) {
         annotationZoomSelect.addEventListener('change', function () {
-          updateAnnotationZoom(annotationZoomSelect.value || '150');
+          updateAnnotationZoom(annotationZoomSelect.value || '25');
         });
+      }
+      if (annotationFitBtn) {
+        annotationFitBtn.addEventListener('click', fitAnnotationToViewport);
       }
       if (annotationAutoModel) {
         annotationAutoModel.addEventListener('change', syncAutoAnnotationModelUI);

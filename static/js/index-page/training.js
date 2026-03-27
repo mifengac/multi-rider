@@ -2,28 +2,28 @@
     const TRAIN_JOB_STATE = { items: [], loading: false, submitting: false, pollTimer: null };
     const TRAIN_PRESETS = {
       quick: {
-        label: 'Quick',
+        label: '快速验证',
         epochs: 30,
         imgsz: 640,
         batchSize: 4,
         model: 'yolo26n.pt',
-        hint: '适合快速验证数据集与训练链路，默认使用较小模型和较短轮数。'
+        hint: '适合先把训练链路跑通，优先验证数据集和标注质量。'
       },
       standard: {
-        label: 'Standard',
+        label: '标准训练',
         epochs: 80,
         imgsz: 640,
         batchSize: 8,
         model: 'yolo26s.pt',
-        hint: '适合较完整的数据集训练，默认使用 yolo26s.pt 作为精度优先方案。'
+        hint: '适合数据集较完整、需要兼顾精度和稳定性的专项模型训练。'
       },
       lowmem: {
-        label: 'Low-Memory',
+        label: '低算力模式',
         epochs: 50,
         imgsz: 512,
         batchSize: 2,
         model: 'yolo26n.pt',
-        hint: '适合低显存或低算力环境，优先降低尺寸和 batch，先把流程稳定跑通。'
+        hint: '适合内网低算力电脑，优先降低资源占用，先把流程稳定跑通。'
       }
     };
     const TRAIN_JOB_STATUS_UI = {
@@ -54,6 +54,13 @@
       var select = document.getElementById('trainPresetSelect');
       var key = select && select.value ? select.value : 'quick';
       return TRAIN_PRESETS[key] || TRAIN_PRESETS.quick;
+    }
+
+    function getTrainBaseModelLabel(modelValue) {
+      var matched = TRAIN_BASE_MODEL_OPTIONS.find(function (item) {
+        return item.value === modelValue;
+      });
+      return matched && matched.label ? matched.label : (modelValue || '--');
     }
 
     function renderTrainBaseModelOptions() {
@@ -174,8 +181,8 @@
                 '<div class="mt-2 break-all font-mono text-xs text-slate-400">' + escapeHtml(item.id || '') + '</div>' +
               '</div>' +
               '<div class="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-right text-xs text-slate-500">' +
-                '<div>模型：' + escapeHtml(item.base_model || '--') + '</div>' +
-                '<div class="mt-1">' + escapeHtml(item.preset_key || '--') + '</div>' +
+                '<div>底模：' + escapeHtml(getTrainBaseModelLabel(item.base_model || '')) + '</div>' +
+                '<div class="mt-1">预设：' + escapeHtml((TRAIN_PRESETS[item.preset_key || ''] || {}).label || item.preset_key || '--') + '</div>' +
               '</div>' +
             '</div>' +
             '<div class="mt-4 grid gap-3 sm:grid-cols-3">' +

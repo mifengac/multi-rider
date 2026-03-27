@@ -2,22 +2,21 @@
       <div class="grid gap-6 xl:grid-cols-[1.35fr,0.95fr]">
         <section class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
           <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">训练流程</div>
-          <h2 class="mt-2 text-2xl font-bold text-slate-900">数据集管理</h2>
+          <h2 class="mt-2 text-2xl font-bold text-slate-900">样本沉淀与数据集管理</h2>
           <p class="mt-3 text-sm leading-7 text-slate-500">
-            这是训练模块的第一个真实入口。现在可以先创建本地数据集；后续再逐步补上 ZIP 导入、
-            历史结果回流、图片标注和训练任务。
+            围绕基层实战场景，把结果图回流、样本整理、人工复核、预标注和训练任务串成一条闭环，减少重复拷贝和离线整理。
           </p>
 
           <form id="trainDatasetForm" onsubmit="return createTrainDataset(event)" class="mt-8 space-y-6 border-t border-slate-100 pt-8">
             <div class="grid gap-4 lg:grid-cols-2">
               <label class="block">
                 <span class="mb-2 block text-sm font-medium text-slate-700">数据集名称</span>
-                <input id="trainDatasetName" type="text" placeholder="wheelie_train_20260325"
+                  <input id="trainDatasetName" type="text" placeholder="未戴头盔专项样本_0327"
                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
               </label>
               <label class="block">
                 <span class="mb-2 block text-sm font-medium text-slate-700">类别列表</span>
-                <input id="trainDatasetClasses" type="text" placeholder="wheelie,multi_rider,reflective_vest"
+                  <input id="trainDatasetClasses" type="text" placeholder="no_helmet,wheelie,multi_rider"
                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
               </label>
             </div>
@@ -116,7 +115,7 @@
             <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Train Jobs</div>
             <h3 class="mt-2 text-xl font-semibold text-slate-900">发起训练任务</h3>
             <p class="mt-3 text-sm leading-7 text-slate-500">
-              当前已经支持真实训练：系统会自动准备 splits、dataset.yaml、训练日志和产物目录，并调用 Ultralytics 开始训练。
+              当前已经支持真实训练：系统会自动准备训练清单、训练目录和日志，并直接启动模型训练。
               如果你只想把人工确认过的样本送进训练，可以勾选“仅使用已确认样本”。
             </p>
 
@@ -145,9 +144,9 @@
                   <span class="mb-2 block text-sm font-medium text-slate-700">训练预设</span>
                   <select id="trainPresetSelect"
                     class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100">
-                    <option value="quick">Quick · YOLO26n / 640 / 30</option>
-                    <option value="standard">Standard · YOLO26s / 640 / 80</option>
-                    <option value="lowmem">Low-Memory · YOLO26n / 512 / 50</option>
+                    <option value="quick">快速验证 · 640 / 30 轮</option>
+                    <option value="standard">标准训练 · 640 / 80 轮</option>
+                    <option value="lowmem">低算力模式 · 512 / 50 轮</option>
                   </select>
                 </label>
                 <div class="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-7 text-slate-600">
@@ -184,7 +183,7 @@
               <div class="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-7 text-slate-600">
                 训练任务会在
                 <code class="rounded bg-white px-2 py-1 text-xs text-slate-700">train_runs/&lt;job_id&gt;</code>
-                下生成参数快照、数据集 YAML、训练日志和产物目录，适合内网低算力环境逐步验证训练效果。
+                下生成参数快照、数据集 YAML、训练日志和产物目录，适合内网低算力环境逐步验证专项模型效果。
               </div>
 
               <div id="trainRunFeedback" class="hidden"></div>
@@ -243,14 +242,13 @@
           </div>
 
           <div class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6">
-            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">当前范围</div>
-            <h3 class="mt-2 text-xl font-semibold text-slate-900">本阶段能力</h3>
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Workflow</div>
+            <h3 class="mt-2 text-xl font-semibold text-slate-900">当前训练闭环</h3>
             <div class="mt-5 space-y-3 text-sm leading-7 text-slate-600">
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">训练页签已经接入真实首页。</div>
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">数据集记录会落到 SQLite，并同步创建本地目录结构。</div>
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持把 ZIP 中的图片导入到指定数据集，并展示最近导入预览。</div>
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持把 Oracle / Upload 的结果图回流到指定数据集，作为后续标注样本。</div>
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持创建真实训练任务，自动生成 splits、dataset.yaml、日志和基础训练产物。</div>
+              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持把 Oracle 巡检结果和本地素材研判结果回流为训练样本。</div>
+              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持图片导入、人工框标、预标注、复核和仅用已确认样本训练。</div>
+              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持发起真实训练任务，生成评估页面，并一键发布训练结果到模型目录。</div>
+              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持模型注册与用途管理，便于区分训练底模、预标注模型和线上识别模型。</div>
             </div>
           </div>
 

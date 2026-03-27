@@ -3,665 +3,357 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Multi-Rider Mockup</title>
+  <title>猎鹰哨兵</title>
+  <link rel="icon" type="image/svg+xml" href="./falcon-badge.svg" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
       font-family: "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
       background:
-        radial-gradient(circle at top right, rgba(186, 230, 253, 0.85), transparent 30%),
-        radial-gradient(circle at bottom left, rgba(254, 215, 170, 0.7), transparent 28%),
-        linear-gradient(180deg, #f8fafc 0%, #fff7ed 100%);
+        radial-gradient(circle at top right, rgba(59, 130, 246, 0.15), transparent 24%),
+        linear-gradient(180deg, #edf4ff 0%, #f8fbff 55%, #eef2f7 100%);
+      color: #0f172a;
     }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-    .card {
+    .glass-card {
       border-radius: 28px;
-      border: 1px solid rgba(255,255,255,0.7);
-      background: rgba(255,255,255,0.88);
-      box-shadow: 0 24px 60px rgba(15,23,42,0.08);
-      backdrop-filter: blur(8px);
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(203, 213, 225, 0.78);
+      box-shadow: 0 24px 72px rgba(15, 23, 42, 0.08);
+      backdrop-filter: blur(12px);
     }
-    .inner-card {
-      border-radius: 22px;
-      border: 1px solid #e2e8f0;
-      background: rgba(248,250,252,0.85);
+    .soft-card {
+      border-radius: 24px;
+      background: #fff;
+      border: 1px solid #dbe4f0;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.05);
     }
-    .tab-btn { transition: all 0.2s ease; }
+    .hidden-panel { display: none; }
+    .hidden-panel.active { display: block; }
+    .auth-tab.active,
+    .nav-pill.active {
+      background: linear-gradient(135deg, #16355b 0%, #264c7d 100%);
+      color: #fff;
+      box-shadow: 0 14px 28px rgba(22, 53, 91, 0.2);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 9999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
   </style>
 </head>
-<body class="min-h-screen text-slate-900">
-  <div class="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-10">
-    <header class="mb-8 grid gap-4 xl:grid-cols-[1.5fr,0.9fr]">
-      <section class="card p-6 md:p-8">
-        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Multi-Rider</div>
-        <h1 class="mt-5 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">检测、身份识别与训练一体化原型</h1>
-        <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
-          面向内网和低算力环境，统一承载 Oracle 检测、本地上传检测、人脸库管理，以及新增的标注与训练模块。
-        </p>
-        <div class="mt-5 flex flex-wrap gap-2">
-          <span class="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-teal-200">内网部署</span>
-          <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-200">低算力优先</span>
-          <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">训练闭环</span>
-        </div>
-      </section>
-      <section class="card bg-slate-900 p-6 text-white">
-        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-200">Overview</div>
-        <div class="mt-5 grid gap-4 sm:grid-cols-2">
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div class="text-sm text-slate-300">运行任务</div>
-            <div class="mt-2 text-3xl font-semibold">1</div>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div class="text-sm text-slate-300">可用模型</div>
-            <div class="mt-2 text-3xl font-semibold">4</div>
-          </div>
-        </div>
-        <div class="mt-5 text-sm leading-7 text-slate-300">
-          默认开放词表模型改为 `yolov8s-worldv2.pt`，训练底模使用 `yolo26n.pt` 和 `yolo26s.pt`。
-        </div>
-      </section>
-    </header>
-
-    <div class="mb-6 flex flex-wrap gap-3" id="tabNav">
-      <button onclick="switchTab('oracle')" id="tabBtn-oracle" class="tab-btn rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">数据库检测</button>
-      <button onclick="switchTab('upload')" id="tabBtn-upload" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">本地上传检测</button>
-      <button onclick="switchTab('train')" id="tabBtn-train" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">Train 模块</button>
-      <button onclick="switchTab('dispatch')" id="tabBtn-dispatch" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">任务下发</button>
-      <button onclick="switchTab('face')" id="tabBtn-face" class="tab-btn rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">人脸库</button>
-    </div>
-
-    <div id="tab-oracle" class="tab-panel active">
-      <div class="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
-        <section class="card p-5 md:p-8">
-          <div class="space-y-8">
-            <div>
-              <h2 class="text-xl font-semibold text-slate-900">Oracle 检测任务</h2>
-              <p class="mt-3 text-sm leading-7 text-slate-500">按时间范围查询图片 URL，批量下载并推理。适合日常筛查和历史数据回溯。</p>
-            </div>
-            <div class="grid gap-4 md:grid-cols-2">
-              <label class="block">
-                <span class="mb-2 block text-sm font-medium text-slate-700">开始时间</span>
-                <input type="datetime-local" value="2026-03-25T00:00:00" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-              <label class="block">
-                <span class="mb-2 block text-sm font-medium text-slate-700">结束时间</span>
-                <input type="datetime-local" value="2026-03-25T23:59:59" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-            </div>
-            <div class="grid gap-4 md:grid-cols-3">
-              <label class="block inner-card p-4">
-                <span class="mb-2 block text-sm font-medium text-slate-700">模型</span>
-                <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">
-                  <option selected>general / yolov8s-worldv2.pt</option>
-                  <option>bczj / biaochezhajiev2.pt</option>
-                </select>
-              </label>
-              <label class="block inner-card p-4">
-                <span class="mb-2 block text-sm font-medium text-slate-700">Classes</span>
-                <input type="text" value="person,motorcycle" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-              <label class="block inner-card p-4">
-                <span class="mb-2 block text-sm font-medium text-slate-700">阈值</span>
-                <input type="number" value="0.10" step="0.01" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-            </div>
-            <div class="flex justify-end">
-              <button class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white">开始分类并下载 ZIP</button>
-            </div>
-          </div>
-        </section>
-        <section class="space-y-6">
-          <div class="card p-5 md:p-6">
-            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Progress</div>
-            <h3 class="mt-2 text-xl font-semibold text-slate-900">任务进度</h3>
-            <div class="mt-5 inner-card p-4">
-              <div class="text-sm font-medium text-slate-800">已处理 156 / 500</div>
-              <div class="mt-4 h-3 rounded-full bg-slate-100">
-                <div class="h-3 rounded-full bg-sky-500" style="width:31%"></div>
+<body class="min-h-screen">
+  <svg width="0" height="0" class="absolute">
+    <defs>
+      <symbol id="falcon-mark" viewBox="0 0 80 80">
+        <path d="M40 6l24 8v20c0 19-10 31-24 40C26 65 16 53 16 34V14l24-8Z" fill="#16355b"/>
+        <path d="M40 12l19 6v16c0 15-7 24-19 33C28 58 21 49 21 34V18l19-6Z" fill="#edf4ff"/>
+        <path d="M18 26c8 1 14 4 18 10-5-1-10 0-15 2 3 2 6 5 8 9-6-1-10-3-14-7-2-5-1-10 3-14Z" fill="#1f4d80"/>
+        <path d="M62 26c-8 1-14 4-18 10 5-1 10 0 15 2-3 2-6 5-8 9 6-1 10-3 14-7 2-5 1-10-3-14Z" fill="#1f4d80"/>
+        <path d="M40 23l3.2 6.4 7 1-5 4.8 1.2 6.8-6.4-3.4-6.4 3.4 1.2-6.8-5-4.8 7-1L40 23Z" fill="#ffc857"/>
+        <path d="M30 47h20c-1 5-5 9-10 12-5-3-9-7-10-12Z" fill="#16355b"/>
+        <path d="M40 46c6 0 10 4 12 10-4 1-8 2-12 2s-8-1-12-2c2-6 6-10 12-10Z" fill="#76aef8"/>
+        <path d="M33 18c2 2 4 3 7 3s5-1 7-3c-2 5-5 8-7 9-2-1-5-4-7-9Z" fill="#8ebfff"/>
+      </symbol>
+    </defs>
+  </svg>
+  <div class="mx-auto max-w-[1600px] px-4 py-6 md:px-6 md:py-8">
+    <section id="authShell" class="grid gap-6 xl:grid-cols-[1.15fr,0.95fr]">
+      <div class="glass-card overflow-hidden bg-slate-900 text-white">
+        <div class="grid h-full gap-8 bg-[radial-gradient(circle_at_top_right,_rgba(96,165,250,0.24),_transparent_26%),linear-gradient(135deg,_#0f172a_0%,_#16355b_56%,_#234a7d_100%)] p-8 md:p-10">
+          <div>
+            <div class="flex items-center gap-4">
+              <div class="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/10 ring-1 ring-inset ring-white/10">
+                <svg class="h-11 w-11" viewBox="0 0 80 80" aria-hidden="true">
+                  <use href="#falcon-mark"></use>
+                </svg>
+              </div>
+              <div>
+                <div class="text-sm font-semibold tracking-[0.3em] text-sky-200">FALCON SENTINEL</div>
+                <h1 class="mt-2 text-4xl font-bold tracking-tight md:text-5xl">猎鹰哨兵</h1>
               </div>
             </div>
+            <div class="mt-4 text-sm text-sky-100/90">云浮市公安局治安管理支队基础管控中心</div>
           </div>
-        </section>
+          <div>
+            <div class="max-w-2xl text-2xl font-semibold leading-tight md:text-3xl">面向基层公安的智能视觉协同平台</div>
+            <p class="mt-5 max-w-2xl text-sm leading-7 text-slate-200">
+              将违法行为识别、人员核验、模型沉淀和任务下发做成一条闭环，强调实用、好上手、少录入。
+            </p>
+          </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <div class="rounded-3xl border border-white/10 bg-white/10 p-5">
+              <div class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">检测研判</div>
+              <div class="mt-3 text-lg font-semibold">历史巡检 + 现场素材</div>
+            </div>
+            <div class="rounded-3xl border border-white/10 bg-white/10 p-5">
+              <div class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">身份核验</div>
+              <div class="mt-3 text-lg font-semibold">识别后自动流转</div>
+            </div>
+            <div class="rounded-3xl border border-white/10 bg-white/10 p-5">
+              <div class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">自训练</div>
+              <div class="mt-3 text-lg font-semibold">基层可用的训练闭环</div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div id="tab-upload" class="tab-panel">
-      <div class="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
-        <section class="card p-5 md:p-8">
-          <h2 class="text-xl font-semibold text-slate-900">本地上传检测</h2>
-          <p class="mt-3 text-sm leading-7 text-slate-500">支持 ZIP 图片包和视频文件。适合现场素材快速排查。</p>
-          <div class="mt-6 grid gap-4 md:grid-cols-2">
+      <div class="glass-card p-6 md:p-8">
+        <div class="mx-auto max-w-xl">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Auth</div>
+              <h2 class="mt-2 text-3xl font-bold tracking-tight text-slate-900">系统登录</h2>
+              <p class="mt-3 text-sm leading-7 text-slate-500">最简单鉴权：支持注册申请、账号登录、演示模式进入。</p>
+            </div>
+            <button onclick="showApp()" class="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">演示进入</button>
+          </div>
+
+          <div class="mt-8 inline-flex rounded-full bg-slate-100 p-1.5">
+            <button id="authTab-login" class="auth-tab active rounded-full px-5 py-2 text-sm font-semibold text-slate-600" onclick="switchAuth('login')">登录</button>
+            <button id="authTab-register" class="auth-tab rounded-full px-5 py-2 text-sm font-semibold text-slate-600" onclick="switchAuth('register')">注册申请</button>
+          </div>
+
+          <div id="authPanel-login" class="hidden-panel active mt-8 space-y-6">
             <label class="block">
-              <span class="mb-2 block text-sm font-medium text-slate-700">上传文件</span>
-              <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                ZIP / MP4 / AVI / MOV / MKV / MPG / MPEG
-              </div>
+              <span class="mb-2 block text-sm font-medium text-slate-700">警号 / 用户名</span>
+              <input type="text" value="44170201" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none" />
             </label>
-            <div class="space-y-4">
-              <label class="block inner-card p-4">
-                <span class="mb-2 block text-sm font-medium text-slate-700">模型</span>
-                <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">
-                  <option selected>yolov8s-worldv2.pt</option>
-                  <option>yolo26s.pt</option>
-                  <option>yolo26n.pt</option>
-                  <option>biaochezhajiev2.pt</option>
-                </select>
-              </label>
-              <label class="block inner-card p-4">
-                <span class="mb-2 block text-sm font-medium text-slate-700">Classes</span>
-                <input type="text" value="person,motorcycle,reflective vest" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">登录密码</span>
+              <input type="password" value="123456" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none" />
+            </label>
+            <div class="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">首次使用可先注册申请账号，适合比赛演示和正式试用。</div>
+            <div class="flex items-center justify-between gap-3">
+              <button onclick="switchAuth('register')" class="text-sm font-medium text-slate-500">去注册</button>
+              <button onclick="showApp()" class="rounded-full bg-[#16355b] px-6 py-3 text-sm font-semibold text-white">登录并进入系统</button>
             </div>
           </div>
-          <div class="mt-6 flex justify-end">
-            <button class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white">开始检测</button>
-          </div>
-        </section>
-        <section class="space-y-6">
-          <div class="card p-5 md:p-6">
-            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Result Review</div>
-            <h3 class="mt-2 text-xl font-semibold text-slate-900">结果图与识别记录</h3>
-            <div class="mt-5 grid gap-4 sm:grid-cols-2">
-              <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <div class="h-36 bg-slate-100"></div>
-                <div class="p-4 text-sm text-slate-600">IMG_0001.jpg / 已匹配 1 人脸</div>
-              </div>
-              <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <div class="h-36 bg-slate-100"></div>
-                <div class="p-4 text-sm text-slate-600">IMG_0002.jpg / 未匹配</div>
-              </div>
+
+          <div id="authPanel-register" class="hidden-panel mt-8 space-y-6">
+            <div class="grid gap-5 md:grid-cols-2">
+              <label class="block"><span class="mb-2 block text-sm font-medium text-slate-700">姓名</span><input type="text" value="张三" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none" /></label>
+              <label class="block"><span class="mb-2 block text-sm font-medium text-slate-700">警号</span><input type="text" value="44170201" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none" /></label>
+              <label class="block"><span class="mb-2 block text-sm font-medium text-slate-700">所属单位</span><input type="text" value="云浮市公安局治安管理支队" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none" /></label>
+              <label class="block"><span class="mb-2 block text-sm font-medium text-slate-700">联系电话</span><input type="text" value="13700000000" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none" /></label>
+            </div>
+            <div class="rounded-3xl bg-amber-50 p-4 text-sm leading-7 text-amber-800 ring-1 ring-inset ring-amber-200">注册申请提交后由管理员人工审核通过。</div>
+            <div class="flex items-center justify-between gap-3">
+              <button onclick="switchAuth('login')" class="text-sm font-medium text-slate-500">返回登录</button>
+              <button onclick="showApp()" class="rounded-full bg-[#16355b] px-6 py-3 text-sm font-semibold text-white">提交申请</button>
             </div>
           </div>
-        </section>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div id="tab-train" class="tab-panel">
-      <div class="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
-        <section class="card p-5 md:p-8">
-          <div class="space-y-8">
-            <div>
-              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Train Pipeline</div>
-              <h2 class="mt-2 text-2xl font-bold text-slate-900">标注与训练闭环</h2>
-              <p class="mt-3 text-sm leading-7 text-slate-500">
-                训练模块优先服务现有业务模型沉淀：导入数据、预标注、人工修正、训练 YOLO26、评估后发布到当前检测链路。
-              </p>
-            </div>
-
-            <div class="grid gap-4 lg:grid-cols-3">
-              <div class="inner-card p-5">
-                <div class="text-sm font-semibold text-slate-900">01 数据集</div>
-                <div class="mt-2 text-sm leading-6 text-slate-500">支持 ZIP 图片、视频抽帧、历史结果图一键回流。</div>
-              </div>
-              <div class="inner-card p-5">
-                <div class="text-sm font-semibold text-slate-900">02 预标注</div>
-                <div class="mt-2 text-sm leading-6 text-slate-500">优先用 `yolov8s-worldv2.pt` 做 prompt 预标注，再人工修正。</div>
-              </div>
-              <div class="inner-card p-5">
-                <div class="text-sm font-semibold text-slate-900">03 训练与发布</div>
-                <div class="mt-2 text-sm leading-6 text-slate-500">用 `yolo26n.pt` / `yolo26s.pt` 训练闭集模型，发布回 `model/`。</div>
-              </div>
-            </div>
-
-            <div class="border-t border-slate-100 pt-8">
-              <div class="grid gap-4 md:grid-cols-2">
-                <label class="block">
-                  <span class="mb-2 block text-sm font-medium text-slate-700">数据集名称</span>
-                  <input type="text" value="wheelie_train_20260325" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-                </label>
-                <label class="block">
-                  <span class="mb-2 block text-sm font-medium text-slate-700">类目</span>
-                  <input type="text" value="wheelie,multi_rider,reflective_vest" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-                </label>
-              </div>
-              <div class="mt-5 grid gap-4 lg:grid-cols-[1fr,1fr,0.8fr]">
-                <label class="block inner-card p-4">
-                  <span class="mb-2 block text-sm font-medium text-slate-700">预标注模型</span>
-                  <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">
-                    <option selected>yolov8s-worldv2.pt</option>
-                    <option>biaochezhajiev2.pt</option>
-                  </select>
-                </label>
-                <label class="block inner-card p-4">
-                  <span class="mb-2 block text-sm font-medium text-slate-700">Prompt / Classes</span>
-                  <input type="text" value="motorcycle,person,reflective vest" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-                </label>
-                <label class="block inner-card p-4">
-                  <span class="mb-2 block text-sm font-medium text-slate-700">阈值</span>
-                  <input type="number" value="0.10" step="0.01" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-                </label>
-              </div>
-            </div>
-
-            <div class="border-t border-slate-100 pt-8">
-              <h3 class="text-lg font-semibold text-slate-900">训练预设</h3>
-              <div class="mt-5 grid gap-4 md:grid-cols-3">
-                <div class="inner-card p-5">
-                  <div class="text-sm font-semibold text-slate-900">Quick</div>
-                  <div class="mt-2 text-sm leading-6 text-slate-500">`yolo26n.pt` / `imgsz=640` / `epochs=30`</div>
-                </div>
-                <div class="inner-card p-5">
-                  <div class="text-sm font-semibold text-slate-900">Standard</div>
-                  <div class="mt-2 text-sm leading-6 text-slate-500">`yolo26s.pt` / `imgsz=640` / `epochs=80`</div>
-                </div>
-                <div class="inner-card p-5">
-                  <div class="text-sm font-semibold text-slate-900">Low Memory</div>
-                  <div class="mt-2 text-sm leading-6 text-slate-500">`yolo26n.pt` / `imgsz=512` / small batch</div>
+    <section id="appShell" class="hidden">
+      <header class="glass-card mb-6 overflow-hidden">
+        <div class="flex flex-col gap-5 bg-[linear-gradient(135deg,_rgba(15,23,42,0.98)_0%,_rgba(22,53,91,0.98)_45%,_rgba(30,64,112,0.96)_100%)] px-6 py-6 text-white md:px-8">
+          <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div class="flex flex-wrap items-start gap-5">
+              <div class="rounded-3xl bg-white/10 px-4 py-3 ring-1 ring-inset ring-white/10">
+                <div class="flex items-center gap-3">
+                  <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-inset ring-white/10">
+                    <svg class="h-8 w-8" viewBox="0 0 80 80" aria-hidden="true">
+                      <use href="#falcon-mark"></use>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="text-2xl font-bold tracking-tight">猎鹰哨兵</div>
+                    <div class="mt-1 text-xs text-sky-100">云浮市公安局治安管理支队基础管控中心</div>
+                  </div>
                 </div>
               </div>
-              <div class="mt-5 grid gap-4 lg:grid-cols-4">
-                <label class="block inner-card p-4">
-                  <span class="mb-2 block text-sm font-medium text-slate-700">Base Model</span>
-                  <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">
-                    <option selected>yolo26n.pt</option>
-                    <option>yolo26s.pt</option>
-                  </select>
-                </label>
-                <label class="block inner-card p-4">
-                  <span class="mb-2 block text-sm font-medium text-slate-700">Image Size</span>
-                  <input type="number" value="640" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-                </label>
-                <label class="block inner-card p-4">
-                  <span class="mb-2 block text-sm font-medium text-slate-700">Epochs</span>
-                  <input type="number" value="80" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-                </label>
-                <label class="block inner-card p-4">
-                  <span class="mb-2 block text-sm font-medium text-slate-700">Batch</span>
-                  <input type="number" value="8" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-                </label>
+              <div class="pt-2">
+                <div class="text-sm font-semibold tracking-[0.24em] text-sky-200">智能视觉研判</div>
+                <div class="mt-2 max-w-2xl text-sm leading-7 text-slate-200">让“识别、核验、训练、下发”在一张工作台上完成。</div>
               </div>
             </div>
-
-            <div class="flex flex-col gap-4 border-t border-slate-100 pt-8 sm:flex-row sm:items-center sm:justify-between">
-              <div class="text-sm leading-7 text-slate-500">
-                发布后把 `best.pt` 复制到 `model/`，当前上传检测页会自动把新模型加入下拉列表。
-              </div>
-              <div class="flex flex-wrap gap-3">
-                <button class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">保存草稿</button>
-                <button class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white">开始训练</button>
+            <div class="grid gap-3 sm:grid-cols-[repeat(2,minmax(0,1fr))_auto]">
+              <div class="rounded-3xl border border-white/10 bg-white/10 px-5 py-4"><div class="text-xs uppercase tracking-[0.25em] text-sky-200">今日命中</div><div class="mt-2 text-2xl font-bold">18</div></div>
+              <div class="rounded-3xl border border-white/10 bg-white/10 px-5 py-4"><div class="text-xs uppercase tracking-[0.25em] text-sky-200">待下发</div><div class="mt-2 text-2xl font-bold">6</div></div>
+              <div class="flex flex-col items-end justify-between rounded-3xl border border-white/10 bg-white/10 px-5 py-4">
+                <div class="text-sm text-sky-100">值班员：张三</div>
+                <button onclick="logout()" class="rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/15">退出登录</button>
               </div>
             </div>
           </div>
-        </section>
+          <nav class="flex flex-wrap gap-3">
+            <button id="navBtn-dashboard" onclick="switchModule('dashboard')" class="nav-pill active rounded-full px-5 py-2.5 text-sm font-semibold text-slate-100 ring-1 ring-inset ring-white/10">总览</button>
+            <button id="navBtn-detection" onclick="switchModule('detection')" class="nav-pill rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-slate-100 ring-1 ring-inset ring-white/10">数据检测与研判</button>
+            <button id="navBtn-face" onclick="switchModule('face')" class="nav-pill rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-slate-100 ring-1 ring-inset ring-white/10">人脸识别与人员核验</button>
+            <button id="navBtn-train" onclick="switchModule('train')" class="nav-pill rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-slate-100 ring-1 ring-inset ring-white/10">模型自训练</button>
+            <button id="navBtn-dispatch" onclick="switchModule('dispatch')" class="nav-pill rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-slate-100 ring-1 ring-inset ring-white/10">任务下发</button>
+          </nav>
+        </div>
+      </header>
 
-        <section class="space-y-6">
-          <div class="card p-5 md:p-6">
-            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Dataset Status</div>
-            <h3 class="mt-2 text-xl font-semibold text-slate-900">数据集概览</h3>
-            <div class="mt-5 grid gap-4 sm:grid-cols-2">
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">Images</div>
-                <div class="mt-2 text-2xl font-bold text-slate-900">2,486</div>
-              </div>
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">Labeled</div>
-                <div class="mt-2 text-2xl font-bold text-emerald-600">1,932</div>
-              </div>
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">Review Left</div>
-                <div class="mt-2 text-2xl font-bold text-amber-500">554</div>
-              </div>
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">Classes</div>
-                <div class="mt-2 text-2xl font-bold text-slate-900">3</div>
-              </div>
+      <div class="grid gap-6 xl:grid-cols-[250px,minmax(0,1fr),340px]">
+        <aside class="glass-card p-5">
+          <div class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Duty Actions</div>
+          <div class="mt-2 text-2xl font-bold tracking-tight text-slate-900">当班快捷动作</div>
+          <div class="mt-5 space-y-3">
+            <div class="rounded-3xl bg-slate-50 p-4">
+              <div class="text-sm font-semibold text-slate-900">开始今日巡检</div>
+              <div class="mt-2 text-sm leading-6 text-slate-600">适合先进入“数据检测与研判”，快速查看当日违法行为命中。</div>
+            </div>
+            <div class="rounded-3xl bg-slate-50 p-4">
+              <div class="text-sm font-semibold text-slate-900">同步人脸库</div>
+              <div class="mt-2 text-sm leading-6 text-slate-600">班前先同步或重建特征，保证核验结果可直接流转。</div>
+            </div>
+            <div class="rounded-3xl bg-slate-50 p-4">
+              <div class="text-sm font-semibold text-slate-900">查看待下发对象</div>
+              <div class="mt-2 text-sm leading-6 text-slate-600">优先处理已命中身份且属地信息完整的对象，减少积压。</div>
+            </div>
+            <div class="rounded-3xl bg-slate-50 p-4">
+              <div class="text-sm font-semibold text-slate-900">补充专项样本</div>
+              <div class="mt-2 text-sm leading-6 text-slate-600">将高价值结果图回流到训练数据集，持续增强实战模型。</div>
             </div>
           </div>
+        </aside>
 
-          <div class="card p-5 md:p-6">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Train Queue</div>
-                <h3 class="mt-2 text-xl font-semibold text-slate-900">训练进度</h3>
-              </div>
-              <span class="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-200">running</span>
+        <main class="space-y-6">
+          <section id="panel-dashboard" class="hidden-panel active soft-card p-6">
+            <div class="grid gap-5 lg:grid-cols-4">
+              <div class="rounded-3xl border border-slate-200 bg-slate-50 p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">今日研判</div><div class="mt-3 text-3xl font-bold">128</div><div class="mt-2 text-sm text-slate-500">历史巡检与现场素材合计</div></div>
+              <div class="rounded-3xl border border-slate-200 bg-slate-50 p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">身份命中</div><div class="mt-3 text-3xl font-bold">11</div><div class="mt-2 text-sm text-slate-500">6 人已进入待下发队列</div></div>
+              <div class="rounded-3xl border border-slate-200 bg-slate-50 p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">自训练模型</div><div class="mt-3 text-3xl font-bold">5</div><div class="mt-2 text-sm text-slate-500">已发布 2 个实战模型</div></div>
+              <div class="rounded-3xl border border-slate-200 bg-slate-50 p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">待下发任务</div><div class="mt-3 text-3xl font-bold">6</div><div class="mt-2 text-sm text-slate-500">3 条短信提醒已生成</div></div>
             </div>
-            <div class="mt-5 inner-card p-4">
-              <div class="flex items-center justify-between text-sm">
-                <span class="font-medium text-slate-800">wheelie_train_20260325 / yolo26s.pt</span>
-                <span class="text-slate-500">epoch 18 / 80</span>
+            <div class="mt-6 grid gap-5 xl:grid-cols-2">
+              <div class="rounded-3xl bg-slate-50 p-5">
+                <div class="text-xl font-semibold text-slate-900">四步工作闭环</div>
+                <div class="mt-4 space-y-3 text-sm leading-7 text-slate-600">
+                  <div class="rounded-2xl border border-slate-200 bg-white p-4"><b class="text-slate-900">数据检测与研判</b>：合并数据库巡检和现场素材，名称更贴近基层使用习惯。</div>
+                  <div class="rounded-2xl border border-slate-200 bg-white p-4"><b class="text-slate-900">人脸识别与人员核验</b>：核验结果直接进入待下发对象。</div>
+                  <div class="rounded-2xl border border-slate-200 bg-white p-4"><b class="text-slate-900">模型自训练</b>：只保留导入、标注、训练、发布主链路。</div>
+                  <div class="rounded-2xl border border-slate-200 bg-white p-4"><b class="text-slate-900">任务下发</b>：以任务平台下发为主，短信提醒为辅。</div>
+                </div>
               </div>
-              <div class="mt-4 h-3 rounded-full bg-slate-100">
-                <div class="h-3 rounded-full bg-sky-500" style="width:22%"></div>
+              <div class="rounded-3xl bg-slate-50 p-5">
+                <div class="text-xl font-semibold text-slate-900">建议演示顺序</div>
+                <div class="mt-4 space-y-3 text-sm leading-7 text-slate-600">
+                  <div class="rounded-2xl border border-slate-200 bg-white p-4">1. 通过“数据检测与研判”识别违法行为与可疑人员。</div>
+                  <div class="rounded-2xl border border-slate-200 bg-white p-4">2. 在“人脸识别与人员核验”中确认身份命中。</div>
+                  <div class="rounded-2xl border border-slate-200 bg-white p-4">3. 进入“任务下发”自动带出属地、联系方式、payload。</div>
+                </div>
               </div>
-              <div class="mt-3 text-xs leading-6 text-slate-500">单机低算力模式下只允许 1 个训练任务并发，避免拖垮当前检测服务。</div>
             </div>
-          </div>
+          </section>
 
-          <div class="card p-5 md:p-6">
-            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Publish</div>
-            <h3 class="mt-2 text-xl font-semibold text-slate-900">模型发布</h3>
-            <div class="mt-5 space-y-3">
-              <div class="inner-card p-4">
-                <div class="text-sm font-semibold text-slate-900">best.pt</div>
-                <div class="mt-2 text-sm leading-6 text-slate-500">mAP50 = 0.83 / recall = 0.79 / precision = 0.86</div>
-              </div>
-              <div class="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50 p-4 text-sm leading-7 text-emerald-700">
-                发布后模型直接进入当前系统的模型目录，不需要额外手工接线。
-              </div>
-              <button class="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white">发布为当前业务模型</button>
+          <section id="panel-detection" class="hidden-panel soft-card p-6">
+            <div class="flex items-start justify-between gap-4">
+              <div><div class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Module 01</div><h2 class="mt-2 text-2xl font-bold">数据检测与研判</h2></div>
+              <span class="badge bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200">去掉打包下载</span>
             </div>
-          </div>
-        </section>
-      </div>
-    </div>
+            <div class="mt-6 grid gap-5 xl:grid-cols-2">
+              <div class="rounded-3xl bg-slate-50 p-5">
+                <div class="text-lg font-semibold">数据库巡检</div>
+                <p class="mt-3 text-sm leading-7 text-slate-600">适合历史批量巡检。页面主操作突出“开始巡检、查看命中、移交核验”。</p>
+                <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">推荐能力：<b class="text-slate-900">专项违法行为识别</b>，适合翘头、多人骑乘等固定场景。</div>
+              </div>
+              <div class="rounded-3xl bg-slate-50 p-5">
+                <div class="text-lg font-semibold">现场素材研判</div>
+                <p class="mt-3 text-sm leading-7 text-slate-600">适合单次上传图片、视频或压缩包后的快速核查。结果区重点展示命中记录和身份核验入口。</p>
+                <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">推荐能力：<b class="text-slate-900">通用人车要素识别</b>，适合快速筛人、车、反光衣等目标。</div>
+              </div>
+            </div>
+          </section>
 
-    <div id="tab-dispatch" class="tab-panel">
-      <div class="grid gap-6 xl:grid-cols-[1.45fr,0.95fr]">
-        <section class="space-y-6">
-          <div class="card p-5 md:p-8">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Task Dispatch</div>
-                <h2 class="mt-2 text-2xl font-bold text-slate-900">任务平台认证</h2>
-                <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-500">
-                  使用派出所一平台提供的账号和密码先认证获取 token。token 缓存成功后，后续任务下发统一携带 `Authorization: Bearer &lt;token&gt;`。
-                </p>
-              </div>
-              <span class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">已认证 / token 有效 41825 秒</span>
+          <section id="panel-face" class="hidden-panel soft-card p-6">
+            <div class="flex items-start justify-between gap-4">
+              <div><div class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Module 02</div><h2 class="mt-2 text-2xl font-bold">人脸识别与人员核验</h2></div>
+              <span class="badge bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200">识别即流转</span>
             </div>
-            <div class="mt-6 grid gap-4 md:grid-cols-2">
-              <label class="block">
-                <span class="mb-2 block text-sm font-medium text-slate-700">账号 / username</span>
-                <input type="text" value="dispatch_admin" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-              <label class="block">
-                <span class="mb-2 block text-sm font-medium text-slate-700">密码 / password</span>
-                <input type="password" value="******" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
+            <div class="mt-6 grid gap-5 xl:grid-cols-2">
+              <div class="rounded-3xl bg-slate-50 p-5"><div class="text-lg font-semibold">人脸库状态</div><p class="mt-3 text-sm leading-7 text-slate-600">把“同步人脸库”单独作为初始化动作，核验页只保留识别和复核。</p></div>
+              <div class="rounded-3xl bg-slate-50 p-5"><div class="text-lg font-semibold">核验结果</div><p class="mt-3 text-sm leading-7 text-slate-600">显示相似度、证件号、是否进入下发队列，减少用户再去历史页查状态。</p></div>
+            </div>
+          </section>
+
+          <section id="panel-train" class="hidden-panel soft-card p-6">
+            <div class="flex items-start justify-between gap-4">
+              <div><div class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Module 03</div><h2 class="mt-2 text-2xl font-bold">模型自训练</h2></div>
+              <span class="badge bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200">低算力友好</span>
+            </div>
+            <div class="mt-6 grid gap-5 xl:grid-cols-3">
+              <div class="rounded-3xl bg-slate-50 p-5"><div class="text-lg font-semibold">数据集工作台</div><p class="mt-3 text-sm leading-7 text-slate-600">一键把结果图加入训练数据集，统一做复核和标注。</p></div>
+              <div class="rounded-3xl bg-slate-50 p-5"><div class="text-lg font-semibold">预标注 + 修正</div><p class="mt-3 text-sm leading-7 text-slate-600">优先用预标注再人工修正，减少从零画框成本。</p></div>
+              <div class="rounded-3xl bg-slate-50 p-5"><div class="text-lg font-semibold">评估与发布</div><p class="mt-3 text-sm leading-7 text-slate-600">训练结束直接看评估页，再一键发布线上模型。</p></div>
             </div>
             <div class="mt-5 grid gap-4 md:grid-cols-3">
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">认证接口</div>
-                <div class="mt-2 text-sm font-semibold text-slate-900">/oauth/token</div>
-                <div class="mt-1 text-xs leading-6 text-slate-500">client_id=jcgkpt / client_secret=123456 / grant_type=password</div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-600">
+                <div class="font-semibold text-slate-900">快速版训练底模</div>
+                <div class="mt-1">适合样本量不大、想快速验证思路的场景。</div>
               </div>
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">Token 类型</div>
-                <div class="mt-2 text-sm font-semibold text-slate-900">Bearer</div>
-                <div class="mt-1 text-xs leading-6 text-slate-500">过期后自动提示重新认证，不直接丢弃待下发队列。</div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-600">
+                <div class="font-semibold text-slate-900">标准版训练底模</div>
+                <div class="mt-1">适合专项模型沉淀，兼顾精度和训练成本。</div>
               </div>
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">本地缓存</div>
-                <div class="mt-2 text-sm font-semibold text-slate-900">状态 + 过期时间</div>
-                <div class="mt-1 text-xs leading-6 text-slate-500">便于页面显示“已认证 / 待认证 / 已过期”。</div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-600">
+                <div class="font-semibold text-slate-900">专项预标注能力</div>
+                <div class="mt-1">适合先自动打草稿，再由人工快速修正。</div>
               </div>
             </div>
-            <div class="mt-6 flex flex-wrap justify-end gap-3">
-              <button class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">刷新 Token</button>
-              <button class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white">认证并缓存 Token</button>
-            </div>
-          </div>
+          </section>
 
-          <div class="card p-5 md:p-8">
+          <section id="panel-dispatch" class="hidden-panel soft-card p-6">
+            <div class="flex items-start justify-between gap-4">
+              <div><div class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Module 04</div><h2 class="mt-2 text-2xl font-bold">任务下发</h2></div>
+              <span class="badge bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200">自动衔接人脸识别</span>
+            </div>
+            <div class="mt-6 grid gap-5 xl:grid-cols-2">
+              <div class="rounded-3xl bg-slate-50 p-5"><div class="text-lg font-semibold">待下发对象</div><p class="mt-3 text-sm leading-7 text-slate-600">命中人员自动入队，按证件号补全属地、姓名、联系电话，减少手工整理。</p></div>
+              <div class="rounded-3xl bg-slate-50 p-5"><div class="text-lg font-semibold">平台下发与短信</div><p class="mt-3 text-sm leading-7 text-slate-600">payload 可编辑，适合接口联调；短信提醒独立作为辅助动作。</p></div>
+            </div>
+          </section>
+        </main>
+
+        <aside class="space-y-6">
+          <section class="glass-card p-5">
             <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Dispatch Queue</div>
-                <h3 class="mt-2 text-xl font-semibold text-slate-900">待下发对象</h3>
-                <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-500">
-                  人脸识别完成后，识别成功的违法人员自动流转至本模块。用户可多选人员，统一生成“任务平台”下发草稿，或直接发送短信提醒。
-                </p>
-              </div>
-              <button class="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white">批量生成下发草稿</button>
+              <div><div class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Task Center</div><h3 class="mt-2 text-2xl font-bold tracking-tight text-slate-900">运行中的任务</h3></div>
+              <span class="badge bg-slate-900 text-white">统一摆放</span>
             </div>
-            <div class="mt-6 space-y-4">
-              <div class="inner-card p-4">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div class="flex items-center gap-4">
-                    <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-500">照片</div>
-                    <div>
-                      <div class="text-sm font-semibold text-slate-900">莫镇禧 / 445302201209120617</div>
-                      <div class="mt-1 text-xs leading-6 text-slate-500">来源：人脸识别 face_20260326_001 · 违法行为：飙车炸街（翘车头） · 相似度 0.4284</div>
-                      <div class="mt-1 text-xs leading-6 text-slate-500">联系电话：18807661151 · 检测来源：本地上传视频 20260324090623.mpg</div>
-                    </div>
-                  </div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">可下发</span>
-                    <button class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">查看来源</button>
-                    <button class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">加入本次下发</button>
-                  </div>
-                </div>
-              </div>
-              <div class="inner-card p-4">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div class="flex items-center gap-4">
-                    <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-500">照片</div>
-                    <div>
-                      <div class="text-sm font-semibold text-slate-900">李某某 / 440123199808081234</div>
-                      <div class="mt-1 text-xs leading-6 text-slate-500">来源：Oracle 检测 oracle_20260326_008 · 违法行为：多人骑乘 · 相似度 0.5031</div>
-                      <div class="mt-1 text-xs leading-6 text-slate-500">联系电话缺失，可先推送任务平台，短信提醒待补录号码后再执行。</div>
-                    </div>
-                  </div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">待补充手机号</span>
-                    <button class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">补录信息</button>
-                    <button class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">加入本次下发</button>
-                  </div>
-                </div>
-              </div>
+            <p class="mt-3 text-sm leading-7 text-slate-600">统一显示四类任务：数据检测、人脸库同步、模型训练、任务下发。比散落在各模块里更适合基层用户随时看状态。</p>
+            <div class="mt-5 space-y-3 text-sm">
+              <div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="font-semibold text-slate-900">数据库巡检任务</div><div class="mt-1 text-slate-500">模块：数据检测与研判 · 进度 67%</div></div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="font-semibold text-slate-900">人脸库同步</div><div class="mt-1 text-slate-500">模块：人脸识别与人员核验 · 已处理 1240 / 4800</div></div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="font-semibold text-slate-900">专项模型训练</div><div class="mt-1 text-slate-500">模块：模型自训练 · epoch 14 / 80</div></div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="font-semibold text-slate-900">任务下发执行</div><div class="mt-1 text-slate-500">模块：任务下发 · 2 人已推送，1 条短信待发送</div></div>
             </div>
-          </div>
-
-          <div class="card p-5 md:p-8">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Task Platform</div>
-                <h3 class="mt-2 text-xl font-semibold text-slate-900">任务平台下发配置</h3>
-                <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-500">
-                  系统根据 `ywdata.t_ap_czrk_jbxx` 自动回填行政区划，按接口文档组装 payload。用户重点确认标题、内容、时限、负责人和地址后再下发。
-                </p>
-              </div>
-              <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">rwdyid = ecfffc32c9aa4aabb75541cb23a3270f</span>
-            </div>
-            <div class="mt-6 grid gap-4 md:grid-cols-2">
-              <label class="block">
-                <span class="mb-2 block text-sm font-medium text-slate-700">指令标题 / zlbt</span>
-                <input type="text" value="飙车炸街违法人员核查" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-              <label class="block">
-                <span class="mb-2 block text-sm font-medium text-slate-700">指令内容 / zlnr</span>
-                <input type="text" value="请核查该对象近期涉嫌飙车炸街违法行为并反馈处置情况。" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-            </div>
-            <div class="mt-4 grid gap-4 lg:grid-cols-4">
-              <label class="block inner-card p-4">
-                <span class="mb-2 block text-sm font-medium text-slate-700">开始时间 / kssj</span>
-                <input type="text" value="2026-03-26 09:30:00" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-              <label class="block inner-card p-4">
-                <span class="mb-2 block text-sm font-medium text-slate-700">结束时间 / jzsj</span>
-                <input type="text" value="2026-03-29 09:30:00" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-              <label class="block inner-card p-4">
-                <span class="mb-2 block text-sm font-medium text-slate-700">签收时限 / qssx</span>
-                <input type="text" value="06" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-              <label class="block inner-card p-4">
-                <span class="mb-2 block text-sm font-medium text-slate-700">反馈时限 / fksx</span>
-                <input type="text" value="08" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-            </div>
-            <div class="mt-5 grid gap-4 lg:grid-cols-3">
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">行政区划映射</div>
-                <div class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-                  <div><span class="font-semibold">sssjDm / sssjMc</span> ← ds||'000000' / dsmc</div>
-                  <div><span class="font-semibold">ssfjDm / ssfjMc</span> ← ssxq||'000000' / ssxqmc</div>
-                  <div><span class="font-semibold">zbpcsdm / zbpcsmc</span> ← pcs / pcsmc</div>
-                  <div><span class="font-semibold">dzmc</span> ← dz</div>
-                </div>
-              </div>
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">人员变量</div>
-                <div class="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-                  <div><span class="font-semibold">zjhm</span> = 445302201209120617</div>
-                  <div><span class="font-semibold">lxdh</span> = 18807661151</div>
-                  <div><span class="font-semibold">xm</span> = 莫镇禧</div>
-                  <div><span class="font-semibold">sjcsly</span> = yfdjzldxwlxxwffzzx</div>
-                </div>
-              </div>
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">业务负责人</div>
-                <label class="mt-3 block">
-                  <span class="mb-2 block text-sm font-medium text-slate-700">ywfzr / ywfzrlxdh</span>
-                  <input type="text" value="张三 / 17246390519" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-                </label>
-              </div>
-            </div>
-            <div class="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 text-slate-100 shadow-sm">
-              <div class="border-b border-white/10 px-5 py-3 text-xs font-semibold uppercase tracking-[0.35em] text-sky-200">Payload Preview</div>
-              <pre class="overflow-x-auto px-5 py-4 text-xs leading-6">{
-  "rwdyid": "ecfffc32c9aa4aabb75541cb23a3270f",
-  "zlbt": "飙车炸街违法人员核查",
-  "zlnr": "请核查该对象近期涉嫌飙车炸街违法行为并反馈处置情况。",
-  "kssj": "2026-03-26 09:30:00",
-  "jzsj": "2026-03-29 09:30:00",
-  "qssx": "06",
-  "fksx": "08",
-  "sssjDm": "440100000000",
-  "sssjMc": "广州市公安局",
-  "ssfjDm": "440106000000",
-  "ssfjMc": "天河区分局",
-  "zbpcsdm": "440106590000",
-  "zbpcsmc": "棠下派出所",
-  "zjhm": "445302201209120617",
-  "lxdh": "18807661151",
-  "xm": "莫镇禧",
-  "dzmc": "广州市海珠区赤岗街道...",
-  "sjcsly": "yfdjzldxwlxxwffzzx",
-  "wxtid": "AUTO-UUID-20260326-0001"
-}</pre>
-            </div>
-            <div class="mt-6 flex flex-wrap justify-end gap-3">
-              <button class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">保存草稿</button>
-              <button class="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white">通过任务平台下发</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="space-y-6">
-          <div class="card p-5 md:p-6">
-            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">SMS Reminder</div>
-            <h3 class="mt-2 text-xl font-semibold text-slate-900">短信提醒</h3>
-            <p class="mt-3 text-sm leading-7 text-slate-500">
-              默认手机号码和模板来自当前模块配置，用户可以临时修改。修改后实时预览实际发送内容，再决定是否写入短信表。
-            </p>
-            <div class="mt-5 space-y-4">
-              <label class="block">
-                <span class="mb-2 block text-sm font-medium text-slate-700">短信号码 / mobile</span>
-                <input type="text" value="18807661151" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none" />
-              </label>
-              <label class="block">
-                <span class="mb-2 block text-sm font-medium text-slate-700">短信模板 / content</span>
-                <textarea rows="5" class="w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none">【治安基础管控中心】{xm}，系统识别到您涉及“{illegalType}”线索，请于{deadline}前主动配合核查。联系单位：{pcsmc}，联系电话：{ywfzrlxdh}。</textarea>
-              </label>
-              <div class="inner-card p-4">
-                <div class="text-xs text-slate-500">短信库写入参数</div>
-                <div class="mt-3 grid gap-3 text-sm text-slate-700">
-                  <div><span class="font-semibold">userid / password</span> = admin / yfga8130018</div>
-                  <div><span class="font-semibold">userport</span> = 0006</div>
-                  <div><span class="font-semibold">eid</span> = 业务主键 / 任务唯一编号</div>
-                  <div><span class="font-semibold">deadtime</span> = sysdate</div>
-                </div>
-              </div>
-              <div class="rounded-3xl border border-sky-200 bg-sky-50 p-4 text-sm leading-7 text-sky-800">
-                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-500">Live Preview</div>
-                <div class="mt-3">【治安基础管控中心】莫镇禧，系统识别到您涉及“飙车炸街（翘车头）”线索，请于 2026-03-29 09:30 前主动配合核查。联系单位：棠下派出所，联系电话：17246390519。</div>
-              </div>
-              <div class="flex justify-end">
-                <button class="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white">发送短信提醒</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="card p-5 md:p-6">
-            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Audit Trail</div>
-            <h3 class="mt-2 text-xl font-semibold text-slate-900">下发记录与审计</h3>
-            <div class="mt-5 space-y-3 text-sm text-slate-600">
-              <div class="inner-card p-4">
-                <div class="font-semibold text-slate-900">2026-03-26 10:08 / 平台下发成功</div>
-                <div class="mt-2 leading-6">莫镇禧 · wxtid=AUTO-UUID-20260326-0001 · 棠下派出所</div>
-              </div>
-              <div class="inner-card p-4">
-                <div class="font-semibold text-slate-900">2026-03-26 10:11 / 短信写库成功</div>
-                <div class="mt-2 leading-6">mobile=18807661151 · userport=0006 · status=0</div>
-              </div>
-              <div class="inner-card p-4">
-                <div class="font-semibold text-slate-900">2026-03-26 10:13 / 下发失败待重试</div>
-                <div class="mt-2 leading-6">Authorization 失效，已提示重新认证，队列数据未丢弃。</div>
-              </div>
-            </div>
-          </div>
-        </section>
+          </section>
+        </aside>
       </div>
-    </div>
-
-    <div id="tab-face" class="tab-panel">
-      <div class="grid gap-6 xl:grid-cols-[1.5fr,0.9fr]">
-        <section class="card p-5 md:p-8">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Face Library</div>
-              <h2 class="mt-2 text-2xl font-bold text-slate-900">人脸库状态</h2>
-              <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-                管理人脸照片、特征向量和识别结果回写。训练模块不直接替代人脸库，只负责视觉检测模型闭环。
-              </p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <button class="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">同步人脸库</button>
-              <button class="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700">重建特征</button>
-            </div>
-          </div>
-          <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div class="inner-card p-4">
-              <div class="text-xs text-slate-500">库状态</div>
-              <div class="mt-2 text-xl font-bold text-emerald-600">ready</div>
-            </div>
-            <div class="inner-card p-4">
-              <div class="text-xs text-slate-500">人员数</div>
-              <div class="mt-2 text-xl font-bold text-slate-900">156</div>
-            </div>
-            <div class="inner-card p-4">
-              <div class="text-xs text-slate-500">照片数</div>
-              <div class="mt-2 text-xl font-bold text-slate-900">212</div>
-            </div>
-            <div class="inner-card p-4">
-              <div class="text-xs text-slate-500">特征状态</div>
-              <div class="mt-2 text-xl font-bold text-emerald-600">valid</div>
-            </div>
-          </div>
-        </section>
-        <section class="space-y-6">
-          <div class="card p-5 md:p-6">
-            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Operation History</div>
-            <h3 class="mt-2 text-xl font-semibold text-slate-900">操作历史</h3>
-            <div class="mt-5 space-y-3 text-sm text-slate-600">
-              <div class="inner-card p-4">2026-03-25 10:30 / 同步完成 / 156 人</div>
-              <div class="inner-card p-4">2026-03-25 10:32 / 重建完成 / 156 特征</div>
-              <div class="inner-card p-4">2026-03-24 14:20 / 同步失败 / 内网不可达</div>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
+    </section>
   </div>
 
   <script>
-    function switchTab(tab) {
-      document.querySelectorAll(".tab-panel").forEach(function(panel) {
-        panel.classList.remove("active");
+    function switchAuth(tab) {
+      ["login", "register"].forEach((name) => {
+        document.getElementById(`authTab-${name}`).classList.toggle("active", name === tab);
+        document.getElementById(`authPanel-${name}`).classList.toggle("active", name === tab);
       });
-      document.getElementById("tab-" + tab).classList.add("active");
-
-      document.querySelectorAll("#tabNav .tab-btn").forEach(function(btn) {
-        btn.classList.remove("bg-slate-900", "text-white");
-        btn.classList.add("bg-white", "text-slate-600", "ring-1", "ring-inset", "ring-slate-200");
+    }
+    function showApp() {
+      document.getElementById("authShell").classList.add("hidden");
+      document.getElementById("appShell").classList.remove("hidden");
+    }
+    function logout() {
+      document.getElementById("appShell").classList.add("hidden");
+      document.getElementById("authShell").classList.remove("hidden");
+      switchAuth("login");
+    }
+    function switchModule(name) {
+      ["dashboard", "detection", "face", "train", "dispatch"].forEach((moduleName) => {
+        document.getElementById(`panel-${moduleName}`).classList.toggle("active", moduleName === name);
+        document.getElementById(`navBtn-${moduleName}`).classList.toggle("active", moduleName === name);
       });
-
-      var activeBtn = document.getElementById("tabBtn-" + tab);
-      activeBtn.classList.add("bg-slate-900", "text-white");
-      activeBtn.classList.remove("bg-white", "text-slate-600", "ring-1", "ring-inset", "ring-slate-200");
     }
   </script>
 </body>

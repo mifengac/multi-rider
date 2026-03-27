@@ -12,7 +12,7 @@
       general: {
         label: '检测提示词',
         placeholder: 'person, motorcycle, bicycle, car, bus, truck',
-        help: '英文逗号分隔。本地上传检测建议优先使用交通场景提示词组合，以提高 YOLOE 命中率。',
+        help: '英文逗号分隔。适合做人员、车辆、摩托车等通用要素的快速粗筛。',
         uploadDefaultConf: 0.10,
         presets: [
           { label: '交通场景', value: 'person,motorcycle,bicycle,car,bus,truck' },
@@ -32,7 +32,7 @@
     const UPLOAD_PROMPT_UI = {
       label: '检测提示词',
       placeholder: 'person, motorcycle, bicycle, car, bus, truck',
-      help: '英文逗号分隔。开放词表模型可直接输入要检测的英文提示词。',
+      help: '英文逗号分隔。适合对人员、车辆、摩托车等目标进行快速提示词筛查。',
       uploadDefaultConf: 0.10,
       defaultClasses: 'person,motorcycle,bicycle,car,bus,truck',
       presets: [
@@ -63,7 +63,9 @@
       if (UPLOAD_MODEL_MAP[modelKey] && UPLOAD_MODEL_MAP[modelKey].short_label) {
         return UPLOAD_MODEL_MAP[modelKey].short_label;
       }
-      return modelKey === 'bczj' ? '飙车炸街' : '通用';
+      if (modelKey === 'bczj') return '专项违法行为识别';
+      if (modelKey === 'general') return '通用人车要素识别';
+      return modelKey || '识别模型';
     }
 
     function statusMeta(status) {
@@ -324,14 +326,14 @@
       Object.keys(panels).forEach(function (key) {
         if (panels[key]) panels[key].classList.add('hidden');
         if (buttons[key]) {
-          buttons[key].classList.remove('bg-slate-900', 'text-white');
-          buttons[key].classList.add('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
+          buttons[key].classList.remove('active');
+          buttons[key].setAttribute('aria-current', 'false');
         }
       });
       if (panels[tab]) panels[tab].classList.remove('hidden');
       if (buttons[tab]) {
-        buttons[tab].classList.add('bg-slate-900', 'text-white');
-        buttons[tab].classList.remove('bg-white', 'text-slate-600', 'ring-1', 'ring-inset', 'ring-slate-200');
+        buttons[tab].classList.add('active');
+        buttons[tab].setAttribute('aria-current', 'page');
       }
       if (tab === 'Face') {
         refreshFaceTab();

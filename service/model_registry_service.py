@@ -14,27 +14,34 @@ from config import (
 
 
 DEPLOYMENT_SLOT_LABELS = {
-    "upload_default": "Local Upload Default",
-    "general": "Database Detection / General",
-    "bczj": "Database Detection / Specialized",
+    "upload_default": "本地上传默认模型",
+    "general": "数据库巡检通用模型",
+    "bczj": "数据库巡检专项模型",
 }
 
 FOUNDATION_MODEL_NAMES = {"yolo26n.pt", "yolo26s.pt"}
 PRODUCTION_MODEL_NAMES = {"biaochezhajiev2.pt", "yolov8s-worldv2.pt"}
 
 MODEL_LIFECYCLE_LABELS = {
-    "active": "Active",
-    "archived": "Archived",
-    "disabled": "Disabled",
+    "active": "启用中",
+    "archived": "已归档",
+    "disabled": "已停用",
 }
 
 MODEL_USAGE_LABELS = {
-    "training_base": "Training Base",
-    "auto_label": "Auto Label",
-    "upload_inference": "Upload Inference",
-    "general_inference": "General Inference",
-    "specialized_inference": "Specialized Inference",
-    "demo": "Demo",
+    "training_base": "训练底模",
+    "auto_label": "预标注",
+    "upload_inference": "本地上传识别",
+    "general_inference": "通用巡检",
+    "specialized_inference": "专项巡检",
+    "demo": "演示展示",
+}
+
+MODEL_CATEGORY_LABELS = {
+    "foundation": "训练底模",
+    "production": "在用模型",
+    "published": "新发布模型",
+    "custom": "自定义模型",
 }
 
 
@@ -204,8 +211,9 @@ def list_managed_models() -> list[dict]:
                 "display_name": metadata.get("display_name") or model_name,
                 "path": model_path,
                 "category": category,
+                "category_label": MODEL_CATEGORY_LABELS.get(category, "自定义模型"),
                 "lifecycle": metadata.get("lifecycle") or "active",
-                "lifecycle_label": MODEL_LIFECYCLE_LABELS.get(metadata.get("lifecycle") or "active", "Active"),
+                "lifecycle_label": MODEL_LIFECYCLE_LABELS.get(metadata.get("lifecycle") or "active", "启用中"),
                 "usages": metadata.get("usages") or [],
                 "usage_labels": [
                     MODEL_USAGE_LABELS[item]
@@ -228,6 +236,10 @@ def list_managed_models() -> list[dict]:
                 },
                 "metadata_path": _model_meta_path(model_name) if os.path.isfile(_model_meta_path(model_name)) else "",
                 "slot_refs": slot_assignments.get(model_name.lower(), []),
+                "slot_labels": [
+                    DEPLOYMENT_SLOT_LABELS.get(slot_key, slot_key)
+                    for slot_key in slot_assignments.get(model_name.lower(), [])
+                ],
             }
         )
     return items

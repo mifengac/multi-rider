@@ -3,15 +3,44 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>图片分类与打包下载</title>
+  <title>猎鹰哨兵</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='falcon-badge.svg') }}" />
   <script src="{{ url_for('static', filename='tailwind.min.js') }}"></script>
   <style>
     body {
       font-family: "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
       background:
-        radial-gradient(circle at top right, rgba(186, 230, 253, 0.85), transparent 32%),
-        radial-gradient(circle at bottom left, rgba(254, 215, 170, 0.75), transparent 28%),
-        linear-gradient(180deg, #f8fafc 0%, #fff7ed 100%);
+        radial-gradient(circle at top right, rgba(59, 130, 246, 0.15), transparent 24%),
+        linear-gradient(180deg, #edf4ff 0%, #f8fbff 55%, #eef2f7 100%);
+      color: #0f172a;
+    }
+    .glass-card {
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(203, 213, 225, 0.78);
+      box-shadow: 0 24px 72px rgba(15, 23, 42, 0.08);
+      backdrop-filter: blur(12px);
+    }
+    .soft-card {
+      border-radius: 24px;
+      background: #fff;
+      border: 1px solid #dbe4f0;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.05);
+    }
+    .auth-tab.active,
+    .nav-pill.active {
+      background: linear-gradient(135deg, #16355b 0%, #264c7d 100%);
+      color: #fff;
+      box-shadow: 0 14px 28px rgba(22, 53, 91, 0.2);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 9999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
     }
   </style>
   <script>
@@ -36,82 +65,255 @@
   <script src="{{ url_for('static', filename='js/index-page/annotation.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/index-page/results.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/index-page/face-library.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/index-page/auth.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/index-page/bootstrap.js') }}" defer></script>
 </head>
 <body class="min-h-screen text-slate-900">
-  <div class="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-10">
-    <header class="mb-8 grid gap-4 xl:grid-cols-[1.5fr,0.9fr]">
-      <section class="rounded-[32px] border border-white/70 bg-white/80 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
-        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Multi-Rider</div>
-        <div class="mt-4 flex flex-wrap items-center gap-3">
-          <span class="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-teal-200">多模型切换</span>
-          <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">SQLite 历史记录</span>
-          <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-200">YOLOE 提示词</span>
-        </div>
-        <h1 class="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">图片分类与打包下载</h1>
-        <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
-          统一支持飙车炸街模型与通用 YOLOE 模型。通用模式下可直接输入英文提示词，留空时按开放词表做无提示检测；任务完成后会自动写入历史记录并支持重新下载。
-        </p>
-      </section>
+  <svg width="0" height="0" class="absolute">
+    <defs>
+      <symbol id="falcon-mark" viewBox="0 0 80 80">
+        <path d="M40 6l24 8v20c0 19-10 31-24 40C26 65 16 53 16 34V14l24-8Z" fill="#16355b"/>
+        <path d="M40 12l19 6v16c0 15-7 24-19 33C28 58 21 49 21 34V18l19-6Z" fill="#edf4ff"/>
+        <path d="M18 26c8 1 14 4 18 10-5-1-10 0-15 2 3 2 6 5 8 9-6-1-10-3-14-7-2-5-1-10 3-14Z" fill="#1f4d80"/>
+        <path d="M62 26c-8 1-14 4-18 10 5-1 10 0 15 2-3 2-6 5-8 9 6-1 10-3 14-7 2-5 1-10-3-14Z" fill="#1f4d80"/>
+        <path d="M40 23l3.2 6.4 7 1-5 4.8 1.2 6.8-6.4-3.4-6.4 3.4 1.2-6.8-5-4.8 7-1L40 23Z" fill="#ffc857"/>
+        <path d="M30 47h20c-1 5-5 9-10 12-5-3-9-7-10-12Z" fill="#16355b"/>
+        <path d="M40 46c6 0 10 4 12 10-4 1-8 2-12 2s-8-1-12-2c2-6 6-10 12-10Z" fill="#76aef8"/>
+      </symbol>
+    </defs>
+  </svg>
 
-      <section class="rounded-[32px] border border-slate-200/70 bg-slate-900 p-6 text-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
-        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-200">Quick Access</div>
-        <div class="mt-5 space-y-4">
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div class="text-sm text-slate-300">运行中的任务</div>
-            <div id="runningCount" class="mt-2 text-4xl font-semibold text-white">0</div>
+  <div class="mx-auto max-w-[1600px] px-4 py-6 md:px-6 md:py-8">
+    <section id="authShell" class="grid gap-6 xl:grid-cols-[1.15fr,0.95fr]">
+      <div class="glass-card overflow-hidden bg-slate-900 text-white">
+        <div class="grid h-full gap-8 bg-[radial-gradient(circle_at_top_right,_rgba(96,165,250,0.24),_transparent_26%),linear-gradient(135deg,_#0f172a_0%,_#16355b_56%,_#234a7d_100%)] p-8 md:p-10">
+          <div>
+            <div class="flex items-center gap-4">
+              <div class="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/10 ring-1 ring-inset ring-white/10">
+                <svg class="h-11 w-11" viewBox="0 0 80 80" aria-hidden="true">
+                  <use href="#falcon-mark"></use>
+                </svg>
+              </div>
+              <div>
+                <div class="text-sm font-semibold tracking-[0.3em] text-sky-200">FALCON SENTINEL</div>
+                <h1 class="mt-2 text-4xl font-bold tracking-tight md:text-5xl">猎鹰哨兵</h1>
+              </div>
+            </div>
+            <div class="mt-4 text-sm text-sky-100/90">云浮市公安局治安管理支队基础管控中心</div>
           </div>
-          <a href="{{ url_for('job.history_page') }}" class="inline-flex w-full items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100">
-            打开历史记录
-          </a>
-          <button type="button" onclick="cancelCurrent()" class="inline-flex w-full items-center justify-center rounded-full border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-            取消当前任务
-          </button>
-        </div>
-      </section>
-    </header>
 
-    {% with messages = get_flashed_messages() %}
-    {% if messages %}
+          <div>
+            <div class="max-w-2xl text-2xl font-semibold leading-tight md:text-3xl">面向基层公安的智能视觉协同平台</div>
+            <p class="mt-5 max-w-2xl text-sm leading-7 text-slate-200">
+              将违法行为识别、人员核验、模型沉淀和任务下发做成一条闭环，强调实用、好上手、少录入。
+            </p>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-3">
+            <div class="rounded-3xl border border-white/10 bg-white/10 p-5">
+              <div class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">检测研判</div>
+              <div class="mt-3 text-lg font-semibold">历史巡检 + 现场素材</div>
+            </div>
+            <div class="rounded-3xl border border-white/10 bg-white/10 p-5">
+              <div class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">身份核验</div>
+              <div class="mt-3 text-lg font-semibold">识别后自动流转</div>
+            </div>
+            <div class="rounded-3xl border border-white/10 bg-white/10 p-5">
+              <div class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">能力成长</div>
+              <div class="mt-3 text-lg font-semibold">基层可用自训练</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card p-6 md:p-8">
+        <div class="mx-auto max-w-xl">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Auth</div>
+              <h2 class="mt-2 text-3xl font-bold tracking-tight text-slate-900">系统登录</h2>
+              <p class="mt-3 text-sm leading-7 text-slate-500">最简单鉴权：支持注册申请、账号登录、演示模式进入。</p>
+            </div>
+            <button type="button" onclick="quickEnterApp()" class="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">演示进入</button>
+          </div>
+
+          <div class="mt-8 inline-flex rounded-full bg-slate-100 p-1.5">
+            <button id="authTabLogin" type="button" class="auth-tab active rounded-full px-5 py-2 text-sm font-semibold text-slate-600" onclick="switchAuthPanel('login')">登录</button>
+            <button id="authTabRegister" type="button" class="auth-tab rounded-full px-5 py-2 text-sm font-semibold text-slate-600" onclick="switchAuthPanel('register')">注册申请</button>
+          </div>
+
+          <form id="authPanelLogin" class="mt-8 space-y-6" onsubmit="return handleLogin(event)">
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">警号 / 用户名</span>
+              <input id="authLoginUsername" type="text" value="44170201" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-[#16355b] focus:ring-4 focus:ring-sky-100" />
+            </label>
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">登录密码</span>
+              <input id="authLoginPassword" type="password" value="123456" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-[#16355b] focus:ring-4 focus:ring-sky-100" />
+            </label>
+            <div class="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">默认演示账号：`44170201 / 123456`，也可以直接注册新账号。</div>
+            <div id="authLoginFeedback" class="text-sm text-rose-600"></div>
+            <div class="flex items-center justify-between gap-3">
+              <button type="button" onclick="switchAuthPanel('register')" class="text-sm font-medium text-slate-500">去注册</button>
+              <button type="submit" class="rounded-full bg-[#16355b] px-6 py-3 text-sm font-semibold text-white">登录并进入系统</button>
+            </div>
+          </form>
+
+          <form id="authPanelRegister" class="mt-8 hidden space-y-6" onsubmit="return handleRegister(event)">
+            <div class="grid gap-5 md:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">姓名</span>
+                <input id="authRegisterName" type="text" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-[#16355b] focus:ring-4 focus:ring-sky-100" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">警号</span>
+                <input id="authRegisterUsername" type="text" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-[#16355b] focus:ring-4 focus:ring-sky-100" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">所属单位</span>
+                <input id="authRegisterUnit" type="text" value="云浮市公安局治安管理支队" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-[#16355b] focus:ring-4 focus:ring-sky-100" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">联系电话</span>
+                <input id="authRegisterPhone" type="text" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-[#16355b] focus:ring-4 focus:ring-sky-100" />
+              </label>
+            </div>
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">设置密码</span>
+              <input id="authRegisterPassword" type="password" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-[#16355b] focus:ring-4 focus:ring-sky-100" />
+            </label>
+            <div class="rounded-3xl bg-amber-50 p-4 text-sm leading-7 text-amber-800 ring-1 ring-inset ring-amber-200">这是最简单的本地鉴权方案，当前用于演示和内部试用，注册后可直接登录。</div>
+            <div id="authRegisterFeedback" class="text-sm text-emerald-700"></div>
+            <div class="flex items-center justify-between gap-3">
+              <button type="button" onclick="switchAuthPanel('login')" class="text-sm font-medium text-slate-500">返回登录</button>
+              <button type="submit" class="rounded-full bg-[#16355b] px-6 py-3 text-sm font-semibold text-white">提交申请</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="appShell" class="hidden">
+      <header class="glass-card mb-6 overflow-hidden">
+        <div class="flex flex-col gap-5 bg-[linear-gradient(135deg,_rgba(15,23,42,0.98)_0%,_rgba(22,53,91,0.98)_45%,_rgba(30,64,112,0.96)_100%)] px-6 py-6 text-white md:px-8">
+          <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div class="flex flex-wrap items-start gap-5">
+              <div class="rounded-3xl bg-white/10 px-4 py-3 ring-1 ring-inset ring-white/10">
+                <div class="flex items-center gap-3">
+                  <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-inset ring-white/10">
+                    <svg class="h-8 w-8" viewBox="0 0 80 80" aria-hidden="true">
+                      <use href="#falcon-mark"></use>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="text-2xl font-bold tracking-tight">猎鹰哨兵</div>
+                    <div class="mt-1 text-xs text-sky-100">云浮市公安局治安管理支队基础管控中心</div>
+                  </div>
+                </div>
+              </div>
+              <div class="pt-2">
+                <div class="text-sm font-semibold tracking-[0.24em] text-sky-200">智能视觉研判</div>
+                <div class="mt-2 max-w-2xl text-sm leading-7 text-slate-200">让“识别、核验、训练、下发”在一张工作台上完成。</div>
+              </div>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-[repeat(2,minmax(0,1fr))_auto]">
+              <div class="rounded-3xl border border-white/10 bg-white/10 px-5 py-4">
+                <div class="text-xs uppercase tracking-[0.25em] text-sky-200">今日命中</div>
+                <div class="mt-2 text-2xl font-bold">18</div>
+              </div>
+              <div class="rounded-3xl border border-white/10 bg-white/10 px-5 py-4">
+                <div class="text-xs uppercase tracking-[0.25em] text-sky-200">待下发</div>
+                <div class="mt-2 text-2xl font-bold">6</div>
+              </div>
+              <div class="flex flex-col items-end justify-between rounded-3xl border border-white/10 bg-white/10 px-5 py-4">
+                <div class="text-sm text-sky-100"><span id="currentUserName">值班员</span> · <span id="currentUserUnit">基层民警</span></div>
+                <button type="button" onclick="logoutApp()" class="rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/15">退出登录</button>
+              </div>
+            </div>
+          </div>
+
+          <nav class="flex flex-wrap gap-3">
+            <button id="tabBtnOracle" type="button" onclick="switchTab('Oracle')" class="nav-pill rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-lg shadow-slate-900/10">数据检测与研判</button>
+            <button id="tabBtnUpload" type="button" onclick="switchTab('Upload')" class="nav-pill rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-slate-100 ring-1 ring-inset ring-white/10">现场素材研判</button>
+            <button id="tabBtnFace" type="button" onclick="switchTab('Face')" class="nav-pill rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-slate-100 ring-1 ring-inset ring-white/10">人脸识别与人员核验</button>
+            <button id="tabBtnTrain" type="button" onclick="switchTab('Train')" class="nav-pill rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-slate-100 ring-1 ring-inset ring-white/10">模型自训练</button>
+            <button id="tabBtnDispatch" type="button" onclick="switchTab('Dispatch')" class="nav-pill rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-slate-100 ring-1 ring-inset ring-white/10">任务下发</button>
+          </nav>
+        </div>
+      </header>
+
+      {% with messages = get_flashed_messages() %}
+      {% if messages %}
       <div class="mb-6 space-y-3">
         {% for msg in messages %}
         <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">{{ msg }}</div>
         {% endfor %}
       </div>
-    {% endif %}
-    {% endwith %}
+      {% endif %}
+      {% endwith %}
 
-    <div class="mb-6 flex gap-3">
-      <button id="tabBtnOracle" type="button" onclick="switchTab('Oracle')"
-        class="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700">
-        数据库检测
-      </button>
-      <button id="tabBtnUpload" type="button" onclick="switchTab('Upload')"
-        class="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">
-        本地上传检测
-      </button>
-      <button id="tabBtnTrain" type="button" onclick="switchTab('Train')"
-        class="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">
-        训练
-      </button>
-      <button id="tabBtnDispatch" type="button" onclick="switchTab('Dispatch')"
-        class="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">
-        任务下发
-      </button>
-      <button id="tabBtnFace" type="button" onclick="switchTab('Face')"
-        class="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">
-        人脸库
-      </button>
-    </div>
+      <div class="mb-6 grid gap-4 md:grid-cols-4">
+        <div class="soft-card p-4">
+          <div class="text-sm font-semibold text-slate-900">开始今日巡检</div>
+          <div class="mt-2 text-sm leading-6 text-slate-600">优先进入“数据检测与研判”，查看历史命中与专项行为。</div>
+        </div>
+        <div class="soft-card p-4">
+          <div class="text-sm font-semibold text-slate-900">同步人脸库</div>
+          <div class="mt-2 text-sm leading-6 text-slate-600">班前先同步底库，保证核验结果可以直接流转到待下发对象。</div>
+        </div>
+        <div class="soft-card p-4">
+          <div class="text-sm font-semibold text-slate-900">查看待下发对象</div>
+          <div class="mt-2 text-sm leading-6 text-slate-600">优先处理已命中身份、属地完整的人员，减少手工整理。</div>
+        </div>
+        <div class="soft-card p-4">
+          <div class="text-sm font-semibold text-slate-900">补充训练样本</div>
+          <div class="mt-2 text-sm leading-6 text-slate-600">把高价值结果图回流到数据集，持续沉淀专项实战模型。</div>
+        </div>
+      </div>
 
-    {% include 'index/_oracle_tab.html' %}
-    {% include 'index/_upload_tab.html' %}
-    {% include 'index/_train_tab.html' %}
-    {% include 'index/_dispatch_tab.html' %}
-    {% include 'index/_dataset_workspace_drawer.html' %}
-    {% include 'index/_face_tab.html' %}
+      <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr),360px]">
+        <main class="space-y-6">
+          {% include 'index/_oracle_tab.html' %}
+          {% include 'index/_upload_tab.html' %}
+          {% include 'index/_train_tab.html' %}
+          {% include 'index/_dispatch_tab.html' %}
+          {% include 'index/_face_tab.html' %}
+        </main>
+
+        <aside class="space-y-6">
+          <section class="glass-card p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Task Center</div>
+                <h2 class="mt-2 text-2xl font-bold text-slate-900">运行中的任务</h2>
+              </div>
+              <span class="badge bg-slate-900 text-white">统一摆放</span>
+            </div>
+            <p class="mt-3 text-sm leading-7 text-slate-500">统一承接数据检测、人脸库同步、模型训练、任务下发等后台任务，避免分散在各模块里来回找。</p>
+            <div class="mt-5 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="text-sm text-slate-500">当前运行中</div>
+              <div id="runningCount" class="mt-2 text-4xl font-semibold text-slate-900">0</div>
+            </div>
+            <div id="jobsInfo" class="mt-5 space-y-4">
+              <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-5 text-sm text-slate-500">加载中...</div>
+            </div>
+          </section>
+
+          <section class="glass-card p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Quick Actions</div>
+            <h3 class="mt-2 text-xl font-semibold text-slate-900">常用操作</h3>
+            <div class="mt-5 space-y-3">
+              <a href="{{ url_for('job.history_page') }}" class="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700">打开历史记录</a>
+              <button type="button" onclick="cancelCurrent()" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">停止当前巡检任务</button>
+              <button type="button" onclick="refreshJobs()" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">刷新任务中心</button>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </section>
   </div>
 
+  {% include 'index/_dataset_workspace_drawer.html' %}
   {% include 'index/_result_detail_drawer.html' %}
   {% include 'index/_result_import_drawer.html' %}
   {% include 'index/_person_detail_drawer.html' %}

@@ -131,6 +131,7 @@ def _serialize_managed_model(item: dict) -> dict:
         "display_name": item.get("display_name", item.get("name")),
         "path": item.get("path"),
         "category": item.get("category"),
+        "category_label": item.get("category_label", item.get("category", "")),
         "lifecycle": item.get("lifecycle", "active"),
         "lifecycle_label": item.get("lifecycle_label", ""),
         "usages": item.get("usages") or [],
@@ -146,6 +147,7 @@ def _serialize_managed_model(item: dict) -> dict:
         "metrics": item.get("metrics") or {},
         "metadata_path": item.get("metadata_path", ""),
         "slot_refs": item.get("slot_refs") or [],
+        "slot_labels": item.get("slot_labels") or [],
     }
 
 
@@ -369,6 +371,7 @@ def train_job_report_data(job_id: str):
                 "summary": report.get("summary") or {},
                 "metrics": report.get("metrics") or {},
                 "losses": report.get("losses") or {},
+                "assessment": report.get("assessment") or {},
                 "history": report.get("history") or [],
                 "images": image_items,
                 "paths": report.get("paths") or {},

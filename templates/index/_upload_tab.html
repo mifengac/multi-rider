@@ -7,8 +7,8 @@
             <div class="flex items-center gap-3">
               <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">01</div>
               <div>
-                <h2 class="text-lg font-semibold text-slate-900">上传文件</h2>
-                <p class="text-sm text-slate-500">支持 ZIP 图片包 或 MP4 / AVI / MOV 视频，单文件最大 500 MB。</p>
+                <h2 class="text-lg font-semibold text-slate-900">上传现场素材</h2>
+                <p class="text-sm text-slate-500">支持图片包和视频素材，适合对民警现场采集内容做快速研判。</p>
               </div>
             </div>
             <div class="mt-5">
@@ -18,7 +18,7 @@
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                 </svg>
                 <span class="mt-4 text-sm font-medium text-slate-600 group-hover:text-teal-700">点击选择文件，或将文件拖放至此</span>
-                <span class="mt-1 text-xs text-slate-400">.zip（图片包）· .mp4 / .avi / .mov（视频）</span>
+                <span class="mt-1 text-xs text-slate-400">.zip 图片包 · .mp4 / .avi / .mov / .mpg 视频</span>
                 <input id="uploadFile" name="file" type="file" accept=".zip,.mp4,.avi,.mov,.mkv,.mpg,.mpeg" class="hidden" onchange="onUploadFileChange(this)" />
               </label>
               <div id="uploadFileInfo" class="hidden mt-4 flex items-center gap-3 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3">
@@ -38,8 +38,8 @@
             <div class="flex items-center gap-3">
               <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-teal-600 text-sm font-semibold text-white">02</div>
               <div>
-                <h2 class="text-lg font-semibold text-slate-900">模型与检测参数</h2>
-                <p class="text-sm text-slate-500">通用模型支持英文提示词；飙车炸街模型沿用类别过滤。</p>
+                <h2 class="text-lg font-semibold text-slate-900">研判模型与参数</h2>
+                <p class="text-sm text-slate-500">根据素材类型切换识别模型，快速完成人车要素或专项违法行为筛查。</p>
               </div>
             </div>
 
@@ -97,11 +97,11 @@
 
           <div class="flex flex-col gap-4 border-t border-slate-100 pt-8 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm leading-7 text-slate-500">
-              ZIP 包将逐图推理；视频按帧间隔采样后推理；命中目标的图片 / 帧打包为 ZIP 供下载。
+              系统会自动筛出命中片段，并把结果图送入后续身份核验和训练样本沉淀流程。
             </div>
             <button type="submit"
               class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:bg-slate-700">
-              开始检测
+              开始素材研判
             </button>
           </div>
         </form>
@@ -127,7 +127,7 @@
           <div id="uploadDownloadLinks" class="mt-5 hidden space-y-3">
             <a id="uploadZipLink" href="#" target="_blank"
               class="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500">
-              下载检测结果 ZIP
+              下载研判结果包
             </a>
           </div>
           <div class="mt-4 flex justify-end">
@@ -158,19 +158,19 @@
 
         <div class="rounded-[32px] border border-white/70 bg-white/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6">
           <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Guide</div>
-          <h3 class="mt-2 text-xl font-semibold text-slate-900">使用说明</h3>
+          <h3 class="mt-2 text-xl font-semibold text-slate-900">办理提示</h3>
           <dl class="mt-5 space-y-4 text-sm">
             <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-              <dt class="font-semibold text-slate-800">📦 ZIP 图片包</dt>
-              <dd class="mt-2 leading-6 text-slate-500">将 JPG / PNG / BMP / TIFF 图片打包成 ZIP 上传，推理后只保留触发检测的图片，重新打包下载。</dd>
+              <dt class="font-semibold text-slate-800">图片素材包</dt>
+              <dd class="mt-2 leading-6 text-slate-500">将 JPG / PNG / BMP / TIFF 图片打包上传，系统会自动筛出命中结果并生成研判结果包。</dd>
             </div>
             <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-              <dt class="font-semibold text-slate-800">🎬 视频文件</dt>
-              <dd class="mt-2 leading-6 text-slate-500">支持 MP4 / AVI / MOV / MKV。按帧采样间隔每隔 N 帧取一帧推理，命中的帧保存为 JPG 打包下载。</dd>
+              <dt class="font-semibold text-slate-800">视频素材</dt>
+              <dd class="mt-2 leading-6 text-slate-500">支持 MP4 / AVI / MOV / MKV / MPG。系统会按帧抽样研判，命中帧会自动沉淀为结果图。</dd>
             </div>
             <div class="rounded-2xl border border-amber-100 bg-amber-50 p-4">
-              <dt class="font-semibold text-amber-800">⚠️ 注意</dt>
-              <dd class="mt-2 leading-6 text-amber-700">单文件最大 500 MB；服务重启后进行中的任务会丢失，请勿上传过大的文件。</dd>
+              <dt class="font-semibold text-amber-800">注意事项</dt>
+              <dd class="mt-2 leading-6 text-amber-700">单文件最大 500 MB；若要继续做身份核验或模型训练，建议保留清晰、正向、目标较大的命中图片。</dd>
             </div>
           </dl>
         </div>

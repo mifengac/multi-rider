@@ -557,6 +557,107 @@ def _read_results_history(results_csv_path: str, limit: int = 20) -> list[dict]:
     return items
 
 
+def _read_results_rows(results_csv_path: str) -> list[dict]:
+    if not results_csv_path or not os.path.isfile(results_csv_path):
+        return []
+    try:
+        with open(results_csv_path, "r", encoding="utf-8", newline="") as fh:
+            return list(csv.DictReader(fh))
+    except Exception:
+        return []
+
+
+def _best_epoch_snapshot(rows: list[dict]) -> dict:
+    best_row = None
+    best_score = None
+    for row in rows:
+        score = _safe_float(row.get("metrics/mAP50-95(B)"))
+        if score is None:
+            continue
+        if best_score is None or score > best_score:
+            best_score = score
+            best_row = row
+    if not best_row:
+        return {}
+    return {
+        "epoch": best_row.get("epoch") or "--",
+        "precision": _format_metric_value(best_row.get("metrics/precision(B)")),
+        "recall": _format_metric_value(best_row.get("metrics/recall(B)")),
+        "mAP50": _format_metric_value(best_row.get("metrics/mAP50(B)")),
+        "mAP50_95": _format_metric_value(best_row.get("metrics/mAP50-95(B)")),
+    }
+
+
+def _build_report_assessment(job: dict, manifest: dict, summary: dict, rows: list[dict]) -> dict:
+    manifest_job = manifest.get("job") or {}
+    labeled_count = int(manifest_job.get("labeled_count") or 0)
+    train_count = int(((manifest_job.get("split") or {}).get("train_assets")) or 0)
+    val_count = int(((manifest_job.get("split") or {}).get("val_assets")) or 0)
+    precision = _safe_float(summary.get("metrics/precision(B)"))
+    recall = _safe_float(summary.get("metrics/recall(B)"))
+    map50 = _safe_float(summary.get("metrics/mAP50(B)"))
+    map50_95 = _safe_float(summary.get("metrics/mAP50-95(B)"))
+    best_epoch = _best_epoch_snapshot(rows)
+
+    status = "needs_improvement"
+    title = "建议继续优化"
+    summary_text = "当前模型可以继续迭代，建议先补样本并复核标注后再用于正式识别。"
+    if map50_95 is not None and map50_95 >= 0.50 and map50 is not None and map50 >= 0.80:
+        status = "good"
+        title = "效果较好"
+        summary_text = "当前模型已经具备较好的识别能力，可优先使用 best.pt 做演示或小范围试用。"
+    elif map50_95 is not None and map50_95 >= 0.35 and map50 is not None and map50 >= 0.65:
+        status = "usable"
+        title = "可以演示"
+        summary_text = "当前模型已具备演示价值，建议优先使用 best.pt，并继续补充样本提升稳定性。"
+
+    recommendations = []
+    if labeled_count < 200:
+        recommendations.append("当前标注样本量偏少，建议至少补到 200 张以上，再继续训练。")
+    elif labeled_count < 500:
+        recommendations.append("当前样本量可用于演示，但若要更稳定，建议继续补到 500 张左右。")
+
+    if val_count < 20:
+        recommendations.append("验证集样本较少，当前指标波动会偏大，建议补充验证集。")
+
+    if precision is not None and recall is not None and abs(precision - recall) >= 0.15:
+        if precision > recall:
+            recommendations.append("查准率高于查全率较多，漏检偏多，可增加复杂场景样本并适当放宽阈值测试。")
+        else:
+            recommendations.append("查全率高于查准率较多，误检偏多，建议补充负样本并复核标注框。")
+
+    if map50_95 is not None and map50 is not None and (map50 - map50_95) >= 0.25:
+        recommendations.append("mAP50 与 mAP50-95 差距较大，说明定位还不够稳定，建议继续收紧标注框并补充难样本。")
+
+    if str(job.get("status") or "") == "done":
+        recommendations.append("发布或测试时建议优先使用 best.pt，不建议直接使用最后一轮权重。")
+
+    if not recommendations:
+        recommendations.append("当前结果较平稳，可先用 best.pt 做演示，再根据误检和漏检继续补样本。")
+
+    sample_level = "low"
+    sample_text = "样本量偏少"
+    if labeled_count >= 500:
+        sample_level = "good"
+        sample_text = "样本量较充足"
+    elif labeled_count >= 200:
+        sample_level = "medium"
+        sample_text = "样本量基本够演示"
+
+    return {
+        "status": status,
+        "title": title,
+        "summary": summary_text,
+        "sample_level": sample_level,
+        "sample_text": sample_text,
+        "sample_count": labeled_count,
+        "train_count": train_count,
+        "val_count": val_count,
+        "best_epoch": best_epoch,
+        "recommendations": recommendations,
+    }
+
+
 def _collect_report_images(job: dict, manifest: dict) -> list[dict]:
     search_dirs = _collect_search_dirs(job, manifest)
     items = []
@@ -631,6 +732,8 @@ def build_train_job_report(job_id: str) -> dict:
     summary = manifest.get("summary") or _read_results_summary(results_csv_path)
     images = _collect_report_images(job, manifest)
     history = _read_results_history(results_csv_path, limit=20)
+    rows = _read_results_rows(results_csv_path)
+    assessment = _build_report_assessment(job, manifest, summary, rows)
 
     report = {
         "job": job,
@@ -647,6 +750,7 @@ def build_train_job_report(job_id: str) -> dict:
             "cls_loss": _format_metric_value(summary.get("train/cls_loss")),
         },
         "history": history,
+        "assessment": assessment,
         "images": images,
         "paths": {
             "run_dir": paths.get("run_dir") or job.get("run_dir") or "",

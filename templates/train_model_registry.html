@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>模型版本管理</title>
+  <title>模型管理</title>
   <script src="{{ url_for('static', filename='tailwind.min.js') }}"></script>
   <style>
     body {
@@ -24,24 +24,24 @@
             返回首页
           </a>
         </div>
-        <div class="mt-5 text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">Model Registry</div>
-        <h1 class="mt-3 text-3xl font-semibold tracking-tight text-slate-900">模型版本管理</h1>
+        <div class="mt-5 text-xs font-semibold uppercase tracking-[0.35em] text-teal-600">模型管理</div>
+        <h1 class="mt-3 text-3xl font-semibold tracking-tight text-slate-900">模型管理与版本切换</h1>
         <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
-          这里分成两层管理。第一层是“部署槽位”，决定当前哪个模型真正用于上传检测、通用检测和专用检测。
-          第二层是“模型注册信息”，用来标记一个模型的用途、状态、备注和显示名。一个模型可以同时具备多个用途，
-          比如既是训练底模，又可用于预标注，而不再只局限于“默认 / 通用 / 专用”三个位置。
+          这里分成两层管理。第一层是“部署位置”，决定当前哪个模型真正用于本地上传识别、数据库巡检通用识别和专项识别。
+          第二层是“模型注册信息”，用于标记一个模型的用途、状态、备注和显示名称。
+          一个模型可以同时具备多个用途，例如既是训练底模，也可以用于预标注或演示展示。
         </p>
       </section>
 
       <section class="rounded-[32px] border border-slate-200/70 bg-slate-900 p-6 text-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
-        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-200">Overview</div>
+        <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-200">总体概况</div>
         <div class="mt-5 space-y-4">
           <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
             <div class="text-sm text-slate-300">模型总数</div>
             <div id="registryModelCount" class="mt-2 text-4xl font-semibold text-white">{{ models|length }}</div>
           </div>
           <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div class="text-sm text-slate-300">部署槽位</div>
+            <div class="text-sm text-slate-300">部署位置</div>
             <div class="mt-2 text-4xl font-semibold text-white">{{ slots|length }}</div>
           </div>
         </div>
@@ -53,8 +53,8 @@
     <section class="mt-6 rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Deployment Slots</div>
-          <h2 class="mt-2 text-2xl font-semibold text-slate-900">部署槽位切换与回滚</h2>
+          <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">部署位置</div>
+          <h2 class="mt-2 text-2xl font-semibold text-slate-900">当前使用模型切换与回滚</h2>
         </div>
         <button id="registryRefreshBtn" type="button" class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
           刷新
@@ -67,8 +67,8 @@
     <section class="mt-6 rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Models</div>
-          <h2 class="mt-2 text-2xl font-semibold text-slate-900">模型清单与注册信息</h2>
+          <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">模型清单</div>
+          <h2 class="mt-2 text-2xl font-semibold text-slate-900">模型列表与注册信息</h2>
         </div>
         <input id="modelSearchInput" type="text" placeholder="搜索模型名、数据集名、来源任务、用途、备注"
           class="w-full max-w-sm rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
@@ -138,7 +138,7 @@
                   '<div class="mt-1 text-slate-400">' + escapeHtml(formatTs(item.changed_ts)) + '</div>' +
                 '</div>';
               }).join('')
-            : '<div class="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-4 text-xs text-slate-500">暂无可回滚历史</div>';
+            : '<div class="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-4 text-xs text-slate-500">暂无可回滚记录</div>';
 
           var optionsHtml = state.models.map(function (model) {
             var selected = model.name === slot.current_model ? ' selected' : '';
@@ -157,7 +157,7 @@
                 '</span>' +
               '</div>' +
               '<div class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">' +
-                '<div class="text-xs text-slate-400">当前模型</div>' +
+                '<div class="text-xs text-slate-400">当前启用模型</div>' +
                 '<div class="mt-2 break-all text-sm font-semibold text-slate-900">' + escapeHtml(slot.current_model || '--') + '</div>' +
                 '<div class="mt-2 break-all font-mono text-xs text-slate-500">' + escapeHtml(slot.current_path || '--') + '</div>' +
               '</div>' +
@@ -174,7 +174,7 @@
                 '</div>' +
               '</div>' +
               '<div class="mt-4">' +
-                '<div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">最近历史</div>' +
+                '<div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">最近切换记录</div>' +
                 '<div class="mt-3 space-y-2">' + historyHtml + '</div>' +
               '</div>' +
             '</div>';
@@ -232,8 +232,8 @@
 
         grid.innerHTML = state.models.map(function (model) {
           var metric = model.metrics || {};
-          var slotBadges = (model.slot_refs || []).map(function (slotKey) {
-            return '<span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-teal-200">' + escapeHtml(slotKey) + '</span>';
+          var slotBadges = (model.slot_labels || model.slot_refs || []).map(function (label) {
+            return '<span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-teal-200">' + escapeHtml(label) + '</span>';
           }).join('');
           var usageBadges = (model.usage_labels || []).map(function (label) {
             return '<span class="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-200">' + escapeHtml(label) + '</span>';
@@ -247,43 +247,43 @@
             '<article class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5" data-model-card="' + escapeHtml((model.name || '').toLowerCase()) + '">' +
               '<div class="flex flex-wrap items-center gap-2">' +
                 '<div class="text-base font-semibold text-slate-900">' + escapeHtml(model.display_name || model.name || '--') + '</div>' +
-                '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">' + escapeHtml(model.category || 'custom') + '</span>' +
-                '<span class="rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ' + getLifecycleBadgeClass(model.lifecycle) + '">' + escapeHtml(model.lifecycle_label || model.lifecycle || 'Active') + '</span>' +
+                '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">' + escapeHtml(model.category_label || model.category || '自定义模型') + '</span>' +
+                '<span class="rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ' + getLifecycleBadgeClass(model.lifecycle) + '">' + escapeHtml(model.lifecycle_label || model.lifecycle || '启用中') + '</span>' +
                 slotBadges +
               '</div>' +
               '<div class="mt-2 break-all font-mono text-xs text-slate-500">' + escapeHtml(model.name || '--') + '</div>' +
               '<div class="mt-2 break-all font-mono text-xs text-slate-500">' + escapeHtml(model.path || '--') + '</div>' +
               '<div class="mt-3 flex flex-wrap gap-2">' + usageBadges + '</div>' +
               '<div class="mt-4 grid gap-3 sm:grid-cols-2">' +
-                '<div class="rounded-2xl border border-slate-200 bg-white px-4 py-3"><div class="text-xs text-slate-400">Dataset</div><div class="mt-1 text-sm font-semibold text-slate-800">' + escapeHtml(model.dataset_name || '--') + '</div></div>' +
-                '<div class="rounded-2xl border border-slate-200 bg-white px-4 py-3"><div class="text-xs text-slate-400">Base Model</div><div class="mt-1 text-sm font-semibold text-slate-800">' + escapeHtml(model.base_model || '--') + '</div></div>' +
-                '<div class="rounded-2xl border border-slate-200 bg-white px-4 py-3"><div class="text-xs text-slate-400">Precision</div><div class="mt-1 text-sm font-semibold text-slate-800">' + escapeHtml(metric.precision || '--') + '</div></div>' +
-                '<div class="rounded-2xl border border-slate-200 bg-white px-4 py-3"><div class="text-xs text-slate-400">mAP50</div><div class="mt-1 text-sm font-semibold text-slate-800">' + escapeHtml(metric.mAP50 || '--') + '</div></div>' +
+                '<div class="rounded-2xl border border-slate-200 bg-white px-4 py-3"><div class="text-xs text-slate-400">来源数据集</div><div class="mt-1 text-sm font-semibold text-slate-800">' + escapeHtml(model.dataset_name || '--') + '</div></div>' +
+                '<div class="rounded-2xl border border-slate-200 bg-white px-4 py-3"><div class="text-xs text-slate-400">训练底模</div><div class="mt-1 text-sm font-semibold text-slate-800">' + escapeHtml(model.base_model || '--') + '</div></div>' +
+                '<div class="rounded-2xl border border-slate-200 bg-white px-4 py-3"><div class="text-xs text-slate-400">查准率</div><div class="mt-1 text-sm font-semibold text-slate-800">' + escapeHtml(metric.precision || '--') + '</div></div>' +
+                '<div class="rounded-2xl border border-slate-200 bg-white px-4 py-3"><div class="text-xs text-slate-400">综合指标 mAP50</div><div class="mt-1 text-sm font-semibold text-slate-800">' + escapeHtml(metric.mAP50 || '--') + '</div></div>' +
               '</div>' +
               '<div class="mt-4 space-y-2 text-xs text-slate-500">' +
                 '<div>来源任务：' + escapeHtml(model.source_job_id || '--') + '</div>' +
-                '<div>仅确认样本：' + escapeHtml(model.confirmed_only ? '是' : '否') + '</div>' +
-                '<div>Metadata：' + escapeHtml(model.metadata_path || '--') + '</div>' +
+                '<div>仅已确认样本：' + escapeHtml(model.confirmed_only ? '是' : '否') + '</div>' +
+                '<div>元数据文件：' + escapeHtml(model.metadata_path || '--') + '</div>' +
               '</div>' +
               '<div class="mt-4 flex flex-wrap gap-2">' +
-                '<button type="button" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" data-quick-slot="upload_default" data-model-name="' + escapeHtml(model.name || '') + '">设为上传默认</button>' +
-                '<button type="button" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" data-quick-slot="general" data-model-name="' + escapeHtml(model.name || '') + '">设为通用模型</button>' +
-                '<button type="button" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" data-quick-slot="bczj" data-model-name="' + escapeHtml(model.name || '') + '">设为专用模型</button>' +
+                '<button type="button" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" data-quick-slot="upload_default" data-model-name="' + escapeHtml(model.name || '') + '">设为上传默认模型</button>' +
+                '<button type="button" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" data-quick-slot="general" data-model-name="' + escapeHtml(model.name || '') + '">设为通用巡检模型</button>' +
+                '<button type="button" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" data-quick-slot="bczj" data-model-name="' + escapeHtml(model.name || '') + '">设为专项巡检模型</button>' +
               '</div>' +
               '<div class="mt-4 rounded-3xl border border-slate-200 bg-white p-4">' +
-                '<div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Registration</div>' +
+                '<div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">注册信息</div>' +
                 '<div class="mt-3 grid gap-3 sm:grid-cols-2">' +
                   '<label class="block">' +
-                    '<span class="mb-2 block text-sm font-medium text-slate-700">显示名</span>' +
+                    '<span class="mb-2 block text-sm font-medium text-slate-700">显示名称</span>' +
                     '<input type="text" data-model-display-name value="' + escapeHtml(model.display_name || model.name || '') + '" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />' +
                   '</label>' +
                   '<label class="block">' +
-                    '<span class="mb-2 block text-sm font-medium text-slate-700">状态</span>' +
+                    '<span class="mb-2 block text-sm font-medium text-slate-700">当前状态</span>' +
                     '<select data-model-lifecycle class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100">' + lifecycleOptions + '</select>' +
                   '</label>' +
                 '</div>' +
                 '<div class="mt-3">' +
-                  '<div class="mb-2 text-sm font-medium text-slate-700">用途</div>' +
+                  '<div class="mb-2 text-sm font-medium text-slate-700">模型用途</div>' +
                   '<div class="flex flex-wrap gap-2" data-model-usages>' + renderUsageCheckboxes(model) + '</div>' +
                 '</div>' +
                 '<label class="mt-3 block">' +
@@ -371,7 +371,7 @@
         var resp = await fetch('/train/models');
         var payload = await resp.json().catch(function () { return {}; });
         if (!payload.ok || !resp.ok) {
-          throw new Error(payload.error || '刷新模型版本管理失败');
+          throw new Error(payload.error || '刷新模型管理失败');
         }
         state.models = payload.models || [];
         state.slots = payload.slots || [];
@@ -398,7 +398,7 @@
         renderSlotControls();
         renderModelGrid();
         renderModelHighlights();
-        setFeedback(payload.message || '模型槽位已更新。', 'success');
+        setFeedback(payload.message || '模型部署位置已更新。', 'success');
       }
 
       async function rollbackSlot(slotKey) {
@@ -415,7 +415,7 @@
         renderSlotControls();
         renderModelGrid();
         renderModelHighlights();
-        setFeedback(payload.message || '模型槽位已回滚。', 'success');
+        setFeedback(payload.message || '模型已回滚到上一版本。', 'success');
       }
 
       async function updateModelMetadata(modelName, metadata) {
@@ -438,7 +438,7 @@
 
       document.getElementById('registryRefreshBtn').addEventListener('click', function () {
         refreshRegistry().catch(function (err) {
-          setFeedback(err.message || '刷新模型版本管理失败', 'error');
+          setFeedback(err.message || '刷新模型管理失败', 'error');
         });
       });
 
