@@ -24,8 +24,11 @@
       imageWidth: 0,
       imageHeight: 0
     };
+    const ANNOTATION_ZOOM_MIN = 25;
+    const ANNOTATION_ZOOM_MAX = 250;
+    const ANNOTATION_ZOOM_DEFAULT = 25;
     const ANNOTATION_VIEW_STATE = {
-      zoomPercent: 150
+      zoomPercent: ANNOTATION_ZOOM_DEFAULT
     };
 
     const AUTO_ANNOTATION_STATE = {
@@ -180,14 +183,15 @@
         boxList: document.getElementById('annotationBoxList'),
         stats: document.getElementById('datasetWorkspaceStats'),
         previewBox: document.getElementById('datasetAssetPreviewBox'),
-        previewMeta: document.getElementById('datasetAssetPreviewMeta'),
-        stageWrapper: document.getElementById('annotationStageWrapper'),
-        stage: document.getElementById('annotationStage'),
-        image: document.getElementById('annotationImage'),
-        overlay: document.getElementById('annotationOverlay'),
-        zoomSelect: document.getElementById('annotationZoomSelect')
-      };
-    }
+      previewMeta: document.getElementById('datasetAssetPreviewMeta'),
+      stageWrapper: document.getElementById('annotationStageWrapper'),
+      viewport: document.getElementById('annotationViewport'),
+      stage: document.getElementById('annotationStage'),
+      image: document.getElementById('annotationImage'),
+      overlay: document.getElementById('annotationOverlay'),
+      zoomSelect: document.getElementById('annotationZoomSelect')
+    };
+  }
 
     function getAutoAnnotationDom() {
       return {
@@ -629,11 +633,11 @@
     }
 
     function getAnnotationZoomPercent() {
-      var value = Number(ANNOTATION_VIEW_STATE.zoomPercent || 150);
+      var value = Number(ANNOTATION_VIEW_STATE.zoomPercent || ANNOTATION_ZOOM_DEFAULT);
       if (!Number.isFinite(value)) {
-        return 150;
+        return ANNOTATION_ZOOM_DEFAULT;
       }
-      return clamp(Math.round(value), 100, 250);
+      return clamp(Math.round(value), ANNOTATION_ZOOM_MIN, ANNOTATION_ZOOM_MAX);
     }
 
     function getAnnotationZoomRatio() {
@@ -665,10 +669,35 @@
     function updateAnnotationZoom(value) {
       var numeric = Number(value);
       if (!Number.isFinite(numeric)) {
-        numeric = 150;
+        numeric = ANNOTATION_ZOOM_DEFAULT;
       }
-      ANNOTATION_VIEW_STATE.zoomPercent = clamp(Math.round(numeric), 100, 250);
+      ANNOTATION_VIEW_STATE.zoomPercent = clamp(Math.round(numeric), ANNOTATION_ZOOM_MIN, ANNOTATION_ZOOM_MAX);
       applyAnnotationImageZoom();
+      renderAnnotationStage();
+    }
+
+    function fitAnnotationToViewport() {
+      var dom = getAnnotationDom();
+      var image = dom.image;
+      var viewport = dom.viewport;
+      if (!image || !viewport) return;
+
+      var naturalWidth = image.naturalWidth || ANNOTATION_STATE.imageWidth || 0;
+      var naturalHeight = image.naturalHeight || ANNOTATION_STATE.imageHeight || 0;
+      if (!naturalWidth || !naturalHeight) return;
+
+      var viewportWidth = Math.max(0, viewport.clientWidth - 24);
+      var viewportHeight = Math.max(0, viewport.clientHeight - 24);
+      if (!viewportWidth || !viewportHeight) return;
+
+      var ratio = Math.min(viewportWidth / naturalWidth, viewportHeight / naturalHeight);
+      if (!Number.isFinite(ratio) || ratio <= 0) return;
+
+      var percent = clamp(Math.floor(ratio * 100), ANNOTATION_ZOOM_MIN, ANNOTATION_ZOOM_MAX);
+      ANNOTATION_VIEW_STATE.zoomPercent = percent;
+      applyAnnotationImageZoom();
+      viewport.scrollTop = 0;
+      viewport.scrollLeft = 0;
       renderAnnotationStage();
     }
 

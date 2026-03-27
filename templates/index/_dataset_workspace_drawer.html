@@ -169,14 +169,22 @@
                 <label class="block">
                   <span class="mb-2 block text-sm font-medium text-slate-700">缩放</span>
                   <select id="annotationZoomSelect" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100">
+                    <option value="25" selected>25%</option>
+                    <option value="33">33%</option>
+                    <option value="50">50%</option>
+                    <option value="67">67%</option>
+                    <option value="75">75%</option>
                     <option value="100">100%</option>
                     <option value="125">125%</option>
-                    <option value="150" selected>150%</option>
+                    <option value="150">150%</option>
                     <option value="175">175%</option>
                     <option value="200">200%</option>
                     <option value="250">250%</option>
                   </select>
                 </label>
+                <button id="annotationFitBtn" type="button" class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                  适应窗口
+                </button>
                 <button id="annotationSaveBtn" type="button" disabled class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">保存标注</button>
                 <button id="annotationRemoveBtn" type="button" disabled class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400">删除选中框</button>
                 <button id="annotationClearBtn" type="button" disabled class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400">清空</button>
@@ -193,7 +201,7 @@
             </div>
             <div id="annotationStageWrapper" class="mt-4 hidden min-w-0">
               <div class="relative max-h-[78vh] overflow-hidden rounded-3xl border border-slate-200 bg-slate-950/5 p-3">
-                <div class="max-h-[72vh] overflow-auto">
+                <div id="annotationViewport" class="max-h-[72vh] overflow-auto">
                   <div id="annotationStage" class="relative mx-auto w-fit min-w-full cursor-crosshair select-none">
                   <img id="annotationImage" src="" alt="" class="block max-w-none rounded-2xl object-contain" draggable="false" />
                   <div id="annotationOverlay" class="absolute inset-0"></div>
@@ -207,7 +215,7 @@
                 <code class="rounded bg-white px-2 py-1 text-[11px] text-slate-700">Delete</code>
                 删除选中框、
                 <code class="rounded bg-white px-2 py-1 text-[11px] text-slate-700">← / →</code>
-                切图。超大图片只会在右侧标注区内部滚动，不会再把左侧素材列表挤掉。
+                切图。现在默认以 25% 缩放打开高分辨率图片，也可以点击“适应窗口”自动缩放到刚好完整显示；超大图片只会在右侧标注区内部滚动，不会再把左侧素材列表挤掉。
               </div>
             </div>
             <div id="datasetAssetPreviewMeta" class="mt-4 text-sm leading-7 text-slate-600"></div>
