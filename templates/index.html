@@ -58,15 +58,15 @@
       }
     };
   </script>
-  <script src="{{ url_for('static', filename='js/index-page/tasks.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/index-page/dispatch.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/index-page/dataset.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/index-page/training.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/index-page/annotation.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/index-page/results.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/index-page/face-library.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/index-page/auth.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='js/index-page/bootstrap.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/detection/tasks.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/dispatch/dispatch.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/training/dataset.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/training/training.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/training/annotation.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/detection/results.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/face/face-library.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='shared/js/auth.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='shared/js/bootstrap.js') }}" defer></script>
 </head>
 <body class="min-h-screen text-slate-900">
   <svg width="0" height="0" class="absolute">
@@ -273,11 +273,11 @@
 
       <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr),360px]">
         <main class="space-y-6">
-          {% include 'index/_oracle_tab.html' %}
-          {% include 'index/_upload_tab.html' %}
-          {% include 'index/_train_tab.html' %}
-          {% include 'index/_dispatch_tab.html' %}
-          {% include 'index/_face_tab.html' %}
+          {% include 'modules/detection/_oracle_tab.html' %}
+          {% include 'modules/detection/_upload_tab.html' %}
+          {% include 'modules/training/_train_tab.html' %}
+          {% include 'modules/dispatch/_dispatch_tab.html' %}
+          {% include 'modules/face/_face_tab.html' %}
         </main>
 
         <aside class="space-y-6">
@@ -313,9 +313,9 @@
     </section>
   </div>
 
-  {% include 'index/_dataset_workspace_drawer.html' %}
-  {% include 'index/_result_detail_drawer.html' %}
-  {% include 'index/_result_import_drawer.html' %}
-  {% include 'index/_person_detail_drawer.html' %}
+  {% include 'modules/training/_dataset_workspace_drawer.html' %}
+  {% include 'modules/detection/_result_detail_drawer.html' %}
+  {% include 'modules/training/_result_import_drawer.html' %}
+  {% include 'modules/face/_person_detail_drawer.html' %}
 </body>
 </html>

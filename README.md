@@ -24,36 +24,60 @@
 
 ```
 multi-rider/
-├── app.py                   # Flask 入口，注册 Blueprint
-├── config.py                # 全局配置（环境变量覆盖）
+├── app.py                   # Flask 入口，注册各业务模块 Blueprint
 ├── requirements.txt         # 直接依赖
 ├── requirements.lock        # uv 生成的完整锁文件
-├── Dockerfile               # Linux Docker 镜像定义
-├── db/
-│   ├── oracle.py            # Oracle 连接与 SQL 构建
-│   └── sqlite.py            # SQLite 任务历史持久化
-├── routes/
-│   ├── job_routes.py        # /  /start  /progress  /cancel  /jobs  /history
-│   ├── file_routes.py       # /download/<job_id>
-│   └── upload_routes.py     # /upload/start  /upload/progress  /upload/download
-├── service/
-│   ├── infer_service.py     # YOLO 模型加载与批量推理
-│   ├── job_service.py       # Oracle 任务生命周期（内存 + SQLite）
-│   └── upload_job_service.py# 上传任务生命周期（ZIP 解析、视频帧提取）
-├── utils/
-│   └── helpers.py           # 时间/文件名工具函数
+├── modules/
+│   ├── detection/           # 检测模块：数据库检测、本地上传、结果下载
+│   ├── face/                # 人脸模块：人脸库、识别、身份核验
+│   ├── dispatch/            # 下发模块：认证、队列、短信、任务下发
+│   └── training/            # 训练模块：数据集、预标注、训练、模型注册
+├── shared/
+│   ├── config/              # 全局配置与环境变量加载
+│   ├── db/                  # SQLite / Oracle 等共享存储与数据库接入
+│   ├── inference/           # YOLO 模型加载与批量推理
+│   ├── ownership/           # 会话归属 / 访问隔离
+│   └── utils/               # 通用工具函数
 ├── templates/
-│   ├── index.html           # 主页（双 Tab）
-│   └── history.html         # 历史记录页
+│   ├── index.html           # 工作台壳层
+│   └── modules/             # 按模块拆分的页面片段与页面模板
 ├── static/
+│   ├── modules/             # 按模块拆分的前端脚本
+│   ├── shared/              # 共享前端脚本
 │   └── tailwind.min.js      # Tailwind CSS 本地文件（内网无需 CDN）
+├── docs/                    # 方案文档、交接记录、设计稿、辅助脚本
+├── ops/
+│   ├── Dockerfile           # Linux Docker 镜像定义
+│   └── app.env.example      # 环境变量模板
 ├── model/                   # 模型文件（不入库）
 ├── output/                  # 推理结果 ZIP 输出目录
 ├── upload_tmp/              # 视频上传临时目录（推理后自动清理）
-├── instantclient_11_2/      # Oracle Instant Client（不入库，Windows/Linux 版本不同）
-└── deploy/
-    └── app.env.example      # 环境变量模板
+└── instantclient_11_2/      # Oracle Instant Client（不入库，Windows/Linux 版本不同）
 ```
+
+## 代码导航
+
+- 检测相关后端：`modules/detection/`
+- 人脸识别与身份核验：`modules/face/`
+- 任务下发与短信：`modules/dispatch/`
+- 训练、预标注、模型注册：`modules/training/`
+- 全局配置与环境变量：`shared/config/config.py`
+- 共享数据库接入：`shared/db/`
+- 共享推理能力：`shared/inference/infer_service.py`
+- 工作台页面壳层：`templates/index.html`
+- 模块页面模板：`templates/modules/`
+- 模块前端脚本：`static/modules/`
+- 运维与部署材料：`ops/`
+- 方案、交接、设计稿：`docs/`
+
+## 运行目录维护
+
+- `output/`：检测结果 ZIP 和 `_results/` 清单目录。需要保留历史结果时不要直接清空；如仅做演示，可定期删除旧任务目录与旧 ZIP。
+- `upload_tmp/`：上传过程中的临时目录。正常结束后会自动清理；若异常中断后残留，可手动清空。
+- `logs/`：启动器和运行日志。当前仓库里常见的是 `app.stdout.log`、`app.stderr.log`；可按时间轮转或定期删除旧日志。
+- `train_runs/`：训练运行输出目录。仅在实际训练后产生内容，通常体积较大，建议按任务完成情况归档或清理。
+- `datasets/`：训练数据集目录。这里是业务数据，不应像缓存目录那样随意清空。
+- `jobs.sqlite3`：SQLite 历史与任务状态库。删除会丢失历史记录、训练任务记录和数据集元信息，清理前应先备份。
 
 ## 环境变量
 
@@ -116,7 +140,7 @@ $env:YOLO_TELEMETRY   = "false"
 $env:ORACLE_HOST      = "oracledb.example.com"
 $env:ORACLE_PASSWORD  = "你的数据库密码"
 $env:FLASK_SECRET_KEY = "改成随机字符串"
-# 其他变量按需修改，不设置则使用 config.py 中的默认值
+# 其他变量按需修改，不设置则使用 shared/config/config.py 中的默认值
 ```
 
 ### 3. 启动服务
@@ -174,7 +198,7 @@ http://本机IP:5001/
 ```bash
 cd multi-rider
 
-docker build -t multi-rider:latest .
+docker build -f ops/Dockerfile -t multi-rider:latest .
 
 # 导出为 tar 供离线传输
 docker save -o multi-rider_latest.tar multi-rider:latest
@@ -194,7 +218,7 @@ sha256sum multi-rider_latest.tar > multi-rider_latest.tar.sha256
 ```
 multi-rider_latest.tar
 multi-rider_latest.tar.sha256
-deploy/app.env.example
+ops/app.env.example
 ```
 
 ### 3. 在内网服务器上部署
@@ -208,7 +232,7 @@ sudo docker load -i multi-rider_latest.tar
 
 # 准备目录和配置文件
 sudo mkdir -p /opt/multi-rider/output /opt/multi-rider/upload_tmp
-sudo cp app.env.example /opt/multi-rider/app.env
+sudo cp ops/app.env.example /opt/multi-rider/app.env
 sudo vi /opt/multi-rider/app.env
 # 至少修改以下两项：
 #   ORACLE_PASSWORD=你的数据库密码

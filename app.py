@@ -3,7 +3,7 @@ import os
 from flask import Flask, jsonify
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from config import (
+from shared.config.config import (
     APP_HOST,
     APP_PORT,
     FLASK_SECRET_KEY,
@@ -12,14 +12,14 @@ from config import (
     MODEL_DEFAULT,
     logger,
 )
-from db.sqlite import cleanup_old_jobs, init_db, mark_running_jobs_interrupted
-from routes.dispatch_routes import dispatch_bp
-from routes.face_routes import face_bp
-from routes.file_routes import file_bp
-from routes.job_routes import job_bp
-from routes.train_routes import train_bp
-from routes.upload_routes import upload_bp
-from service.infer_service import get_model
+from shared.db.sqlite import cleanup_old_jobs, init_db, mark_running_jobs_interrupted
+from modules.detection.file_routes import file_bp
+from modules.detection.job_routes import job_bp
+from modules.detection.upload_routes import upload_bp
+from modules.dispatch.routes import dispatch_bp
+from modules.face.routes import face_bp
+from modules.training.routes import train_bp
+from shared.inference.infer_service import get_model
 
 
 def create_app() -> Flask:

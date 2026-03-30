@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.env
+.mcp/
 
 dist/
 .remote_check_*/
