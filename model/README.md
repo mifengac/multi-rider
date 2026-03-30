@@ -4,8 +4,8 @@ Model directory notes
 Current runtime focus:
 - `biaochezhajiev2.pt`: private production model for wheelie detection
 - `yolov8s-worldv2.pt`: default open-vocabulary runtime model
-- `yolo26n.pt`: low-compute training base model
-- `yolo26s.pt`: balanced training base model
+- `yolo26n.pt`: 26年最新微型版，仅5M，适合极低算力场景
+- `yolo26s.pt`: 26年最新小型版，19M，平衡速度与精度进行训练
 - `det_10g.onnx`, `w600k_r50.onnx`: face detection and face recognition models
 - `mobileclip_blt.ts`, `ViT-B-32.pt`: prompt-model text assets
 
