@@ -107,8 +107,8 @@ multi-rider/
 
 ### 前提条件
 
-- Python 3.10 或以上（推荐通过官网离线安装包安装）
-- Oracle Instant Client **Windows 版**（`.dll` 文件），解压到 `instantclient_11_2\`
+- Python 3.12（推荐通过官网离线安装包安装，或使用已存在的 `.venv`）
+- Oracle Instant Client **Windows 版**（`.dll` 文件），解压到 `instantclient_11_2`
   - 需包含 `oci.dll`、`oraocci11.dll`、`oraociei11.dll` 等
 - 模型文件已放入 `model\`：`biaochezhajiev2.pt`、`yolov8s-worldv2.pt`
 - `static\tailwind.min.js` 已存在（已包含在仓库）
@@ -120,16 +120,26 @@ multi-rider/
 cd multi-rider
 
 # 使用 uv（推荐）
-uv venv .venv
-.venv\Scripts\Activate.ps1
-uv pip install -r requirements.txt
+uv venv .venv --python 3.12
+uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements-dev.txt
 
 # 单独安装 torch CPU 版（从 PyTorch 官方离线包安装）
-uv pip install torch==2.8.0+cpu torchvision==0.23.0+cpu `
+uv pip install --python .\.venv\Scripts\python.exe torch==2.8.0+cpu torchvision==0.23.0+cpu `
     --index-url https://download.pytorch.org/whl/cpu
 ```
 
 > 如果事先已下载 `.whl` 文件，可用 `uv pip install ./torch-*.whl` 离线安装。
+
+### 1.1 运行测试
+
+```powershell
+$env:FACE_SQL_ENABLED = "false"
+$env:DISPATCH_MOCK_MODE = "true"
+$env:YOLO_TELEMETRY = "false"
+uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest
+```
 
 ### 2. 配置环境变量
 

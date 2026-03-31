@@ -10,7 +10,7 @@ charset-normalizer==3.4.4
     # via requests
 click==8.1.8
     # via flask
-./vendor/wheels/clip-1.0-py3-none-any.whl
+clip==1.0
     # via -r requirements.txt
 colorama==0.4.6
     # via
