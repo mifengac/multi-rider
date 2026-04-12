@@ -9,9 +9,6 @@ ultralytics==8.4.27
 torch==2.11.0
 torchvision==0.26.0
 
-# PyPI CLIP dependency used by Ultralytics / YOLO-World.
-clip==1.0
-
 # Numerical / image processing
 numpy==2.0.2
 opencv-python-headless>=4.8,<5

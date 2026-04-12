@@ -263,6 +263,7 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_jobs_owner_start_ts ON jobs(owner_ip, start_ts DESC)"
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_end_ts ON jobs(end_ts)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
 
         conn.execute(
             """
@@ -427,6 +428,7 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_train_jobs_owner_ip_created_ts ON train_jobs(owner_ip, created_ts DESC)"
         )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_train_jobs_status ON train_jobs(status)")
 
         conn.execute(
             """
@@ -502,6 +504,7 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_auto_annotate_jobs_owner_ip_created_ts ON auto_annotate_jobs(owner_ip, created_ts DESC)"
         )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_auto_annotate_jobs_status ON auto_annotate_jobs(status)")
 
         conn.execute(
             """
@@ -574,6 +577,9 @@ def init_db() -> None:
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_dispatch_queue_owner_source_face_person ON dispatch_queue(owner_key, source_job_id, source_asset_id, face_index, person_id_no)"
         )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dispatch_queue_status ON dispatch_queue(dispatch_status)"
+        )
 
         conn.execute(
             """
@@ -614,6 +620,10 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_dispatch_sms_records_owner_created_ts ON dispatch_sms_records(owner_key, created_ts DESC)"
         )
+
+        from shared.task_queue import init_task_queue_table
+        init_task_queue_table(conn)
+
         conn.commit()
 
 

@@ -36,6 +36,7 @@ from modules.face.services.identity_service import (
     get_face_models,
     load_image,
 )
+from modules.face.services.vector_store import VectorIndex
 
 
 PHOTO_DIR = os.path.join(FACE_DATA_DIR, "photos")
@@ -69,6 +70,7 @@ class PersonRecord:
 _CACHE_LOCK = threading.Lock()
 _PERSON_CACHE: list[PersonRecord] | None = None
 _MATRIX_CACHE: np.ndarray | None = None
+_VECTOR_INDEX: VectorIndex | None = None
 _CACHE_MTIME: float | None = None
 
 
@@ -172,10 +174,11 @@ def _save_meta(meta: dict[str, Any]) -> None:
 
 
 def _invalidate_cache() -> None:
-    global _PERSON_CACHE, _MATRIX_CACHE, _CACHE_MTIME
+    global _PERSON_CACHE, _MATRIX_CACHE, _VECTOR_INDEX, _CACHE_MTIME
     with _CACHE_LOCK:
         _PERSON_CACHE = None
         _MATRIX_CACHE = None
+        _VECTOR_INDEX = None
         _CACHE_MTIME = None
 
 
@@ -244,7 +247,7 @@ def _load_cached_matrix() -> tuple[list[PersonRecord], np.ndarray]:
         return [], np.empty((0, 512), dtype=np.float32)
 
     mtime = os.path.getmtime(DB_CACHE_FILE)
-    global _PERSON_CACHE, _MATRIX_CACHE, _CACHE_MTIME
+    global _PERSON_CACHE, _MATRIX_CACHE, _VECTOR_INDEX, _CACHE_MTIME
     with _CACHE_LOCK:
         if _PERSON_CACHE is not None and _MATRIX_CACHE is not None and _CACHE_MTIME == mtime:
             return _PERSON_CACHE, _MATRIX_CACHE
@@ -254,6 +257,10 @@ def _load_cached_matrix() -> tuple[list[PersonRecord], np.ndarray]:
         matrix = np.stack([person.embedding for person in valid]).astype(np.float32) if valid else np.empty((0, 512), dtype=np.float32)
         _PERSON_CACHE = valid
         _MATRIX_CACHE = matrix
+        # Build vector index for fast search
+        vi = VectorIndex(dim=512)
+        vi.build(matrix)
+        _VECTOR_INDEX = vi
         _CACHE_MTIME = mtime
         return valid, matrix
 
@@ -532,16 +539,17 @@ def identify_image_path(image_path: str, top_k: int | None = None) -> dict[str, 
     if db_matrix.size == 0:
         return {"status": "library_unavailable", "error": "face library has no valid embeddings", "face_count": 0, "faces": []}
 
+    # Use VectorIndex (hnswlib or numpy fallback) for fast search
+    vi = _VECTOR_INDEX
     face_results = []
     overall_status = "no_match"
     for embedding, info in faces:
-        scores = db_matrix @ embedding
-        top_indexes = np.argsort(scores)[::-1][:top_k]
+        top_indexes, scores = vi.query(embedding, k=top_k)
         matches = []
-        for index in top_indexes:
-            score = float(scores[index])
+        for idx, score in zip(top_indexes, scores):
+            score = float(score)
             if score >= FACE_SIMILARITY_THR:
-                matches.append(_person_payload(persons[index], score))
+                matches.append(_person_payload(persons[int(idx)], score))
 
         face_status = "matched" if matches else ("low_quality" if info.get("quality") == "low_quality" else "no_match")
         if face_status == "matched":

@@ -144,6 +144,11 @@ def _run_job(
     classes_raw: str,
     model_key: str,
 ) -> None:
+    # Persist the job immediately so it survives a process restart.
+    with JOBS_LOCK:
+        snapshot = _job_snapshot(JOBS[job_id])
+    _save_terminal_job(snapshot)
+
     try:
         model = get_model(model_key)
         result_store = create_result_store(job_id, "oracle", "oracle", "oracle")

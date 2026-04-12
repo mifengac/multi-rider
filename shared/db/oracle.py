@@ -78,11 +78,62 @@ def _connect_oracle(host: str, port: int, service: str, user: str, password: str
     raise RuntimeError("Oracle driver not available")
 
 
+# ---------------------------------------------------------------------------
+# Connection pools – reuse TCP connections instead of connect-per-query.
+# Pools are created lazily on first use and kept for the process lifetime.
+# ---------------------------------------------------------------------------
+_oracle_pool = None
+_sms_oracle_pool = None
+
+
+def _create_pool(host: str, port: int, service: str, user: str, password: str):
+    """Create an oracledb connection pool (falls back to single-connect if
+    the driver does not support pooling)."""
+    dsn = f"{host}:{port}/{service}"
+    if oracledb is not None and hasattr(oracledb, "create_pool"):
+        return oracledb.create_pool(
+            user=user, password=password, dsn=dsn,
+            min=2, max=8, increment=1,
+        )
+    # cx_Oracle pool (older driver)
+    if cx_oracle is not None and hasattr(cx_oracle, "SessionPool"):
+        return cx_oracle.SessionPool(
+            user=user, password=password, dsn=dsn,
+            min=2, max=8, increment=1,
+        )
+    return None
+
+
+def _get_oracle_pool():
+    global _oracle_pool
+    if _oracle_pool is None:
+        _oracle_pool = _create_pool(
+            ORACLE_HOST, ORACLE_PORT, ORACLE_SERVICE, ORACLE_USER, ORACLE_PASSWORD,
+        )
+    return _oracle_pool
+
+
+def _get_sms_oracle_pool():
+    global _sms_oracle_pool
+    if _sms_oracle_pool is None:
+        _sms_oracle_pool = _create_pool(
+            SMS_ORACLE_HOST, SMS_ORACLE_PORT, SMS_ORACLE_SERVICE,
+            SMS_ORACLE_USER, SMS_ORACLE_PASSWORD,
+        )
+    return _sms_oracle_pool
+
+
 def get_oracle_connection():
+    pool = _get_oracle_pool()
+    if pool is not None:
+        return pool.acquire()
     return _connect_oracle(ORACLE_HOST, ORACLE_PORT, ORACLE_SERVICE, ORACLE_USER, ORACLE_PASSWORD)
 
 
 def get_sms_oracle_connection():
+    pool = _get_sms_oracle_pool()
+    if pool is not None:
+        return pool.acquire()
     return _connect_oracle(
         SMS_ORACLE_HOST,
         SMS_ORACLE_PORT,

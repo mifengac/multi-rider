@@ -4,9 +4,8 @@ from flask import Blueprint, jsonify, render_template, request, send_file, url_f
 
 from shared.config.config import MODEL_DIR, get_upload_model_options, logger
 from shared.db.sqlite import get_job as get_saved_job
-from modules.detection.services.job_service import get_job_snapshot
+from shared.job_lookup import resolve_job
 from modules.detection.services.result_store_service import load_result_manifest
-from modules.detection.services.upload_job_service import get_upload_job_snapshot
 from modules.training.services.auto_annotate_service import auto_annotate_dataset_assets
 from modules.training.services.auto_annotate_task_service import (
     get_auto_annotate_job_snapshot,
@@ -58,13 +57,7 @@ def _parse_bool(value) -> bool:
 
 
 def _resolve_result_job(job_id: str) -> dict | None:
-    job = get_job_snapshot(job_id)
-    if job is not None:
-        return job
-    upload_job = get_upload_job_snapshot(job_id)
-    if upload_job is not None:
-        return upload_job
-    return get_saved_job(job_id)
+    return resolve_job(job_id)
 
 
 def _serialize_asset(dataset_id: str, item: dict) -> dict:

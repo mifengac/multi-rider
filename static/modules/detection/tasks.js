@@ -187,32 +187,34 @@
     function renderRunningJobs(items) {
       const box = document.getElementById('jobsInfo');
       if (!items || items.length === 0) {
-        box.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-5 text-sm text-slate-500">当前没有运行中的任务。</div>';
+        box.innerHTML =
+          '<div class="task-item" style="opacity:0.5;">' +
+            '<div class="task-indicator" style="background:#8aaac8;"></div>' +
+            '<div class="task-item-body">' +
+              '<div class="task-item-name">暂无运行中的任务</div>' +
+              '<div class="task-item-meta">等待任务启动...</div>' +
+            '</div>' +
+          '</div>';
         return;
       }
 
       box.innerHTML = items.map(function (job) {
-        const pct = formatPercent(job.processed || 0, job.total || 0);
-        const meta = statusMeta(job.status || 'running');
+        const pct   = formatPercent(job.processed || 0, job.total || 0);
+        const meta  = statusMeta(job.status || 'running');
+        const isRun = (job.status === 'running');
+        const dotColor = isRun ? '#3b82f6' : '#8aaac8';
+        const spinClass = isRun ? ' spin' : '';
         return (
-          '<div class="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm shadow-slate-200/60">' +
-            '<div class="flex items-start justify-between gap-3">' +
-              '<div>' +
-                '<div class="text-xs uppercase tracking-[0.25em] text-slate-400">JOB</div>' +
-                '<div class="mt-1 break-all font-mono text-xs text-slate-600">' + (job.id || '') + '</div>' +
+          '<div class="task-item">' +
+            '<div class="task-indicator' + spinClass + '" style="background:' + dotColor + ';"></div>' +
+            '<div class="task-item-body">' +
+              '<div class="task-item-name">' + (job.id || '') + '</div>' +
+              '<div class="task-item-meta">' + modelDisplay(job.model_key || 'general') + ' · ' + (job.processed || 0) + '/' + (job.total || 0) + '</div>' +
+              '<div class="task-bar-outer">' +
+                '<div class="task-bar-inner" style="width:' + pct + '%;"></div>' +
               '</div>' +
-              '<div class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ' + meta.badge + '">' + meta.label + '</div>' +
             '</div>' +
-            '<div class="mt-3 flex items-center justify-between text-sm text-slate-600">' +
-              '<span>模型：' + modelDisplay(job.model_key || 'general') + '</span>' +
-              '<span>' + (job.processed || 0) + '/' + (job.total || 0) + ' · ' + pct + '%</span>' +
-            '</div>' +
-            '<div class="mt-3 h-2 rounded-full bg-slate-100">' +
-              '<div class="h-2 rounded-full ' + meta.bar + '" style="width:' + pct + '%"></div>' +
-            '</div>' +
-            '<div class="mt-4 flex justify-end">' +
-              '<button type="button" class="rounded-full bg-rose-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-600" onclick="cancelJob(\'' + (job.id || '') + '\')">停止任务</button>' +
-            '</div>' +
+            '<div style="font-size:11px; color:#2563eb; font-weight:700; flex-shrink:0; padding-left:6px;">' + pct + '%</div>' +
           '</div>'
         );
       }).join('');
@@ -223,8 +225,20 @@
         .then(function (resp) { return resp.json(); })
         .then(function (data) {
           if (!data.ok) return;
-          document.getElementById('runningCount').textContent = data.running_count || 0;
-          renderRunningJobs(data.running || []);
+          // Update quick stats bar
+          var running = data.running || [];
+          var runningCount = data.running_count || running.length || 0;
+          var qsRun  = document.getElementById('runningCount');
+          if (qsRun)  qsRun.textContent  = runningCount;
+          var qsDone   = document.getElementById('qs-done');
+          var qsPend   = document.getElementById('qs-pending');
+          var qsKept   = document.getElementById('qs-kept');
+          var qsFailed = document.getElementById('qs-failed');
+          if (qsDone   && data.done_count   !== undefined) qsDone.textContent   = data.done_count;
+          if (qsPend   && data.queue_count  !== undefined) qsPend.textContent   = data.queue_count;
+          if (qsKept   && data.kept_count   !== undefined) qsKept.textContent   = data.kept_count;
+          if (qsFailed && data.failed_count !== undefined) qsFailed.textContent = data.failed_count;
+          renderRunningJobs(running);
         })
         .catch(function () {})
         .finally(function () {
@@ -308,6 +322,14 @@
 
     // ==================== UPLOAD TAB ====================
 
+    var TAB_META = {
+      Oracle:   { title: '数据检测与研判', subtitle: '查询 Oracle 内网数据库，对已采集的目标图像执行 AI 检测与结果研判', btnLabel: '▶ 新建检测任务' },
+      Upload:   { title: '现场素材研判',   subtitle: '上传视频或图片，直接在系统内执行 AI 检测分析', btnLabel: '▶ 上传素材' },
+      Face:     { title: '人脸识别与人员核验', subtitle: '识别结果人员与底库交叉比对，后台自动触发流转', btnLabel: '同步人脸库' },
+      Train:    { title: '模型自训练',     subtitle: '将实战结果数据回流训练集，沉淀专项识别能力', btnLabel: '开始训练' },
+      Dispatch: { title: '任务下发',       subtitle: '向现场执法单位推送告知单，提高处置响应速度', btnLabel: '下发全部' }
+    };
+
     function switchTab(tab) {
       var panels = {
         Oracle: document.getElementById('tabOracle'),
@@ -335,6 +357,14 @@
         buttons[tab].classList.add('active');
         buttons[tab].setAttribute('aria-current', 'page');
       }
+      // Update content header
+      var meta = TAB_META[tab] || {};
+      var titleEl = document.getElementById('contentTitle');
+      var subEl   = document.getElementById('contentSubtitle');
+      var btnEl   = document.getElementById('headerPrimaryBtn');
+      if (titleEl) titleEl.textContent = meta.title || tab;
+      if (subEl)   subEl.textContent   = meta.subtitle || '';
+      if (btnEl)   btnEl.textContent   = meta.btnLabel || '';
       if (tab === 'Face') {
         refreshFaceTab();
       } else if (tab === 'Train') {

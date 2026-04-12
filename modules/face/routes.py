@@ -4,15 +4,14 @@ from flask import Blueprint, jsonify, request, send_file, url_for
 
 from shared.db.sqlite import get_job as get_saved_job
 from shared.db.sqlite import save_job
-from modules.detection.services.job_service import get_job_snapshot
+from shared.job_lookup import resolve_job
 from modules.detection.services.result_store_service import (
     attach_identity_to_manifest_items,
     load_identity_report_for_manifest,
     load_result_manifest,
     persist_identity_results,
 )
-from modules.detection.services.upload_job_service import get_upload_job_snapshot
-from modules.dispatch.services.queue_service import ingest_identity_results
+from shared.events import emit
 from modules.face.services.library_service import (
     get_face_library_photo_path,
     get_face_library_status,
@@ -33,13 +32,7 @@ face_bp = Blueprint("face", __name__, url_prefix="/face")
 
 
 def _resolve_job(job_id: str) -> dict | None:
-    job = get_job_snapshot(job_id)
-    if job is not None:
-        return job
-    upload_job = get_upload_job_snapshot(job_id)
-    if upload_job is not None:
-        return upload_job
-    return get_saved_job(job_id)
+    return resolve_job(job_id)
 
 
 def _job_manifest(job_id: str) -> tuple[dict | None, dict | None]:
@@ -235,7 +228,14 @@ def identify_faces():
 
     dispatch_flow = {"created": 0, "updated": 0, "items": []}
     try:
-        dispatch_flow = ingest_identity_results(owner_key, owner_ip, job, items)
+        emit(
+            "identity_matched",
+            owner_key=owner_key,
+            owner_ip=owner_ip,
+            job=job,
+            items=items,
+            result=dispatch_flow,
+        )
     except Exception as exc:
         logger.exception("failed to flow identity results into dispatch queue for job %s: %s", job_id, exc)
 

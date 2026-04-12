@@ -1,1 +1,0 @@
-现在这个项目只是识别到了图片,但是图片中的人的身份无法确认,所以你参考scripts\0312face_recognition_pipeline.py帮我将insightface的功能加到当前项目中,用figma设计,

@@ -31,7 +31,6 @@ from modules.detection.services.result_store_service import (
     load_identity_report,
     load_result_manifest,
 )
-from modules.face.services.library_service import get_face_library_status
 from shared.utils.helpers import (
     default_time_range,
     ensure_hours_list,
@@ -43,6 +42,12 @@ from shared.ownership.ownership import get_request_owner, job_matches_owner
 
 
 job_bp = Blueprint("job", __name__)
+
+
+def _get_face_library_status() -> dict:
+    """Lazy import to avoid circular dependency on face module at import time."""
+    from modules.face.services.library_service import get_face_library_status
+    return get_face_library_status()
 
 
 def _progress_payload(job: dict) -> dict:
@@ -312,6 +317,49 @@ def history_detail(job_id: str):
         },
         "items": items,
         "identity_summary": identity_report.get("summary") or (record.get("identity_summary") or {}),
-        "library": get_face_library_status(),
+        "library": _get_face_library_status(),
     }
     return jsonify(payload)
+
+
+@job_bp.get("/api/dashboard/stats")
+def dashboard_stats():
+    """Return real-time header stats: today's identity matches and pending dispatch count."""
+    import sqlite3 as _sqlite3
+    import time as _time
+    from shared.config.config import SQLITE_DB_PATH as _DB_PATH
+
+    owner_key, owner_ip = get_request_owner(request)
+
+    today_start = int(_time.time()) - (_time.time() % 86400)  # midnight UTC approx
+    # More accurate: midnight local calendar day
+    import datetime as _dt
+    now_local = _dt.datetime.now()
+    today_midnight = _dt.datetime(now_local.year, now_local.month, now_local.day).timestamp()
+
+    today_matched = 0
+    pending_dispatch = 0
+
+    try:
+        conn = _sqlite3.connect(_DB_PATH, timeout=5)
+        conn.row_factory = _sqlite3.Row
+
+        # "今日命中" = dispatch_queue entries created today for this user
+        row = conn.execute(
+            "SELECT COUNT(*) AS cnt FROM dispatch_queue WHERE created_ts >= ? AND (owner_key=? OR owner_ip=?)",
+            (int(today_midnight), owner_key, owner_ip),
+        ).fetchone()
+        today_matched = row["cnt"] if row else 0
+
+        # "待下发" = dispatch_queue entries pending for this user
+        row2 = conn.execute(
+            "SELECT COUNT(*) AS cnt FROM dispatch_queue WHERE dispatch_status='pending' AND (owner_key=? OR owner_ip=?)",
+            (owner_key, owner_ip),
+        ).fetchone()
+        pending_dispatch = row2["cnt"] if row2 else 0
+
+        conn.close()
+    except Exception:
+        pass
+
+    return jsonify({"ok": True, "today_matched": today_matched, "pending_dispatch": pending_dispatch})

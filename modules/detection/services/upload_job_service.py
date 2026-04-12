@@ -378,6 +378,15 @@ def _run_upload_job(
     temp_dir: str | None,
     frame_interval: int | None = None,
 ) -> None:
+    # Persist the job immediately so it survives a process restart.
+    with UPLOAD_JOBS_LOCK:
+        snapshot = {k: v for k, v in (UPLOAD_JOBS.get(job_id) or {}).items() if k != "cancel"}
+    if snapshot:
+        try:
+            save_job(snapshot)
+        except Exception as exc:
+            logger.warning("early persist upload job %s failed: %s", job_id, exc)
+
     result_store = None
     zip_path = os.path.join(OUTPUT_DIR, f"upload_{job_id}.zip")
 

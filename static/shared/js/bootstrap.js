@@ -1,3 +1,32 @@
+    function fetchDashboardStats() {
+      fetch('/api/dashboard/stats')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data) return;
+          var hit     = data.today_matched  ?? '--';
+          var pending = data.pending_dispatch ?? '--';
+          // 侧边栏主数字
+          var el1 = document.getElementById('statTodayMatched');
+          var el2 = document.getElementById('statPendingDispatch');
+          if (el1) el1.textContent = hit;
+          if (el2) el2.textContent = pending;
+          // 右面板统计
+          var ph = document.getElementById('panelStatHit');
+          var pp = document.getElementById('panelStatPending');
+          if (ph) ph.textContent = hit;
+          if (pp) pp.textContent = pending;
+          // 顶部状态栏
+          var th = document.getElementById('topBarHit');
+          var tp = document.getElementById('topBarPending');
+          if (th) th.textContent = hit;
+          if (tp) tp.textContent = pending;
+          // 导航徽章
+          var badge = document.getElementById('navBadgePending');
+          if (badge) badge.textContent = (typeof pending === 'number' ? pending : data.pending_dispatch) || 0;
+        })
+        .catch(function () {});
+    }
+
     window.addEventListener('load', function () {
       if (typeof initAppAuth === 'function') {
         initAppAuth();
@@ -7,6 +36,8 @@
       applyModelUI();
       syncConfValue();
       refreshJobs();
+      fetchDashboardStats();
+      setInterval(fetchDashboardStats, 30000);
 
       populateUploadModelSelect();
       document.getElementById('uploadModelKey').addEventListener('change', applyUploadModelUI);
