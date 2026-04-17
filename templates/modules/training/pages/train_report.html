@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>训练评估 - {{ report.job.dataset_name or report.job.id }}</title>
   <script src="{{ url_for('static', filename='tailwind.min.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/css/editorial-ui.css') }}" />
   <style>
     body {
       font-family: "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -15,7 +16,7 @@
     }
   </style>
 </head>
-<body class="min-h-screen text-slate-900">
+<body class="mr-editorial min-h-screen text-slate-900">
   {% set status_labels = {
     'queued': '排队中',
     'running': '训练中',

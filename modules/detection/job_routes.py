@@ -127,6 +127,11 @@ def index():
     )
 
 
+@job_bp.get("/design-preview")
+def design_preview():
+    return render_template("design_preview.html")
+
+
 @job_bp.route("/start", methods=["GET", "POST", "OPTIONS"])
 def start_job():
     if request.method == "OPTIONS":
