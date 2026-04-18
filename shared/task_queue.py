@@ -1,21 +1,22 @@
 """SQLite-backed durable task queue.
 
-Replaces in-process ``threading.Thread`` dispatching for heavy workloads
-(training, inference, face library rebuild). Tasks survive Web-process
-restarts and can be consumed by the same process or by a dedicated worker.
+This module replaces in-process ``threading.Thread`` dispatching for heavy
+workloads such as training, inference, and face library rebuilds. Tasks survive
+Web-process restarts and can be consumed by a dedicated ``worker.py`` process.
 
-The queue is stored in the same database file used by the rest of the app
+The queue is stored in the same SQLite database used by the rest of the app
 (``SQLITE_DB_PATH``).
 
-Usage — producer (Flask route)::
+Producer example::
 
     from shared.task_queue import submit_task
-    task_id = submit_task("train", payload={"dataset_id": "...", ...})
-    return jsonify({"task_id": task_id})
 
-Usage — consumer (inline or ``worker.py``)::
+    task_id = submit_task("train", payload={"dataset_id": "...", ...})
+
+Consumer example::
 
     from shared.task_queue import claim_task, complete_task, fail_task
+
     row = claim_task("train")
     if row:
         try:
@@ -52,7 +53,7 @@ def _connect() -> sqlite3.Connection:
 
 
 # ---------------------------------------------------------------------------
-# Schema bootstrap – called from init_db()
+# Schema bootstrap - called from init_db()
 # ---------------------------------------------------------------------------
 
 def init_task_queue_table(conn: sqlite3.Connection) -> None:
@@ -98,7 +99,7 @@ def submit_task(
     owner_ip: str = "",
     task_id: str | None = None,
 ) -> str:
-    """Enqueue a new task and return its *task_id*."""
+    """Enqueue a new task and return its task id."""
     task_id = task_id or uuid4().hex
     now = int(time.time())
     with _connect() as conn:
@@ -107,7 +108,14 @@ def submit_task(
             INSERT INTO task_queue (id, task_type, status, payload, owner_key, owner_ip, created_ts)
             VALUES (?, ?, 'pending', ?, ?, ?, ?)
             """,
-            (task_id, task_type, json.dumps(payload or {}, ensure_ascii=False), owner_key, owner_ip, now),
+            (
+                task_id,
+                task_type,
+                json.dumps(payload or {}, ensure_ascii=False),
+                owner_key,
+                owner_ip,
+                now,
+            ),
         )
         conn.commit()
     logger.info("task submitted: %s type=%s", task_id, task_type)
@@ -119,31 +127,51 @@ def submit_task(
 # ---------------------------------------------------------------------------
 
 def claim_task(task_type: str | None = None) -> dict[str, Any] | None:
-    """Atomically claim the oldest pending task (optionally filtered by *task_type*).
+    """Atomically claim the oldest pending task.
 
-    Returns a plain ``dict`` with ``id``, ``task_type``, ``payload`` (parsed),
-    ``owner_key``, ``owner_ip``, or ``None`` when the queue is empty.
+    When *task_type* is provided, only tasks of that type are considered. The
+    ``BEGIN IMMEDIATE`` transaction prevents multiple worker processes from
+    selecting the same pending row before it is marked as running.
     """
     now = int(time.time())
     with _connect() as conn:
-        if task_type:
-            row = conn.execute(
-                "SELECT * FROM task_queue WHERE status='pending' AND task_type=? ORDER BY created_ts ASC LIMIT 1",
-                (task_type,),
-            ).fetchone()
-        else:
-            row = conn.execute(
-                "SELECT * FROM task_queue WHERE status='pending' ORDER BY created_ts ASC LIMIT 1",
-            ).fetchone()
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            if task_type:
+                row = conn.execute(
+                    """
+                    SELECT * FROM task_queue
+                    WHERE status='pending' AND task_type=?
+                    ORDER BY created_ts ASC, id ASC
+                    LIMIT 1
+                    """,
+                    (task_type,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    """
+                    SELECT * FROM task_queue
+                    WHERE status='pending'
+                    ORDER BY created_ts ASC, id ASC
+                    LIMIT 1
+                    """,
+                ).fetchone()
 
-        if row is None:
-            return None
+            if row is None:
+                conn.commit()
+                return None
 
-        conn.execute(
-            "UPDATE task_queue SET status='running', claimed_ts=? WHERE id=? AND status='pending'",
-            (now, row["id"]),
-        )
-        conn.commit()
+            cur = conn.execute(
+                "UPDATE task_queue SET status='running', claimed_ts=? WHERE id=? AND status='pending'",
+                (now, row["id"]),
+            )
+            if cur.rowcount != 1:
+                conn.rollback()
+                return None
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
     try:
         payload = json.loads(row["payload"])
@@ -233,10 +261,7 @@ def list_tasks(
 
 
 def reset_stale_running(max_age_seconds: int = 3600) -> int:
-    """Reset tasks stuck in *running* for longer than *max_age_seconds* back to *pending*.
-
-    Returns the number of reset rows. Safe to call periodically from the worker loop.
-    """
+    """Reset stale running tasks back to pending and return the changed count."""
     cutoff = int(time.time()) - max_age_seconds
     with _connect() as conn:
         cur = conn.execute(

@@ -1,12 +1,15 @@
 """Standalone task worker process.
 
-Polls the ``task_queue`` table and executes heavy workloads (training,
-face-library rebuild/sync, auto-annotate) **outside** the Flask web process.
+Polls the ``task_queue`` table and executes queued heavy workloads outside the
+Flask web process. Training, auto-annotate, and face-library routes enqueue
+tasks today.
 
 Start manually::
 
     python worker.py                 # consume all task types
     python worker.py --type train    # consume only training tasks
+    python worker.py --type auto_annotate
+    python worker.py --type face_library
 
 The worker runs **one task at a time** (CPU-bound workloads). For
 concurrency, start multiple worker instances with different ``--type``
@@ -44,7 +47,7 @@ _shutdown = False
 def _sig_handler(_signum, _frame):
     global _shutdown
     _shutdown = True
-    logger.info("worker: shutdown signal received, finishing current task …")
+    logger.info("worker: shutdown signal received, finishing current task")
 
 
 signal.signal(signal.SIGINT, _sig_handler)
@@ -52,18 +55,23 @@ signal.signal(signal.SIGTERM, _sig_handler)
 
 
 # ---------------------------------------------------------------------------
-# Task dispatchers — import lazily to avoid loading heavy libs at startup
+# Task dispatchers - import lazily to avoid loading heavy libs at startup
 # ---------------------------------------------------------------------------
 
 
 def _handle_train(payload: dict) -> dict:
     """Run a YOLO training task."""
     from modules.training.services.train_task_service import (
-        _prepare_train_job,
+        get_train_job_snapshot,
         _run_train_job,
     )
 
-    job = _prepare_train_job(payload)
+    job_id = str(payload.get("job_id") or "").strip()
+    if not job_id:
+        raise ValueError("missing train job_id")
+    job = get_train_job_snapshot(job_id)
+    if job is None:
+        raise LookupError(f"train job not found: {job_id}")
     _run_train_job(job)
     return {"job_id": job.get("id"), "status": job.get("status")}
 
@@ -71,10 +79,16 @@ def _handle_train(payload: dict) -> dict:
 def _handle_auto_annotate(payload: dict) -> dict:
     """Run an auto-annotate task."""
     from modules.training.services.auto_annotate_task_service import (
+        get_auto_annotate_job_snapshot,
         _run_auto_annotate_job,
     )
 
-    job = payload.get("job", {})
+    job_id = str(payload.get("job_id") or "").strip()
+    if not job_id:
+        raise ValueError("missing auto annotate job_id")
+    job = get_auto_annotate_job_snapshot(job_id)
+    if job is None:
+        raise LookupError(f"auto annotate job not found: {job_id}")
     asset_ids = payload.get("asset_ids", [])
     _run_auto_annotate_job(job, asset_ids)
     return {"job_id": job.get("id"), "status": job.get("status")}
@@ -82,14 +96,19 @@ def _handle_auto_annotate(payload: dict) -> dict:
 
 def _handle_face_library(payload: dict) -> dict:
     """Run a face library rebuild or sync."""
-    action = payload.get("action", "rebuild")
-    if action == "sync":
-        from modules.face.services.library_service import sync_face_library
-        result = sync_face_library()
-    else:
-        from modules.face.services.library_service import rebuild_face_library
-        result = rebuild_face_library()
-    return result
+    from modules.face.services.library_task_service import (
+        get_face_library_task,
+        _run_face_library_task,
+    )
+
+    job_id = str(payload.get("job_id") or "").strip()
+    if not job_id:
+        raise ValueError("missing face library job_id")
+    job = get_face_library_task(job_id)
+    if job is None:
+        raise LookupError(f"face library job not found: {job_id}")
+    _run_face_library_task(job)
+    return {"job_id": job.get("id"), "status": job.get("status")}
 
 
 HANDLERS: dict[str, callable] = {
@@ -119,7 +138,7 @@ def run_worker(task_type: str | None = None, poll_interval: float = 2.0) -> None
     while not _shutdown:
         task = claim_task(task_type)
         if task is None:
-            # No work — idle sleep then housekeeping.
+            # No work - idle sleep then housekeeping.
             time.sleep(poll_interval)
             now = time.time()
             if now - last_cleanup > 3600:

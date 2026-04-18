@@ -116,13 +116,32 @@ AUTO_ANNOTATE_JOB_COLUMNS = (
     "owner_ip",
 )
 
+FACE_LIBRARY_JOB_COLUMNS = (
+    "id",
+    "action",
+    "status",
+    "message",
+    "stage",
+    "processed",
+    "total",
+    "created_ts",
+    "start_ts",
+    "end_ts",
+    "error",
+    "result_json",
+    "library_json",
+)
+
 
 def _connect() -> sqlite3.Connection:
     parent = os.path.dirname(SQLITE_DB_PATH)
     if parent:
         os.makedirs(parent, exist_ok=True)
-    conn = sqlite3.connect(SQLITE_DB_PATH)
+    conn = sqlite3.connect(SQLITE_DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA synchronous=NORMAL")
     return conn
 
 
@@ -196,6 +215,27 @@ def _row_to_auto_annotate_job(row: sqlite3.Row | None) -> dict[str, Any] | None:
     if row is None:
         return None
     return {column: row[column] for column in AUTO_ANNOTATE_JOB_COLUMNS}
+
+
+def _row_to_face_library_job(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    if row is None:
+        return None
+
+    job = {column: row[column] for column in FACE_LIBRARY_JOB_COLUMNS}
+    try:
+        result = json.loads(job.get("result_json") or "{}")
+    except Exception:
+        result = {}
+    try:
+        library = json.loads(job.get("library_json") or "{}")
+    except Exception:
+        library = {}
+
+    job["result"] = result
+    job["library"] = library
+    job.pop("result_json", None)
+    job.pop("library_json", None)
+    return job
 
 
 def init_db() -> None:
@@ -505,6 +545,57 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_auto_annotate_jobs_owner_ip_created_ts ON auto_annotate_jobs(owner_ip, created_ts DESC)"
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_auto_annotate_jobs_status ON auto_annotate_jobs(status)")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS face_library_jobs (
+                id TEXT PRIMARY KEY,
+                action TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'queued',
+                message TEXT NOT NULL DEFAULT '',
+                stage TEXT NOT NULL DEFAULT '',
+                processed INTEGER NOT NULL DEFAULT 0,
+                total INTEGER NOT NULL DEFAULT 0,
+                created_ts INTEGER NOT NULL DEFAULT 0,
+                start_ts INTEGER,
+                end_ts INTEGER,
+                error TEXT NOT NULL DEFAULT '',
+                result_json TEXT NOT NULL DEFAULT '{}',
+                library_json TEXT NOT NULL DEFAULT '{}'
+            )
+            """
+        )
+
+        face_library_columns = _existing_columns(conn, "face_library_jobs")
+        if "action" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN action TEXT NOT NULL DEFAULT 'rebuild'")
+        if "status" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN status TEXT NOT NULL DEFAULT 'queued'")
+        if "message" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN message TEXT NOT NULL DEFAULT ''")
+        if "stage" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN stage TEXT NOT NULL DEFAULT ''")
+        if "processed" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN processed INTEGER NOT NULL DEFAULT 0")
+        if "total" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN total INTEGER NOT NULL DEFAULT 0")
+        if "created_ts" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN created_ts INTEGER NOT NULL DEFAULT 0")
+        if "start_ts" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN start_ts INTEGER")
+        if "end_ts" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN end_ts INTEGER")
+        if "error" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN error TEXT NOT NULL DEFAULT ''")
+        if "result_json" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN result_json TEXT NOT NULL DEFAULT '{}'")
+        if "library_json" not in face_library_columns:
+            conn.execute("ALTER TABLE face_library_jobs ADD COLUMN library_json TEXT NOT NULL DEFAULT '{}'")
+
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_face_library_jobs_status ON face_library_jobs(status)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_face_library_jobs_created_ts ON face_library_jobs(created_ts DESC)"
+        )
 
         conn.execute(
             """
@@ -1043,6 +1134,88 @@ def list_auto_annotate_jobs(owner_key: str, owner_ip: str, limit: int = 20) -> l
             (owner_key, owner_ip, safe_limit),
         ).fetchall()
     return [_row_to_auto_annotate_job(row) for row in rows if row is not None]
+
+
+def save_face_library_job(job: dict[str, Any]) -> None:
+    payload = {
+        "id": job.get("id", ""),
+        "action": job.get("action", "rebuild"),
+        "status": job.get("status", "queued"),
+        "message": job.get("message", ""),
+        "stage": job.get("stage", ""),
+        "processed": int(job.get("processed") or 0),
+        "total": int(job.get("total") or 0),
+        "created_ts": int(job.get("created_ts") or job.get("start_ts") or 0),
+        "start_ts": job.get("start_ts"),
+        "end_ts": job.get("end_ts"),
+        "error": job.get("error", ""),
+        "result_json": json.dumps(job.get("result") or {}, ensure_ascii=False),
+        "library_json": json.dumps(job.get("library") or {}, ensure_ascii=False),
+    }
+
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO face_library_jobs (
+                id, action, status, message, stage, processed, total, created_ts,
+                start_ts, end_ts, error, result_json, library_json
+            )
+            VALUES (
+                :id, :action, :status, :message, :stage, :processed, :total, :created_ts,
+                :start_ts, :end_ts, :error, :result_json, :library_json
+            )
+            ON CONFLICT(id) DO UPDATE SET
+                action = excluded.action,
+                status = excluded.status,
+                message = excluded.message,
+                stage = excluded.stage,
+                processed = excluded.processed,
+                total = excluded.total,
+                created_ts = excluded.created_ts,
+                start_ts = excluded.start_ts,
+                end_ts = excluded.end_ts,
+                error = excluded.error,
+                result_json = excluded.result_json,
+                library_json = excluded.library_json
+            """,
+            payload,
+        )
+        conn.commit()
+
+
+def get_face_library_job(job_id: str) -> dict[str, Any] | None:
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM face_library_jobs WHERE id = ?", (job_id,)).fetchone()
+    return _row_to_face_library_job(row)
+
+
+def get_active_face_library_job() -> dict[str, Any] | None:
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM face_library_jobs
+            WHERE status IN ('queued', 'running')
+            ORDER BY created_ts ASC, id ASC
+            LIMIT 1
+            """
+        ).fetchone()
+    return _row_to_face_library_job(row)
+
+
+def list_face_library_jobs(limit: int = 20) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(int(limit or 20), 200))
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM face_library_jobs
+            ORDER BY created_ts DESC, id DESC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        ).fetchall()
+    return [_row_to_face_library_job(row) for row in rows if row is not None]
 
 
 def list_jobs(owner_key: str, owner_ip: str, limit: int = 50) -> list[dict[str, Any]]:

@@ -9,6 +9,7 @@ from shared.config.config import (
     CLIP_VIT_B32_PATH,
     MOBILECLIP_TS_PATH,
     MOBILECLIP2_TS_PATH,
+    TORCH_NUM_THREADS,
     logger,
     model_supports_text_prompt,
     resolve_model_path,
@@ -32,6 +33,25 @@ except Exception as exc:
 _MODEL_CACHE: dict[str, object] = {}
 _MODEL_LOCKS: dict[str, threading.Lock] = {}
 _CACHE_LOCK = threading.Lock()
+
+
+def _configure_torch_threads() -> None:
+    if TORCH_NUM_THREADS <= 0:
+        return
+    try:
+        import torch
+
+        torch.set_num_threads(TORCH_NUM_THREADS)
+        if hasattr(torch, "set_num_interop_threads"):
+            torch.set_num_interop_threads(max(1, min(2, TORCH_NUM_THREADS)))
+        logger.info("Configured torch CPU threads: %s", TORCH_NUM_THREADS)
+    except RuntimeError as exc:
+        logger.debug("torch CPU thread configuration skipped: %s", exc)
+    except Exception as exc:
+        logger.warning("failed to configure torch CPU threads: %s", exc)
+
+
+_configure_torch_threads()
 
 session = requests.Session()
 session.headers.update(

@@ -5,12 +5,12 @@ import re
 import shutil
 import subprocess
 import sys
-import threading
 import time
 from uuid import uuid4
 
 from shared.config.config import BASE_DIR, MODEL_DIR, TRAIN_RUNS_DIR, logger, resolve_model_path
 from shared.db.sqlite import get_train_job, list_train_jobs, save_train_job
+from shared.task_queue import submit_task
 from modules.training.services.dataset_service import get_dataset, list_dataset_assets
 
 
@@ -445,8 +445,13 @@ def start_train_job(
     }
     save_train_job(job)
 
-    thread = threading.Thread(target=_run_train_job, args=(job,), daemon=True)
-    thread.start()
+    submit_task(
+        "train",
+        {"job_id": job_id},
+        owner_key=owner_key,
+        owner_ip=owner_ip,
+        task_id=job_id,
+    )
     return job
 
 

@@ -104,6 +104,8 @@ MAX_WORKERS = int(os.getenv("MAX_WORKERS", "8"))
 CONF_THRESH = float(os.getenv("CONF_THRESH", "0.8"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "8"))
 IMGSZ = int(os.getenv("IMGSZ", "640"))
+TORCH_NUM_THREADS = int(os.getenv("TORCH_NUM_THREADS", "0") or 0)
+OPENCV_NUM_THREADS = int(os.getenv("OPENCV_NUM_THREADS", "0") or 0)
 
 OUTPUT_DIR = _resolve_path(os.getenv("OUTPUT_DIR", os.path.join(BASE_DIR, "output")))
 SQLITE_DB_PATH = _resolve_path(os.getenv("SQLITE_DB_PATH", os.path.join(BASE_DIR, "jobs.sqlite3")))

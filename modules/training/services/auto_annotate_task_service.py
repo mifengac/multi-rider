@@ -1,4 +1,3 @@
-import threading
 import time
 from uuid import uuid4
 
@@ -8,6 +7,7 @@ from shared.db.sqlite import (
     list_auto_annotate_jobs,
     save_auto_annotate_job,
 )
+from shared.task_queue import submit_task
 from modules.training.services.auto_annotate_service import auto_annotate_dataset_assets
 from modules.training.services.dataset_service import get_dataset
 
@@ -132,8 +132,13 @@ def start_auto_annotate_job(
     }
     save_auto_annotate_job(job)
 
-    thread = threading.Thread(target=_run_auto_annotate_job, args=(job, list(asset_ids)), daemon=True)
-    thread.start()
+    submit_task(
+        "auto_annotate",
+        {"job_id": job["id"], "asset_ids": list(asset_ids)},
+        owner_key=owner_key,
+        owner_ip=owner_ip,
+        task_id=job["id"],
+    )
     return job
 
 

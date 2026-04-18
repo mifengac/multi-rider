@@ -8,7 +8,15 @@ from typing import Optional
 import cv2
 import numpy as np
 
-from shared.config.config import FACE_BLUR_THRESH, FACE_MODEL_DET, FACE_MODEL_REC, logger
+from shared.config.config import FACE_BLUR_THRESH, FACE_MODEL_DET, FACE_MODEL_REC, OPENCV_NUM_THREADS, logger
+
+
+if OPENCV_NUM_THREADS > 0:
+    try:
+        cv2.setNumThreads(OPENCV_NUM_THREADS)
+        logger.info("Configured OpenCV CPU threads: %s", OPENCV_NUM_THREADS)
+    except Exception as exc:
+        logger.warning("failed to configure OpenCV CPU threads: %s", exc)
 
 
 DET_GALLERY_SIZE = 640
