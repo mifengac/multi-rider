@@ -4,10 +4,10 @@ This file is a compact handoff for continuing development without rereading the 
 
 ## Project Context
 
-- Project path: `C:\Users\Administrator\Desktop\project\multi-rider`
+- Project path: `C:\Users\So\Desktop\project\multi-rider`
 - Current working branch for this handoff: `feature/worker-compose-architecture`
 - Previous base branch: `refactor/readability-reorg`
-- Current local runtime: Windows 10, managed with `uv` and `.venv`
+- Current local runtime: Windows 10, managed with `uv`
 - Future target runtime: Ubuntu 22 intranet server, 16 CPU cores, no GPU, long-running deployment
 - Maintainer model: mostly one person, so prefer simple, observable, low-ops architecture
 
@@ -62,6 +62,8 @@ Continue using `uv` directly:
 Optional typed workers:
 
 ```powershell
+.\.venv\Scripts\python.exe worker.py --type detection
+.\.venv\Scripts\python.exe worker.py --type upload
 .\.venv\Scripts\python.exe worker.py --type train
 .\.venv\Scripts\python.exe worker.py --type auto_annotate
 .\.venv\Scripts\python.exe worker.py --type face_library
@@ -140,6 +142,90 @@ Changed face library sync/rebuild from in-memory Web thread tasks to durable que
 - `static/modules/face/face-library.js`
   - Polling now treats both `queued` and `running` as active states.
 
+### Oracle Detection Worker Migration
+
+Changed Oracle batch detection from Web-process threads to durable queued Worker mode.
+
+- `modules/detection/job_routes.py`
+  - `/start` no longer starts `threading.Thread(...)`.
+  - Route now creates a persisted queued job via `start_detection_job(...)`.
+- `modules/detection/services/job_service.py`
+  - Added `start_detection_job(...)`.
+  - Oracle jobs now persist to SQLite before execution with status `queued`.
+  - Active Oracle jobs are listed from SQLite instead of Web-process memory.
+  - `_run_job(...)` now accepts the persisted job record, then writes running progress back to SQLite during batch execution.
+  - Cancellation now works against persisted Oracle job state, not only in-process memory.
+- `worker.py`
+  - Added `detection` handler.
+  - Worker now loads the persisted Oracle job by `job_id` and executes the existing detection pipeline.
+- `shared/db/sqlite.py`
+  - Added `list_active_jobs(...)` for queued/running job queries.
+  - `mark_running_jobs_interrupted(...)` now supports filtering by `job_type`.
+- `app.py`
+  - Web bootstrap now only marks running `upload` jobs interrupted on restart.
+  - This avoids incorrectly marking Worker-owned Oracle detection jobs as interrupted when only the Web process restarts.
+
+### Upload Detection Worker Migration
+
+Changed ZIP/video upload detection from Web-process threads to durable queued Worker mode.
+
+- `modules/detection/services/upload_job_service.py`
+  - Removed direct `threading.Thread(...)` startup for ZIP/video detection.
+  - `start_zip_job()` and `start_video_job()` now create/save a queued `jobs` record and submit:
+    `submit_task("upload", {"job_id": job_id}, task_id=job_id)`
+  - Upload source file path, temp directory, and video `frame_interval` are now persisted in SQLite job records.
+  - `_run_upload_job(...)` now loads the persisted job, executes inside Worker, and writes running progress back to SQLite during batch execution.
+  - Upload cancellation now works against persisted SQLite job state instead of only Web-process memory.
+- `worker.py`
+  - Added `upload` handler.
+  - Worker now loads the persisted upload job by `job_id` and runs ZIP/video detection.
+- `shared/db/sqlite.py`
+  - Added `source_path`, `temp_dir`, and `frame_interval` columns to `jobs`.
+  - Old-job cleanup now removes persisted upload temp directories/source files in addition to result ZIPs.
+- `app.py`
+  - Web bootstrap no longer marks any `jobs` rows interrupted.
+  - All entries in the shared `jobs` table are now Worker-owned (`oracle` and `upload`).
+- `static/modules/detection/tasks.js`
+  - Added explicit `queued` status UI so queued Worker tasks do not render as running.
+- `templates/modules/detection/history/history.html`
+  - Added explicit `queued` status UI.
+- `templates/modules/detection/history/history_detail.html`
+  - Added explicit `queued` status UI.
+
+### Health Endpoint
+
+Added a lightweight health endpoint for operability checks.
+
+- `shared/health.py`
+  - Added `/healthz` backend checks for:
+    - SQLite open/read/write.
+    - output directory writable.
+    - configured model files exist.
+    - stale `task_queue` rows stuck in `running`.
+- `app.py`
+  - Registered `GET /healthz`.
+  - Returns HTTP `200` when all checks pass, otherwise `503`.
+
+### Task Queue Diagnostics
+
+Added read-only task queue observability.
+
+- `shared/task_queue_diagnostics.py`
+  - Summarizes task counts by status and task type.
+  - Lists recent queue rows with redacted owners and without raw payload/result leakage.
+  - Flags stale `running` tasks using the same stale threshold as `/healthz`.
+- `modules/diagnostics/routes.py`
+  - Registered `GET /diagnostics/task-queue`.
+  - Supports `task_type`, `status`, and `limit` query parameters.
+- `templates/modules/diagnostics/_task_queue_tab.html`
+  - Added a Workbench diagnostics tab.
+- `static/modules/diagnostics/task-queue.js`
+  - Renders summary cards, health details, distributions, filters, and recent task rows.
+- `ops/Dockerfile`
+  - Container `HEALTHCHECK` now probes `/healthz` instead of the business `/jobs` endpoint.
+- `docs/architecture_polish_checklist.md`
+  - Added architecture and polish follow-up checklist.
+
 ### Ubuntu Compose Deployment
 
 - Added `docker-compose.yml`
@@ -206,20 +292,50 @@ Changed face library sync/rebuild from in-memory Web thread tasks to durable que
   - Reuse existing active face library task.
   - Worker face library handler loads existing job.
   - Face library SQLite round-trip behavior.
+- `tests/test_detection_worker_queue.py`
+  - Oracle detection job enqueue behavior.
+  - Worker detection handler loads existing job.
+  - SQLite active-job listing and filtered interruption behavior.
+- `tests/test_upload_worker_queue.py`
+  - ZIP upload job enqueue behavior.
+  - Video upload job enqueue behavior.
+  - Worker upload handler loads existing job.
+- `tests/test_health.py`
+  - Healthy dependency state returns green report.
+  - Missing model files and stale queue rows return unhealthy report.
+- `tests/test_app_smoke.py`
+  - Added `/healthz` route coverage for both healthy and unhealthy HTTP status codes.
+  - Added task queue diagnostics route and template wiring coverage.
+- `tests/test_task_queue_diagnostics.py`
+  - Queue diagnostics summary, filtering, stale detection, and owner redaction.
 
 Latest local verification:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q
+uv run --isolated --with-requirements requirements-dev.txt --with Flask==3.0.0 --with requests==2.31.0 --with Pillow==10.4.0 --with numpy==2.0.2 --with opencv-python-headless==4.12.0.88 -m pytest -q
 ```
 
 Result:
 
 ```text
-28 passed
+43 passed
 ```
 
-Docker is not installed on the current Windows development machine, so `docker compose config` could not be run locally.
+Docker Desktop is installed on the current Windows development machine.
+
+Compose precheck results:
+
+- Default `docker compose config` fails because `./app.env` does not exist yet.
+- `$env:APP_ENV_FILE='ops/app.env.ubuntu.example'; docker compose config` succeeds.
+- `instantclient_11_2/libclntsh.so.11.1` is absent in this Windows workspace, so Docker build/start is not a valid Ubuntu E2E substitute until Linux Instant Client files are supplied.
+
+Local endpoint smoke with Flask test client:
+
+```text
+/healthz 200 application/json
+/diagnostics/task-queue 200 application/json
+/ 200 text/html; charset=utf-8
+```
 
 ## Important Files
 
@@ -234,51 +350,39 @@ Docker is not installed on the current Windows development machine, so `docker c
 - `shared/db/sqlite.py`
 - `shared/config/config.py`
 - `shared/inference/infer_service.py`
+- `modules/detection/services/job_service.py`
+- `modules/detection/services/upload_job_service.py`
+- `modules/detection/job_routes.py`
 - `modules/face/services/library_task_service.py`
 - `modules/face/services/identity_service.py`
 - `modules/training/services/train_task_service.py`
 - `modules/training/services/auto_annotate_task_service.py`
 - `static/modules/face/face-library.js`
+- `tests/test_detection_worker_queue.py`
+- `tests/test_upload_worker_queue.py`
 - `docs/project_design_methodology.md`
 
 ## Remaining Architecture Debt
 
-The main remaining task is `detection`.
+No remaining Web-thread debt exists in `detection`.
 
-Current Web-thread entry points still exist:
+Current architecture debt is now mostly operability and diagnostics:
 
-- `modules/detection/job_routes.py`
-  - `/start` Oracle batch detection starts a Web-process thread.
-- `modules/detection/services/upload_job_service.py`
-  - ZIP upload detection starts a Web-process thread.
-  - Video upload detection starts a Web-process thread.
-
-Recommended next migration:
-
-1. Migrate Oracle batch detection `/start` first.
-2. Keep `/progress/<job_id>`, `/jobs`, `/history`, and result download contracts stable.
-3. Persist detection job state to SQLite from creation time.
-4. Enqueue with `submit_task("detection", {"job_id": job_id, ...}, task_id=job_id)`.
-5. Add `worker.py` detection handler that loads the persisted job and runs the existing `_run_job(...)`.
-6. Only after Oracle detection is stable, migrate ZIP/video upload detection.
+1. Validate Docker Compose end-to-end on Ubuntu with at least one Oracle job and one upload job.
+2. Decide whether to expose task-queue inspection/retry controls in the UI.
+3. Add a stronger deployment smoke script once the Ubuntu host and Linux Instant Client are available.
 
 ## Practical Priorities Next Time
 
 Start here:
 
 1. Verify GitHub branch CI or remote visibility after push.
-2. If continuing architecture work, implement Worker migration for `modules/detection/job_routes.py` `/start`.
-3. Add a lightweight `/healthz` route checking:
-   - SQLite open/read/write.
-   - output directory writable.
-   - model files exist.
-   - Worker queue has no excessive stale `running` tasks.
-4. Consider adding a small admin/diagnostic page for task queue status.
-5. On Ubuntu, validate:
+2. On Ubuntu, validate:
    - `docker compose config`
    - `docker compose up -d`
    - `docker compose logs -f worker`
-   - one end-to-end queued task.
+   - one Oracle task and one upload task end-to-end.
+3. If operational controls are needed, add guarded retry/reset actions to the diagnostics page.
 
 ## Key Mental Model
 

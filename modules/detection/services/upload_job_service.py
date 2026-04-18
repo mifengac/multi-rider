@@ -19,8 +19,14 @@ from shared.config.config import (
     logger,
     model_supports_text_prompt,
 )
+from shared.db.sqlite import get_job as get_saved_job
 from shared.db.sqlite import save_job
-from modules.detection.services.result_store_service import add_result_bytes, create_result_store, finalize_result_store
+from shared.task_queue import submit_task
+from modules.detection.services.result_store_service import (
+    add_result_bytes,
+    create_result_store,
+    finalize_result_store,
+)
 from shared.inference.infer_service import _predict_batch, get_model
 from shared.ownership.ownership import job_matches_owner
 
@@ -29,33 +35,111 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
 
 UPLOAD_JOBS: dict[str, dict] = {}
 UPLOAD_JOBS_LOCK = threading.Lock()
+TERMINAL_STATUSES = {"done", "error", "canceled", "interrupted"}
+
+
+def _upload_snapshot(job: dict) -> dict:
+    return {key: value for key, value in job.items() if key != "cancel"}
 
 
 def get_upload_job_snapshot(job_id: str) -> dict | None:
     with UPLOAD_JOBS_LOCK:
         job = UPLOAD_JOBS.get(job_id)
-        if job is None:
-            return None
-        return {k: v for k, v in job.items() if k != "cancel"}
+        if job is not None:
+            return _upload_snapshot(job)
+
+    saved_job = get_saved_job(job_id)
+    if saved_job is None or saved_job.get("job_type") != "upload":
+        return None
+    return saved_job
 
 
 def request_upload_cancel(job_id: str, owner_key: str = "", owner_ip: str = "") -> bool:
+    snapshot = None
     with UPLOAD_JOBS_LOCK:
         job = UPLOAD_JOBS.get(job_id)
-        if job is None or not job_matches_owner(job, owner_key, owner_ip):
-            return False
-        job["cancel"].set()
+        if job is not None and job_matches_owner(job, owner_key, owner_ip):
+            job["cancel"].set()
+            if job.get("status") not in TERMINAL_STATUSES:
+                job["status"] = "canceled"
+                job["message"] = "cancel requested"
+                job["end_ts"] = job.get("end_ts") or int(time.time())
+            snapshot = _upload_snapshot(job)
+
+    if snapshot is not None:
+        save_job(snapshot)
         return True
 
+    job = get_saved_job(job_id)
+    if job is None or job.get("job_type") != "upload" or not job_matches_owner(job, owner_key, owner_ip):
+        return False
 
-def _new_upload_job(total: int, source_name: str, source_type: str) -> dict:
+    if job.get("status") in TERMINAL_STATUSES:
+        return True
+
+    job["status"] = "canceled"
+    job["message"] = "cancel requested"
+    job["end_ts"] = job.get("end_ts") or int(time.time())
+    save_job(job)
+    return True
+
+
+def _save_job_state(snapshot: dict) -> None:
+    try:
+        save_job(snapshot)
+    except Exception as exc:
+        logger.exception("failed to persist upload job %s: %s", snapshot.get("id"), exc)
+
+
+def _sync_cancel_state(job_id: str) -> bool:
+    with UPLOAD_JOBS_LOCK:
+        job = UPLOAD_JOBS.get(job_id)
+        if job is None:
+            return False
+        if job["cancel"].is_set():
+            if job.get("status") not in TERMINAL_STATUSES:
+                job["status"] = "canceled"
+                job["message"] = job.get("message") or "cancel requested"
+            return True
+
+    saved_job = get_saved_job(job_id)
+    if saved_job is None or saved_job.get("job_type") != "upload" or saved_job.get("status") != "canceled":
+        return False
+
+    with UPLOAD_JOBS_LOCK:
+        job = UPLOAD_JOBS.get(job_id)
+        if job is None:
+            return True
+        job["cancel"].set()
+        if job.get("status") not in TERMINAL_STATUSES:
+            job["status"] = "canceled"
+            job["message"] = saved_job.get("message") or "cancel requested"
+            if saved_job.get("end_ts"):
+                job["end_ts"] = saved_job.get("end_ts")
+    return True
+
+
+def _persist_job_state(job_id: str) -> None:
+    _sync_cancel_state(job_id)
+    with UPLOAD_JOBS_LOCK:
+        job = UPLOAD_JOBS.get(job_id)
+        if job is None:
+            return
+        snapshot = _upload_snapshot(job)
+    _save_job_state(snapshot)
+
+
+def _new_upload_job(total: int, source_name: str, source_type: str, status: str = "queued") -> dict:
     return {
         "job_type": "upload",
         "id": uuid4().hex,
         "source_name": source_name,
         "source_type": source_type,
-        "status": "running",
-        "message": "",
+        "source_path": "",
+        "temp_dir": "",
+        "frame_interval": None,
+        "status": status,
+        "message": status,
         "total": total,
         "processed": 0,
         "kept": 0,
@@ -73,26 +157,7 @@ def _new_upload_job(total: int, source_name: str, source_type: str) -> dict:
         "model_key": get_upload_model_default(),
         "owner_key": "",
         "owner_ip": "",
-        "cancel": threading.Event(),
     }
-
-
-def _finish_upload_job(job_id: str, status: str, message: str = "") -> None:
-    snapshot = None
-    with UPLOAD_JOBS_LOCK:
-        job = UPLOAD_JOBS.get(job_id)
-        if job is None:
-            return
-        job["status"] = status
-        job["message"] = message
-        job["end_ts"] = int(time.time())
-        if status in {"done", "error", "canceled"}:
-            snapshot = {k: v for k, v in job.items() if k != "cancel"}
-    if snapshot is not None:
-        try:
-            save_job(snapshot)
-        except Exception as exc:
-            logger.exception("failed to persist upload job %s: %s", job_id, exc)
 
 
 def _close_batch_images(batch: list[tuple[str, Image.Image]]) -> None:
@@ -132,9 +197,7 @@ def _resolve_model_filters(model_key: str, model, classes_raw: str) -> tuple[Opt
 
 
 def _is_upload_canceled(job_id: str) -> bool:
-    with UPLOAD_JOBS_LOCK:
-        job = UPLOAD_JOBS.get(job_id)
-        return bool(job and job["cancel"].is_set())
+    return _sync_cancel_state(job_id)
 
 
 def _mark_upload_failed_item(job_id: str) -> None:
@@ -177,9 +240,6 @@ def _process_batch(
                     job["total"] = job["processed"]
         logger.exception("upload inference failed for job %s: %s", job_id, exc)
         raise RuntimeError(f"inference failed: {exc}") from exc
-    finally:
-        # PIL images are no longer needed after predict returns.
-        pass
 
     kept_delta = 0
     try:
@@ -259,6 +319,7 @@ def _run_zip_source(
                     kept_sequence,
                 )
                 batch = []
+                _persist_job_state(job_id)
 
         if batch and not _is_upload_canceled(job_id):
             kept_sequence = _process_batch(
@@ -274,6 +335,7 @@ def _run_zip_source(
                 result_store,
                 kept_sequence,
             )
+            _persist_job_state(job_id)
         else:
             _close_batch_images(batch)
 
@@ -343,6 +405,7 @@ def _run_video_source(
                     kept_sequence,
                 )
                 batch = []
+                _persist_job_state(job_id)
 
         if batch and not _is_upload_canceled(job_id):
             kept_sequence = _process_batch(
@@ -358,6 +421,7 @@ def _run_video_source(
                 result_store,
                 kept_sequence,
             )
+            _persist_job_state(job_id)
         else:
             _close_batch_images(batch)
     finally:
@@ -367,7 +431,7 @@ def _run_video_source(
 
 
 def _run_upload_job(
-    job_id: str,
+    job: dict,
     source_path: str,
     source_type: str,
     conf_thresh: float,
@@ -378,25 +442,48 @@ def _run_upload_job(
     temp_dir: str | None,
     frame_interval: int | None = None,
 ) -> None:
-    # Persist the job immediately so it survives a process restart.
+    job_id = str(job.get("id") or "").strip()
+    if not job_id:
+        raise ValueError("missing job id")
+
+    runtime_job = dict(job)
+    runtime_job["cancel"] = threading.Event()
+    runtime_job["source_path"] = source_path
+    runtime_job["source_type"] = source_type
+    runtime_job["temp_dir"] = temp_dir or runtime_job.get("temp_dir") or ""
+    runtime_job["frame_interval"] = frame_interval if frame_interval is not None else runtime_job.get("frame_interval")
+    runtime_job["conf_thresh"] = conf_thresh
+    runtime_job["batch_size"] = batch_size
+    runtime_job["imgsz"] = imgsz
+    runtime_job["classes_raw"] = classes_raw
+    runtime_job["model_key"] = model_key or runtime_job.get("model_key") or get_upload_model_default()
+    runtime_job["start_ts"] = runtime_job.get("start_ts") or int(time.time())
+    runtime_job["message"] = runtime_job.get("message") or "queued"
+
     with UPLOAD_JOBS_LOCK:
-        snapshot = {k: v for k, v in (UPLOAD_JOBS.get(job_id) or {}).items() if k != "cancel"}
-    if snapshot:
-        try:
-            save_job(snapshot)
-        except Exception as exc:
-            logger.warning("early persist upload job %s failed: %s", job_id, exc)
+        UPLOAD_JOBS[job_id] = runtime_job
 
     result_store = None
     zip_path = os.path.join(OUTPUT_DIR, f"upload_{job_id}.zip")
 
     try:
-        model = get_model(model_key)
+        if _sync_cancel_state(job_id):
+            with UPLOAD_JOBS_LOCK:
+                current = UPLOAD_JOBS[job_id]
+                current["end_ts"] = current.get("end_ts") or int(time.time())
+                snapshot = _upload_snapshot(current)
+            _save_job_state(snapshot)
+            return
+
         with UPLOAD_JOBS_LOCK:
-            job_meta = UPLOAD_JOBS.get(job_id) or {}
-            source_name = job_meta.get("source_name", "")
-        result_store = create_result_store(job_id, "upload", source_type, source_name)
-        allowed_classes, prompt_classes = _resolve_model_filters(model_key, model, classes_raw)
+            current = UPLOAD_JOBS[job_id]
+            current["status"] = "running"
+            current["message"] = "running"
+        _persist_job_state(job_id)
+
+        model = get_model(runtime_job["model_key"])
+        result_store = create_result_store(job_id, "upload", source_type, runtime_job.get("source_name", ""))
+        allowed_classes, prompt_classes = _resolve_model_filters(runtime_job["model_key"], model, classes_raw)
 
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as result_zip:
             if source_type == "zip":
@@ -408,7 +495,7 @@ def _run_upload_job(
                     conf_thresh,
                     allowed_classes,
                     imgsz,
-                    model_key,
+                    runtime_job["model_key"],
                     prompt_classes,
                     result_zip,
                     result_store,
@@ -423,7 +510,7 @@ def _run_upload_job(
                     conf_thresh,
                     allowed_classes,
                     imgsz,
-                    model_key,
+                    runtime_job["model_key"],
                     prompt_classes,
                     result_zip,
                     result_store,
@@ -437,20 +524,36 @@ def _run_upload_job(
                     pass
             if result_store and os.path.isdir(result_store["result_dir"]):
                 shutil.rmtree(result_store["result_dir"], ignore_errors=True)
-            _finish_upload_job(job_id, "canceled")
+            with UPLOAD_JOBS_LOCK:
+                current = UPLOAD_JOBS.get(job_id)
+                if current is not None:
+                    current["status"] = "canceled"
+                    current["message"] = current.get("message") or "cancel requested"
+                    current["end_ts"] = current.get("end_ts") or int(time.time())
+                    snapshot = _upload_snapshot(current)
+                else:
+                    snapshot = None
+            if snapshot is not None:
+                _save_job_state(snapshot)
             return
 
         manifest_path = finalize_result_store(result_store)
 
         with UPLOAD_JOBS_LOCK:
-            job = UPLOAD_JOBS.get(job_id)
-            if job is not None:
-                job["zip_path"] = zip_path
-                job["zip_parts"] = [{"path": zip_path, "name": os.path.basename(zip_path)}]
-                job["result_dir"] = result_store["result_dir"]
-                job["result_manifest_path"] = manifest_path
-
-        _finish_upload_job(job_id, "done")
+            current = UPLOAD_JOBS.get(job_id)
+            if current is not None:
+                current["zip_path"] = zip_path
+                current["zip_parts"] = [{"path": zip_path, "name": os.path.basename(zip_path)}]
+                current["result_dir"] = result_store["result_dir"]
+                current["result_manifest_path"] = manifest_path
+                current["status"] = "done"
+                current["message"] = "completed"
+                current["end_ts"] = int(time.time())
+                snapshot = _upload_snapshot(current)
+            else:
+                snapshot = None
+        if snapshot is not None:
+            _save_job_state(snapshot)
 
     except Exception as exc:
         logger.exception("upload job %s failed: %s", job_id, exc)
@@ -461,10 +564,39 @@ def _run_upload_job(
                 pass
         if result_store and os.path.isdir(result_store["result_dir"]):
             shutil.rmtree(result_store["result_dir"], ignore_errors=True)
-        _finish_upload_job(job_id, "error", str(exc))
+
+        _sync_cancel_state(job_id)
+        with UPLOAD_JOBS_LOCK:
+            current = UPLOAD_JOBS.get(job_id)
+            if current is not None:
+                if current["cancel"].is_set():
+                    current["status"] = "canceled"
+                    current["message"] = current.get("message") or "cancel requested"
+                else:
+                    current["status"] = "error"
+                    current["message"] = str(exc)
+                current["end_ts"] = int(time.time())
+                snapshot = _upload_snapshot(current)
+            else:
+                snapshot = None
+        if snapshot is not None:
+            _save_job_state(snapshot)
     finally:
-        if temp_dir:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        with UPLOAD_JOBS_LOCK:
+            current = UPLOAD_JOBS.get(job_id)
+            if current is not None and current.get("status") in TERMINAL_STATUSES:
+                UPLOAD_JOBS.pop(job_id, None)
+
+
+def _enqueue_upload_job(job: dict) -> None:
+    save_job(job)
+    submit_task(
+        "upload",
+        {"job_id": job["id"]},
+        owner_key=job.get("owner_key", ""),
+        owner_ip=job.get("owner_ip", ""),
+        task_id=job["id"],
+    )
 
 
 def start_zip_job(
@@ -490,14 +622,16 @@ def start_zip_job(
             )
     except Exception as exc:
         shutil.rmtree(temp_dir, ignore_errors=True)
-        return None, f"ZIP 解析失败：{exc}"
+        return None, f"ZIP parse failed: {exc}"
 
     if total <= 0:
         shutil.rmtree(temp_dir, ignore_errors=True)
-        return None, "ZIP 中未找到有效图片（支持 jpg/png/bmp/tiff/webp）"
+        return None, "ZIP contains no supported images (.jpg/.png/.bmp/.tiff/.webp)"
 
-    job = _new_upload_job(total, original_filename, "zip")
+    job = _new_upload_job(total, original_filename, "zip", status="queued")
     job.update(
+        source_path=zip_path,
+        temp_dir=temp_dir,
         conf_thresh=conf_thresh,
         batch_size=batch_size,
         imgsz=imgsz,
@@ -506,16 +640,13 @@ def start_zip_job(
         owner_key=owner_key,
         owner_ip=owner_ip,
     )
-    job_id = job["id"]
-    with UPLOAD_JOBS_LOCK:
-        UPLOAD_JOBS[job_id] = job
 
-    threading.Thread(
-        target=_run_upload_job,
-        args=(job_id, zip_path, "zip", conf_thresh, batch_size, imgsz, classes_raw, model_key, temp_dir, None),
-        daemon=True,
-    ).start()
-    return job_id, ""
+    try:
+        _enqueue_upload_job(job)
+    except Exception as exc:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return None, f"start upload job failed: {exc}"
+    return job["id"], ""
 
 
 def start_video_job(
@@ -535,14 +666,17 @@ def start_video_job(
     if not cap.isOpened():
         cap.release()
         shutil.rmtree(temp_dir, ignore_errors=True)
-        return None, "无法打开视频文件，请确认格式为 MP4/AVI/MOV"
+        return None, "cannot open video file; expected MP4/AVI/MOV"
 
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
     cap.release()
     total = max(1, (frame_count + max(1, frame_interval) - 1) // max(1, frame_interval)) if frame_count > 0 else 1
 
-    job = _new_upload_job(total, original_filename, "video")
+    job = _new_upload_job(total, original_filename, "video", status="queued")
     job.update(
+        source_path=video_path,
+        temp_dir=temp_dir,
+        frame_interval=max(1, int(frame_interval)),
         conf_thresh=conf_thresh,
         batch_size=batch_size,
         imgsz=imgsz,
@@ -550,15 +684,11 @@ def start_video_job(
         model_key=model_key,
         owner_key=owner_key,
         owner_ip=owner_ip,
-        frame_interval=frame_interval,
     )
-    job_id = job["id"]
-    with UPLOAD_JOBS_LOCK:
-        UPLOAD_JOBS[job_id] = job
 
-    threading.Thread(
-        target=_run_upload_job,
-        args=(job_id, video_path, "video", conf_thresh, batch_size, imgsz, classes_raw, model_key, temp_dir, frame_interval),
-        daemon=True,
-    ).start()
-    return job_id, ""
+    try:
+        _enqueue_upload_job(job)
+    except Exception as exc:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return None, f"start upload job failed: {exc}"
+    return job["id"], ""

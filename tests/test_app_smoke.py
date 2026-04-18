@@ -1,17 +1,122 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 import zipfile
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_app_factory_registers_expected_endpoints(app_module):
     flask_app = app_module.create_app()
 
+    assert "healthz" in flask_app.view_functions
+    assert "diagnostics.task_queue_diagnostics" in flask_app.view_functions
     assert "job.index" in flask_app.view_functions
     assert "upload.upload_start" in flask_app.view_functions
     assert "dispatch.dispatch_auth_status" in flask_app.view_functions
     assert "face.face_library_status" in flask_app.view_functions
     assert "train.dataset_list" in flask_app.view_functions
+
+
+def test_healthz_returns_ok_payload(client, app_module, monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "get_health_report",
+        lambda: {
+            "ok": True,
+            "timestamp": 1710000000,
+            "checks": {
+                "sqlite": {"ok": True},
+                "output_dir": {"ok": True},
+                "models": {"ok": True},
+                "task_queue": {"ok": True},
+            },
+        },
+    )
+
+    response = client.get("/healthz")
+
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
+
+
+def test_healthz_returns_503_when_unhealthy(client, app_module, monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "get_health_report",
+        lambda: {
+            "ok": False,
+            "timestamp": 1710000000,
+            "checks": {
+                "sqlite": {"ok": False, "error": "db locked"},
+                "output_dir": {"ok": True},
+                "models": {"ok": True},
+                "task_queue": {"ok": True},
+            },
+        },
+    )
+
+    response = client.get("/healthz")
+
+    assert response.status_code == 503
+    assert response.get_json()["checks"]["sqlite"]["ok"] is False
+
+
+def test_task_queue_diagnostics_route_returns_mocked_snapshot(client, monkeypatch):
+    import modules.diagnostics.routes as diagnostics_routes
+
+    calls = []
+
+    def fake_snapshot(**kwargs):
+        calls.append(kwargs)
+        return {
+            "generated_ts": 1710000000,
+            "filters": {"task_type": kwargs["task_type"], "status": kwargs["status"], "limit": 200},
+            "stale_after_seconds": 3600,
+            "totals": {"total": 1, "pending": 1, "running": 0, "completed": 0, "failed": 0, "stale_running": 0},
+            "by_status": [{"status": "pending", "count": 1}],
+            "by_type_status": [{"task_type": "upload", "status": "pending", "count": 1}],
+            "tasks": [{"task_id": "task-1", "task_type": "upload", "status": "pending", "job_id": "job-1"}],
+        }
+
+    monkeypatch.setattr(diagnostics_routes, "get_task_queue_snapshot", fake_snapshot)
+    monkeypatch.setattr(
+        diagnostics_routes,
+        "get_health_report",
+        lambda: {"ok": True, "checks": {"task_queue": {"ok": True, "running_count": 0}}},
+    )
+
+    response = client.get("/diagnostics/task-queue?task_type=upload&status=pending&limit=999")
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["totals"]["total"] == 1
+    assert payload["health"]["task_queue"]["ok"] is True
+    assert calls == [{"task_type": "upload", "status": "pending", "limit": "999"}]
+
+
+def test_index_template_wires_task_queue_diagnostics_tab(client):
+    response = client.get("/")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "tabBtnDiagnostics" in html
+    assert "tabDiagnostics" in html
+    assert "modules/diagnostics/task-queue.js" in html
+
+
+def test_task_queue_diagnostics_template_has_read_only_controls():
+    template = (REPO_ROOT / "templates" / "modules" / "diagnostics" / "_task_queue_tab.html").read_text(encoding="utf-8")
+    script = (REPO_ROOT / "static" / "modules" / "diagnostics" / "task-queue.js").read_text(encoding="utf-8")
+
+    assert "diagRefreshBtn" in template
+    assert "diagTaskRows" in template
+    assert "/diagnostics/task-queue" in script
+    assert "reset_stale" not in template.lower()
+    assert "delete" not in template.lower()
 
 
 def test_file_routes_use_mocked_job_payload(client, monkeypatch, tmp_path):

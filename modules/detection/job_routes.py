@@ -1,5 +1,4 @@
 import os
-import threading
 from datetime import datetime
 
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
@@ -18,13 +17,10 @@ from shared.db.oracle import fetch_image_urls
 from shared.db.sqlite import get_job as get_saved_job
 from shared.db.sqlite import list_jobs as list_saved_jobs
 from modules.detection.services.job_service import (
-    JOBS,
-    JOBS_LOCK,
-    _new_job_record,
-    _run_job,
     get_job_snapshot,
     list_running_jobs,
     request_cancel,
+    start_detection_job,
 )
 from modules.detection.services.result_store_service import (
     attach_identity_to_manifest_items,
@@ -189,24 +185,17 @@ def start_job():
         pass
 
     owner_key, owner_ip = get_request_owner(request)
-    with JOBS_LOCK:
-        job = _new_job_record(total=len(url_and_times))
-        job["owner_key"] = owner_key
-        job["owner_ip"] = owner_ip
-        job["model_key"] = model_key
-        for running_job in JOBS.values():
-            if running_job.get("status") == "running" and job_matches_owner(running_job, owner_key, owner_ip):
-                running_job["cancel"].set()
-        JOBS[job["id"]] = job
-        job_id = job["id"]
-
-    thread = threading.Thread(
-        target=_run_job,
-        args=(job_id, url_and_times, conf_val, batch_val, imgsz_val, classes_raw, model_key),
-        daemon=True,
+    job = start_detection_job(
+        url_and_times,
+        conf_val,
+        batch_val,
+        imgsz_val,
+        classes_raw,
+        model_key,
+        owner_key,
+        owner_ip,
     )
-    thread.start()
-    return jsonify({"ok": True, "job_id": job_id, "total": len(url_and_times)})
+    return jsonify({"ok": True, "job_id": job["id"], "total": len(url_and_times)})
 
 
 @job_bp.get("/progress/<job_id>")

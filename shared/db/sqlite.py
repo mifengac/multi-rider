@@ -13,6 +13,9 @@ JOB_COLUMNS = (
     "id",
     "source_name",
     "source_type",
+    "source_path",
+    "temp_dir",
+    "frame_interval",
     "status",
     "message",
     "total",
@@ -247,6 +250,9 @@ def init_db() -> None:
                 job_type TEXT NOT NULL DEFAULT 'oracle',
                 source_name TEXT,
                 source_type TEXT,
+                source_path TEXT,
+                temp_dir TEXT,
+                frame_interval INTEGER,
                 status TEXT NOT NULL,
                 message TEXT,
                 total INTEGER NOT NULL DEFAULT 0,
@@ -285,6 +291,12 @@ def init_db() -> None:
             conn.execute("ALTER TABLE jobs ADD COLUMN source_name TEXT")
         if "source_type" not in columns:
             conn.execute("ALTER TABLE jobs ADD COLUMN source_type TEXT")
+        if "source_path" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN source_path TEXT")
+        if "temp_dir" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN temp_dir TEXT")
+        if "frame_interval" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN frame_interval INTEGER")
         if "owner_key" not in columns:
             conn.execute("ALTER TABLE jobs ADD COLUMN owner_key TEXT")
         if "result_dir" not in columns:
@@ -725,6 +737,9 @@ def save_job(job: dict[str, Any]) -> None:
         "id": job.get("id", ""),
         "source_name": job.get("source_name", ""),
         "source_type": job.get("source_type", ""),
+        "source_path": job.get("source_path", ""),
+        "temp_dir": job.get("temp_dir", ""),
+        "frame_interval": job.get("frame_interval"),
         "status": job.get("status", ""),
         "message": job.get("message", ""),
         "total": int(job.get("total") or 0),
@@ -754,13 +769,15 @@ def save_job(job: dict[str, Any]) -> None:
         conn.execute(
             """
             INSERT INTO jobs (
-                job_type, id, source_name, source_type, status, message, total, processed, kept, notfound, failed,
+                job_type, id, source_name, source_type, source_path, temp_dir, frame_interval,
+                status, message, total, processed, kept, notfound, failed,
                 downloaded, start_ts, end_ts, owner_key, owner_ip, conf_thresh, batch_size,
                 imgsz, classes_raw, model_key, zip_paths_json, result_dir, result_manifest_path,
                 identity_result_path, identity_summary_json, summary_text
             )
             VALUES (
-                :job_type, :id, :source_name, :source_type, :status, :message, :total, :processed, :kept, :notfound, :failed,
+                :job_type, :id, :source_name, :source_type, :source_path, :temp_dir, :frame_interval,
+                :status, :message, :total, :processed, :kept, :notfound, :failed,
                 :downloaded, :start_ts, :end_ts, :owner_key, :owner_ip, :conf_thresh, :batch_size,
                 :imgsz, :classes_raw, :model_key, :zip_paths_json, :result_dir, :result_manifest_path,
                 :identity_result_path, :identity_summary_json, :summary_text
@@ -769,6 +786,9 @@ def save_job(job: dict[str, Any]) -> None:
                 job_type = excluded.job_type,
                 source_name = excluded.source_name,
                 source_type = excluded.source_type,
+                source_path = excluded.source_path,
+                temp_dir = excluded.temp_dir,
+                frame_interval = excluded.frame_interval,
                 status = excluded.status,
                 message = excluded.message,
                 total = excluded.total,
@@ -802,6 +822,40 @@ def get_job(job_id: str) -> dict[str, Any] | None:
     with _connect() as conn:
         row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
     return _row_to_job(row)
+
+
+def list_active_jobs(
+    owner_key: str,
+    owner_ip: str,
+    limit: int = 20,
+    job_type: str | None = None,
+) -> list[dict[str, Any]]:
+    if not owner_key and not owner_ip:
+        return []
+
+    safe_limit = max(1, min(int(limit or 20), 200))
+    query = """
+        SELECT *
+        FROM jobs
+        WHERE status IN ('queued', 'running')
+          AND (
+                owner_key = ?
+             OR (COALESCE(owner_key, '') = '' AND owner_ip = ?)
+          )
+    """
+    params: list[Any] = [owner_key, owner_ip]
+    if job_type:
+        query += " AND job_type = ?"
+        params.append(job_type)
+    query += """
+        ORDER BY start_ts DESC, id DESC
+        LIMIT ?
+    """
+    params.append(safe_limit)
+
+    with _connect() as conn:
+        rows = conn.execute(query, params).fetchall()
+    return [_row_to_job(row) for row in rows if row is not None]
 
 
 def save_dataset(dataset: dict[str, Any]) -> None:
@@ -1242,7 +1296,11 @@ def cleanup_old_jobs(days: int = 7) -> int:
     cutoff = int(time.time()) - max(days, 0) * 24 * 60 * 60
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT id, zip_paths_json, result_dir FROM jobs WHERE end_ts IS NOT NULL AND end_ts < ?",
+            """
+            SELECT id, zip_paths_json, result_dir, source_path, temp_dir
+            FROM jobs
+            WHERE end_ts IS NOT NULL AND end_ts < ?
+            """,
             (cutoff,),
         ).fetchall()
 
@@ -1269,6 +1327,22 @@ def cleanup_old_jobs(days: int = 7) -> int:
                     pass
                 except Exception as exc:
                     logger.warning("failed to remove result dir %s: %s", result_dir, exc)
+            temp_dir = row["temp_dir"]
+            if temp_dir and os.path.isdir(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir, ignore_errors=False)
+                except FileNotFoundError:
+                    pass
+                except Exception as exc:
+                    logger.warning("failed to remove temp dir %s: %s", temp_dir, exc)
+            source_path = row["source_path"]
+            if source_path and os.path.isfile(source_path):
+                try:
+                    os.remove(source_path)
+                except FileNotFoundError:
+                    pass
+                except Exception as exc:
+                    logger.warning("failed to remove source file %s: %s", source_path, exc)
 
         if delete_ids:
             conn.executemany("DELETE FROM jobs WHERE id = ?", [(job_id,) for job_id in delete_ids])
@@ -1277,11 +1351,19 @@ def cleanup_old_jobs(days: int = 7) -> int:
     return len(delete_ids)
 
 
-def mark_running_jobs_interrupted() -> int:
+def mark_running_jobs_interrupted(job_types: list[str] | None = None) -> int:
     now = int(time.time())
+    safe_job_types = [str(item).strip() for item in (job_types or []) if str(item).strip()]
+    where = "status = 'running'"
+    params: list[Any] = [now]
+    if safe_job_types:
+        placeholders = ", ".join("?" for _ in safe_job_types)
+        where += f" AND job_type IN ({placeholders})"
+        params.extend(safe_job_types)
+
     with _connect() as conn:
         cursor = conn.execute(
-            """
+            f"""
             UPDATE jobs
             SET status = 'interrupted',
                 end_ts = COALESCE(end_ts, ?),
@@ -1289,9 +1371,9 @@ def mark_running_jobs_interrupted() -> int:
                     WHEN message IS NULL OR message = '' THEN 'service restarted before job completed'
                     ELSE message
                 END
-            WHERE status = 'running'
+            WHERE {where}
             """,
-            (now,),
+            params,
         )
         conn.commit()
         return cursor.rowcount

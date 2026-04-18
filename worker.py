@@ -2,11 +2,13 @@
 
 Polls the ``task_queue`` table and executes queued heavy workloads outside the
 Flask web process. Training, auto-annotate, and face-library routes enqueue
-tasks today.
+tasks today, and both Oracle / upload detection are now executed here as well.
 
 Start manually::
 
     python worker.py                 # consume all task types
+    python worker.py --type detection
+    python worker.py --type upload
     python worker.py --type train    # consume only training tasks
     python worker.py --type auto_annotate
     python worker.py --type face_library
@@ -76,6 +78,87 @@ def _handle_train(payload: dict) -> dict:
     return {"job_id": job.get("id"), "status": job.get("status")}
 
 
+def _handle_detection(payload: dict) -> dict:
+    """Run an Oracle detection task."""
+    from modules.detection.services.job_service import (
+        _run_job,
+        get_job_snapshot,
+    )
+
+    job_id = str(payload.get("job_id") or "").strip()
+    if not job_id:
+        raise ValueError("missing detection job_id")
+
+    job = get_job_snapshot(job_id)
+    if job is None:
+        raise LookupError(f"detection job not found: {job_id}")
+
+    raw_items = payload.get("url_and_times") or []
+    url_and_times: list[tuple[str, str]] = []
+    for item in raw_items:
+        if isinstance(item, (list, tuple)) and item:
+            url = str(item[0] or "").strip()
+            ts = str(item[1] or "").strip() if len(item) > 1 else ""
+        else:
+            url = str(item or "").strip()
+            ts = ""
+        if url:
+            url_and_times.append((url, ts))
+    if not url_and_times:
+        raise ValueError("missing detection url_and_times")
+
+    _run_job(
+        job,
+        url_and_times,
+        float(payload.get("conf_thresh") or job.get("conf_thresh") or 0.0),
+        int(payload.get("batch_size") or job.get("batch_size") or 1),
+        int(payload.get("imgsz") or job.get("imgsz") or 640),
+        str(payload.get("classes_raw") or job.get("classes_raw") or ""),
+        str(payload.get("model_key") or job.get("model_key") or ""),
+    )
+    updated_job = get_job_snapshot(job_id) or job
+    return {"job_id": updated_job.get("id"), "status": updated_job.get("status")}
+
+
+def _handle_upload(payload: dict) -> dict:
+    """Run a ZIP or video upload detection task."""
+    from modules.detection.services.upload_job_service import (
+        _run_upload_job,
+        get_upload_job_snapshot,
+    )
+
+    job_id = str(payload.get("job_id") or "").strip()
+    if not job_id:
+        raise ValueError("missing upload job_id")
+
+    job = get_upload_job_snapshot(job_id)
+    if job is None:
+        raise LookupError(f"upload job not found: {job_id}")
+
+    source_path = str(job.get("source_path") or "").strip()
+    if not source_path:
+        raise ValueError("missing upload source_path")
+
+    source_type = str(job.get("source_type") or "").strip()
+    if source_type not in {"zip", "video"}:
+        raise ValueError(f"unsupported upload source_type: {source_type}")
+
+    _run_upload_job(
+        job,
+        source_path,
+        source_type,
+        float(job.get("conf_thresh") or 0.0),
+        int(job.get("batch_size") or 1),
+        int(job.get("imgsz") or 640),
+        str(job.get("classes_raw") or ""),
+        str(job.get("model_key") or ""),
+        str(job.get("temp_dir") or ""),
+        int(job.get("frame_interval") or 0) if job.get("frame_interval") is not None else None,
+    )
+    updated_job = get_upload_job_snapshot(job_id) or job
+    return {"job_id": updated_job.get("id"), "status": updated_job.get("status")}
+
+
 def _handle_auto_annotate(payload: dict) -> dict:
     """Run an auto-annotate task."""
     from modules.training.services.auto_annotate_task_service import (
@@ -112,6 +195,8 @@ def _handle_face_library(payload: dict) -> dict:
 
 
 HANDLERS: dict[str, callable] = {
+    "detection": _handle_detection,
+    "upload": _handle_upload,
     "train": _handle_train,
     "auto_annotate": _handle_auto_annotate,
     "face_library": _handle_face_library,

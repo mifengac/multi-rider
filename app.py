@@ -12,7 +12,9 @@ from shared.config.config import (
     MODEL_DEFAULT,
     logger,
 )
-from shared.db.sqlite import cleanup_old_jobs, init_db, mark_running_jobs_interrupted
+from shared.db.sqlite import cleanup_old_jobs, init_db
+from shared.health import get_health_report
+from modules.diagnostics.routes import diagnostics_bp
 from modules.detection.file_routes import file_bp
 from modules.detection.job_routes import job_bp
 from modules.detection.upload_routes import upload_bp
@@ -27,6 +29,11 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = FLASK_SECRET_KEY
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
+
+    @app.get("/healthz")
+    def healthz():
+        report = get_health_report()
+        return jsonify(report), (200 if report.get("ok") else 503)
 
     @app.errorhandler(RequestEntityTooLarge)
     def handle_file_too_large(exc):
@@ -49,13 +56,13 @@ def create_app() -> Flask:
     app.register_blueprint(face_bp)
     app.register_blueprint(train_bp)
     app.register_blueprint(dispatch_bp)
+    app.register_blueprint(diagnostics_bp)
     return app
 
 
 def bootstrap_app() -> None:
     init_db()
     cleanup_old_jobs(7)
-    mark_running_jobs_interrupted()
 
     if not os.path.isdir(INSTANT_CLIENT_DIR):
         logger.warning("instantclient directory not found: %s", INSTANT_CLIENT_DIR)

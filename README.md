@@ -54,7 +54,7 @@ multi-rider/
 │   └── app.env.ubuntu.example # Ubuntu 22 + Docker Compose 环境变量模板
 ├── model/                   # 模型文件（不入库）
 ├── output/                  # 推理结果 ZIP 输出目录
-├── upload_tmp/              # 视频上传临时目录（推理后自动清理）
+├── upload_tmp/              # 上传源文件暂存目录（Worker 完成后按历史清理策略删除）
 └── instantclient_11_2/      # Oracle Instant Client（不入库，Windows/Linux 版本不同）
 ```
 
@@ -76,7 +76,7 @@ multi-rider/
 ## 运行目录维护
 
 - `output/`：检测结果 ZIP 和 `_results/` 清单目录。需要保留历史结果时不要直接清空；如仅做演示，可定期删除旧任务目录与旧 ZIP。
-- `upload_tmp/`：上传过程中的临时目录。正常结束后会自动清理；若异常中断后残留，可手动清空。
+- `upload_tmp/`：上传源文件暂存目录。为支持 Worker 重试，文件不会在任务结束瞬间删除，而是随旧任务清理策略统一删除。
 - `logs/`：启动器和运行日志。当前仓库里常见的是 `app.stdout.log`、`app.stderr.log`；可按时间轮转或定期删除旧日志。
 - `train_runs/`：训练运行输出目录。仅在实际训练后产生内容，通常体积较大，建议按任务完成情况归档或清理。
 - `datasets/`：训练数据集目录。这里是业务数据，不应像缓存目录那样随意清空。
@@ -177,12 +177,14 @@ $env:FLASK_SECRET_KEY = "改成随机字符串"
 如需只处理某一类任务，可按类型启动：
 
 ```powershell
+.\.venv\Scripts\python.exe worker.py --type detection
+.\.venv\Scripts\python.exe worker.py --type upload
 .\.venv\Scripts\python.exe worker.py --type train
 .\.venv\Scripts\python.exe worker.py --type auto_annotate
 .\.venv\Scripts\python.exe worker.py --type face_library
 ```
 
-未启动 Worker 时，训练、批量预标注和人脸库任务会停留在 `queued`，这是预期状态。
+未启动 Worker 时，数据库检测、本地上传检测、训练、批量预标注和人脸库任务会停留在 `queued`，这是预期状态。
 
 服务默认监听 `0.0.0.0:5001`，浏览器访问：
 
@@ -195,6 +197,22 @@ http://localhost:5001/
 ```
 http://本机IP:5001/
 ```
+
+健康检查：
+
+```
+http://localhost:5001/healthz
+```
+
+返回 `200` 表示 SQLite、输出目录、模型文件和任务队列状态正常；返回 `503` 表示至少一项检查失败。
+
+任务队列诊断：
+
+```
+http://localhost:5001/diagnostics/task-queue
+```
+
+该接口和工作台里的“任务队列诊断”页只读展示 Worker 队列状态、陈旧运行任务和最近任务列表，不会重置、重试或删除任务。
 
 ### 4. 开机自启（可选）
 
@@ -289,12 +307,24 @@ sudo docker compose up -d
 http://服务器IP:5001/
 ```
 
+健康检查：
+
+```
+http://服务器IP:5001/healthz
+```
+
+任务队列诊断：
+
+```
+http://服务器IP:5001/diagnostics/task-queue
+```
+
 Compose 会启动两个容器：
 
 | 容器 | 命令 | 作用 |
 |---|---|---|
 | `multi-rider-web` | `python app.py` | 页面和 API，只负责创建任务、查询状态 |
-| `multi-rider-worker` | `python worker.py` | 执行训练、批量预标注、人脸库任务，后续也会承接 detection |
+| `multi-rider-worker` | `python worker.py` | 执行数据库检测、本地上传检测、训练、批量预标注、人脸库任务 |
 
 Worker 不需要进入容器手工运行；Compose 会自动启动并在异常退出后重启。
 
@@ -342,7 +372,7 @@ sudo ufw allow 5001/tcp
 
 - `instantclient_11_2/` 必须是 **Linux `.so`** 版本（容器内为 Debian 用户态）
 - `runtime/` 挂载到宿主机，容器重建后 SQLite、历史 ZIP、数据集、人脸库和训练产物不丢失
-- 上传任务进度存于容器内存，容器重启后运行中的上传任务状态会丢失
+- 上传检测任务状态已持久化到 SQLite；Worker 重启后会按队列状态继续处理或重试
 - `YOLO_TELEMETRY=false` 已在 Dockerfile ENV 中预设，无需手动添加
 - 16 核 CPU 无 GPU 环境建议先保持一个 Worker；训练任务最好放在低峰期运行
 

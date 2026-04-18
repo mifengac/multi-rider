@@ -29,6 +29,7 @@
   <script src="{{ url_for('static', filename='modules/training/annotation.js') }}" defer></script>
   <script src="{{ url_for('static', filename='modules/detection/results.js') }}" defer></script>
   <script src="{{ url_for('static', filename='modules/face/face-library.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/diagnostics/task-queue.js') }}" defer></script>
   <script src="{{ url_for('static', filename='shared/js/auth.js') }}" defer></script>
   <script src="{{ url_for('static', filename='shared/js/bootstrap.js') }}" defer></script>
 </head>
@@ -261,6 +262,17 @@
             </span>
           </a>
         </div>
+
+        <div class="mr-nav-group">
+          <div class="mr-nav-label">System</div>
+          <a id="tabBtnDiagnostics" class="mr-nav-item" href="#" onclick="switchTab('Diagnostics');return false;">
+            <span class="mr-nav-icon">06</span>
+            <span class="mr-nav-copy">
+              <strong>任务队列诊断</strong>
+              <span>Worker 队列、健康状态与最近任务</span>
+            </span>
+          </a>
+        </div>
       </section>
 
       <section class="mr-sidebar-user">
@@ -334,6 +346,7 @@
         {% include 'modules/training/_train_tab.html' %}
         {% include 'modules/dispatch/_dispatch_tab.html' %}
         {% include 'modules/face/_face_tab.html' %}
+        {% include 'modules/diagnostics/_task_queue_tab.html' %}
       </div>
     </main>
 

@@ -220,6 +220,8 @@
           switchTab('Dispatch');
         } else if (activeTab === 'Face') {
           switchTab('Face');
+        } else if (activeTab === 'Diagnostics') {
+          switchTab('Diagnostics');
         }
       } catch (e) {}
 
