@@ -48,6 +48,23 @@ function diagSetText(id, value) {
   if (el) el.textContent = value;
 }
 
+function diagSetRemediation(message, tone) {
+  var el = document.getElementById('diagRemediation');
+  if (!el) return;
+  if (!message) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  var classes = {
+    warning: 'mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-800',
+    error: 'mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-7 text-rose-700',
+    neutral: 'mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600'
+  };
+  el.className = classes[tone] || classes.neutral;
+  el.textContent = message;
+}
+
 function diagRenderDistribution(id, items, formatter) {
   var box = document.getElementById(id);
   if (!box) return;
@@ -70,6 +87,7 @@ function diagRenderHealth(payload) {
   var taskQueue = health.task_queue || {};
   var badge = document.getElementById('diagHealthBadge');
   var details = document.getElementById('diagHealthDetails');
+  var staleCount = Number(taskQueue.stale_running_count || 0);
   if (badge) {
     var ok = health.ok && taskQueue.ok !== false;
     badge.textContent = ok ? '正常' : '需关注';
@@ -78,19 +96,29 @@ function diagRenderHealth(payload) {
   if (details) {
     details.innerHTML =
       '<div>运行中：' + diagEscapeHtml(taskQueue.running_count || 0) + ' 个</div>' +
-      '<div>陈旧运行：' + diagEscapeHtml(taskQueue.stale_running_count || 0) + ' 个</div>' +
+      '<div>陈旧运行：' + diagEscapeHtml(staleCount) + ' 个</div>' +
       '<div>陈旧阈值：' + diagFormatDuration(taskQueue.stale_after_seconds || payload.stale_after_seconds || 0) + '</div>' +
       ((taskQueue.sample_task_ids || []).length
         ? '<div class="mt-2 break-all text-amber-700">样例：' + diagEscapeHtml((taskQueue.sample_task_ids || []).join(', ')) + '</div>'
+        : '') +
+      (staleCount > 0
+        ? '<div class="mt-2 text-amber-700">处理建议：先确认 worker.py 或 Docker worker 是否仍在运行，再查看 Worker 日志；本页保持只读，不会自动重置任务。</div>'
+        : '') +
+      (taskQueue.error
+        ? '<div class="mt-2 text-rose-600">健康检查错误：' + diagEscapeHtml(taskQueue.error) + '</div>'
         : '');
   }
 }
 
-function diagRenderTasks(tasks) {
+function diagRenderTasks(tasks, payload) {
   var body = document.getElementById('diagTaskRows');
   if (!body) return;
   if (!tasks || !tasks.length) {
-    body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500">暂无符合筛选条件的队列任务</td></tr>';
+    var totals = (payload && payload.totals) || {};
+    var message = Number(totals.total || 0) === 0
+      ? '队列为空：当前没有 pending、running、completed 或 failed 任务。若业务任务一直排队，请确认 worker.py 或 Docker worker 已启动。'
+      : '暂无符合筛选条件的队列任务。可清空筛选条件或调大数量后再刷新。';
+    body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500">' + diagEscapeHtml(message) + '</td></tr>';
     return;
   }
   body.innerHTML = tasks.map(function (task) {
@@ -120,6 +148,8 @@ function diagRenderTasks(tasks) {
 function renderTaskQueueDiagnostics(payload) {
   TASK_QUEUE_DIAGNOSTICS.lastPayload = payload;
   var totals = payload.totals || {};
+  var total = Number(totals.total || 0);
+  var stale = Number(totals.stale_running || 0);
   diagSetText('diagQueueTotal', totals.total || 0);
   diagSetText('diagQueuePending', totals.pending || 0);
   diagSetText('diagQueueRunning', totals.running || 0);
@@ -133,7 +163,17 @@ function renderTaskQueueDiagnostics(payload) {
   diagRenderDistribution('diagByTypeStatus', payload.by_type_status || [], function (item) {
     return (item.task_type || '--') + ' / ' + (item.status || '--');
   });
-  diagRenderTasks(payload.tasks || []);
+  diagRenderTasks(payload.tasks || [], payload);
+
+  if (stale > 0) {
+    diagSetRemediation('发现陈旧 running 任务：先确认 Worker 是否存活，再查看 worker.py 日志和 Docker worker 容器日志。当前版本只读展示，不会在页面里重置或重试。', 'warning');
+  } else if ((payload.health || {}).ok === false) {
+    diagSetRemediation('健康检查未通过：优先查看 /healthz 返回内容，确认模型文件、SQLite 路径、输出目录和任务队列是否可访问。', 'warning');
+  } else if (total === 0) {
+    diagSetRemediation('队列为空：这是干净状态。新建数据库检测、上传检测、训练或人脸库任务后，这里会出现 pending/running/completed/failed 记录。', 'neutral');
+  } else {
+    diagSetRemediation('', 'neutral');
+  }
 }
 
 function refreshTaskQueueDiagnostics() {
@@ -146,10 +186,16 @@ function refreshTaskQueueDiagnostics() {
   params.set('limit', (limitEl && limitEl.value) || '60');
 
   return fetch('/diagnostics/task-queue?' + params.toString())
-    .then(function (resp) { return resp.json(); })
+    .then(function (resp) {
+      return resp.json().then(function (payload) {
+        payload.__http_ok = resp.ok;
+        payload.__http_status = resp.status;
+        return payload;
+      });
+    })
     .then(function (payload) {
-      if (!payload.ok) {
-        throw new Error(payload.error || '诊断接口返回失败');
+      if (!payload.ok || payload.__http_ok === false) {
+        throw new Error(payload.error || ('诊断接口返回 HTTP ' + (payload.__http_status || 'unknown')));
       }
       renderTaskQueueDiagnostics(payload);
     })
@@ -158,6 +204,7 @@ function refreshTaskQueueDiagnostics() {
       if (body) {
         body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-rose-600">' + diagEscapeHtml(error.message || '诊断加载失败') + '</td></tr>';
       }
+      diagSetRemediation('诊断加载失败：请检查 Web 日志、SQLite 数据库路径和 /diagnostics/task-queue 接口返回。', 'error');
     });
 }
 

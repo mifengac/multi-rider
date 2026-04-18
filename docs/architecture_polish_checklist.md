@@ -37,3 +37,12 @@ This checklist records follow-up work after moving heavy jobs to the durable SQL
 - `docker compose config` succeeds when `APP_ENV_FILE=ops/app.env.ubuntu.example` is provided.
 - Default `docker compose config` fails until a real `app.env` is created.
 - `instantclient_11_2/libclntsh.so.11.1` is absent in this Windows workspace, so Docker image build and true Ubuntu-style startup should be treated as blocked until Linux Instant Client files are supplied.
+
+## Follow-up Applied On 2026-04-19
+
+- Added `/livez` as a process-only liveness endpoint while keeping `/healthz` strict for SQLite, output directory, model, and queue checks.
+- Added `ops/app.env.local.example` for Windows/local demos with external dispatch mocked and face SQL disabled by default.
+- Added `ops/smoke_check.py` for deployment smoke checks: `/livez`, `/healthz`, `/diagnostics/task-queue`, `/`, plus an isolated synthetic SQLite queue claim/complete check.
+- Updated the shared header primary button so each Tab owns its action: Oracle submit, upload submit, face sync, train submit, dispatch selected, and diagnostics refresh.
+- Improved the task queue diagnostics empty/error/stale guidance without adding mutating queue operations.
+- Ubuntu true E2E remains blocked in this Windows workspace until a real `app.env` and Linux `instantclient_11_2/libclntsh.so.11.1` are available on the target host.

@@ -51,6 +51,8 @@ multi-rider/
 ├── ops/
 │   ├── Dockerfile           # Linux Docker 镜像定义
 │   ├── app.env.example      # Windows 10 + uv 本地运行环境变量模板
+│   ├── app.env.local.example # Windows 本地演示安全模板（默认 mock 外部下发、人脸 SQL）
+│   ├── smoke_check.py       # 本地部署 smoke 检查脚本
 │   └── app.env.ubuntu.example # Ubuntu 22 + Docker Compose 环境变量模板
 ├── model/                   # 模型文件（不入库）
 ├── output/                  # 推理结果 ZIP 输出目录
@@ -152,6 +154,15 @@ uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua
 
 ### 2. 配置环境变量
 
+推荐先复制安全本地模板。该模板默认 `DISPATCH_MOCK_MODE=true`、`FACE_SQL_ENABLED=false`，适合开发机和演示环境，不会主动调用真实下发平台或人脸 SQL：
+
+```powershell
+Copy-Item .\ops\app.env.local.example .\app.env
+notepad .\app.env
+```
+
+如果需要连接真实 Oracle、下发平台或人脸库 SQL，再把 `app.env` 里的 `CHANGE_ME` 和 mock 开关改成目标环境值。
+
 在 PowerShell 中临时设置（每次启动前执行），或写入系统环境变量：
 
 ```powershell
@@ -201,10 +212,11 @@ http://本机IP:5001/
 健康检查：
 
 ```
+http://localhost:5001/livez
 http://localhost:5001/healthz
 ```
 
-返回 `200` 表示 SQLite、输出目录、模型文件和任务队列状态正常；返回 `503` 表示至少一项检查失败。
+`/livez` 只表示 Flask 进程可响应，适合判断服务是否存活。`/healthz` 是严格健康检查，返回 `200` 表示 SQLite、输出目录、模型文件和任务队列状态正常；返回 `503` 表示至少一项检查失败。
 
 任务队列诊断：
 
@@ -213,6 +225,16 @@ http://localhost:5001/diagnostics/task-queue
 ```
 
 该接口和工作台里的“任务队列诊断”页只读展示 Worker 队列状态、陈旧运行任务和最近任务列表，不会重置、重试或删除任务。
+
+本地 smoke 检查：
+
+```powershell
+# Web 和 Worker 已启动时执行完整检查
+.\.venv\Scripts\python.exe .\ops\smoke_check.py --base-url http://127.0.0.1:5001
+
+# 未启动 Web 时，仅验证 SQLite 队列 claim/complete 链路，使用临时测试库
+.\.venv\Scripts\python.exe .\ops\smoke_check.py --queue-only
+```
 
 ### 4. 开机自启（可选）
 
@@ -297,8 +319,18 @@ sudo vi /opt/multi-rider/app.env
 #   DISPATCH_CLIENT_SECRET=下发平台密钥
 #   DISPATCH_SMS_PASSWORD=短信平台密码
 
+# 先验证 Compose 配置解析
+sudo docker compose config
+
 # 一条命令启动 Web + Worker
 sudo docker compose up -d
+```
+
+仓库根目录本地预检时，如果还没有 `./app.env`，可临时指定示例文件解析 Compose：
+
+```powershell
+$env:APP_ENV_FILE='ops/app.env.ubuntu.example'
+docker compose config
 ```
 
 访问地址：
@@ -310,6 +342,7 @@ http://服务器IP:5001/
 健康检查：
 
 ```
+http://服务器IP:5001/livez
 http://服务器IP:5001/healthz
 ```
 

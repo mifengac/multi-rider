@@ -12,12 +12,20 @@ def test_app_factory_registers_expected_endpoints(app_module):
     flask_app = app_module.create_app()
 
     assert "healthz" in flask_app.view_functions
+    assert "livez" in flask_app.view_functions
     assert "diagnostics.task_queue_diagnostics" in flask_app.view_functions
     assert "job.index" in flask_app.view_functions
     assert "upload.upload_start" in flask_app.view_functions
     assert "dispatch.dispatch_auth_status" in flask_app.view_functions
     assert "face.face_library_status" in flask_app.view_functions
     assert "train.dataset_list" in flask_app.view_functions
+
+
+def test_livez_returns_process_ok(client):
+    response = client.get("/livez")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True, "service": "multi-rider"}
 
 
 def test_healthz_returns_ok_payload(client, app_module, monkeypatch):
@@ -113,10 +121,24 @@ def test_task_queue_diagnostics_template_has_read_only_controls():
     script = (REPO_ROOT / "static" / "modules" / "diagnostics" / "task-queue.js").read_text(encoding="utf-8")
 
     assert "diagRefreshBtn" in template
+    assert "diagRemediation" in template
     assert "diagTaskRows" in template
     assert "/diagnostics/task-queue" in script
+    assert "worker.py" in script
     assert "reset_stale" not in template.lower()
     assert "delete" not in template.lower()
+
+
+def test_header_primary_button_has_tab_specific_actions():
+    template = (REPO_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    script = (REPO_ROOT / "static" / "modules" / "detection" / "tasks.js").read_text(encoding="utf-8")
+
+    assert "runTabPrimaryAction('Oracle')" in template
+    assert "function runTabPrimaryAction(tab)" in script
+    assert "submitFormById('uploadForm')" in script
+    assert "submitFormById('trainRunForm')" in script
+    assert "sendDispatchTasks()" in script
+    assert "refreshTaskQueueDiagnostics()" in script
 
 
 def test_file_routes_use_mocked_job_payload(client, monkeypatch, tmp_path):

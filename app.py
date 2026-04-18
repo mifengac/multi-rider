@@ -35,6 +35,10 @@ def create_app() -> Flask:
         report = get_health_report()
         return jsonify(report), (200 if report.get("ok") else 503)
 
+    @app.get("/livez")
+    def livez():
+        return jsonify({"ok": True, "service": "multi-rider"}), 200
+
     @app.errorhandler(RequestEntityTooLarge)
     def handle_file_too_large(exc):
         limit_mb = max(1, MAX_UPLOAD_BYTES // (1024 * 1024))

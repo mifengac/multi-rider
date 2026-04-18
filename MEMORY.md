@@ -318,7 +318,7 @@ uv run --isolated --with-requirements requirements-dev.txt --with Flask==3.0.0 -
 Result:
 
 ```text
-43 passed
+47 passed
 ```
 
 Docker Desktop is installed on the current Windows development machine.
@@ -332,10 +332,19 @@ Compose precheck results:
 Local endpoint smoke with Flask test client:
 
 ```text
+/livez 200 application/json
 /healthz 200 application/json
 /diagnostics/task-queue 200 application/json
 / 200 text/html; charset=utf-8
 ```
+
+Latest follow-up on 2026-04-19:
+
+- Added `/livez` for process-only liveness while keeping `/healthz` strict.
+- Added tab-specific header primary actions.
+- Improved task queue diagnostics empty/error/stale guidance.
+- Added `ops/app.env.local.example` and `ops/smoke_check.py`.
+- `python ops/smoke_check.py --queue-only` succeeds with an isolated test SQLite DB.
 
 ## Important Files
 
@@ -344,7 +353,9 @@ Local endpoint smoke with Flask test client:
 - `docker-compose.yml`
 - `ops/Dockerfile`
 - `ops/app.env.example`
+- `ops/app.env.local.example`
 - `ops/app.env.ubuntu.example`
+- `ops/smoke_check.py`
 - `worker.py`
 - `shared/task_queue.py`
 - `shared/db/sqlite.py`
@@ -360,6 +371,8 @@ Local endpoint smoke with Flask test client:
 - `static/modules/face/face-library.js`
 - `tests/test_detection_worker_queue.py`
 - `tests/test_upload_worker_queue.py`
+- `tests/test_ops_smoke_check.py`
+- `docs/architecture_polish_checklist.md`
 - `docs/project_design_methodology.md`
 
 ## Remaining Architecture Debt
@@ -370,17 +383,18 @@ Current architecture debt is now mostly operability and diagnostics:
 
 1. Validate Docker Compose end-to-end on Ubuntu with at least one Oracle job and one upload job.
 2. Decide whether to expose task-queue inspection/retry controls in the UI.
-3. Add a stronger deployment smoke script once the Ubuntu host and Linux Instant Client are available.
+3. Add guarded queue retry/reset actions only if operations need them; keep them explicit and auditable.
 
 ## Practical Priorities Next Time
 
 Start here:
 
 1. Verify GitHub branch CI or remote visibility after push.
-2. On Ubuntu, validate:
+2. On Ubuntu, provide a real `app.env` and Linux `instantclient_11_2/libclntsh.so.11.1`, then validate:
    - `docker compose config`
    - `docker compose up -d`
    - `docker compose logs -f worker`
+   - `/livez`, `/healthz`, `/diagnostics/task-queue`
    - one Oracle task and one upload task end-to-end.
 3. If operational controls are needed, add guarded retry/reset actions to the diagnostics page.
 

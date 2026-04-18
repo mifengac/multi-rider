@@ -327,10 +327,36 @@
       Oracle:   { title: '数据检测与研判', subtitle: '查询 Oracle 内网数据库，对已采集的目标图像执行 AI 检测与结果研判', btnLabel: '▶ 新建检测任务' },
       Upload:   { title: '现场素材研判',   subtitle: '上传视频或图片，直接在系统内执行 AI 检测分析', btnLabel: '▶ 上传素材' },
       Face:     { title: '人脸识别与人员核验', subtitle: '识别结果人员与底库交叉比对，后台自动触发流转', btnLabel: '同步人脸库' },
-      Train:    { title: '模型自训练',     subtitle: '将实战结果数据回流训练集，沉淀专项识别能力', btnLabel: '开始训练' },
-      Dispatch: { title: '任务下发',       subtitle: '向现场执法单位推送告知单，提高处置响应速度', btnLabel: '下发全部' },
+      Train:    { title: '模型自训练',     subtitle: '将实战结果数据回流训练集，沉淀专项识别能力', btnLabel: '创建训练任务' },
+      Dispatch: { title: '任务下发',       subtitle: '向现场执法单位推送告知单，提高处置响应速度', btnLabel: '下发选中' },
       Diagnostics: { title: '任务队列诊断', subtitle: '查看 SQLite 持久化队列、Worker 执行状态和陈旧任务风险', btnLabel: '刷新诊断' }
     };
+
+    function submitFormById(formId) {
+      var form = document.getElementById(formId);
+      if (!form) return false;
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      return true;
+    }
+
+    function runTabPrimaryAction(tab) {
+      if (tab === 'Oracle') return submitFormById('jobForm');
+      if (tab === 'Upload') return submitFormById('uploadForm');
+      if (tab === 'Train') return submitFormById('trainRunForm');
+      if (tab === 'Face' && typeof runFaceLibraryAction === 'function') {
+        runFaceLibraryAction('global', 'sync');
+        return true;
+      }
+      if (tab === 'Dispatch' && typeof sendDispatchTasks === 'function') {
+        sendDispatchTasks();
+        return true;
+      }
+      if (tab === 'Diagnostics' && typeof refreshTaskQueueDiagnostics === 'function') {
+        refreshTaskQueueDiagnostics();
+        return true;
+      }
+      return false;
+    }
 
     function switchTab(tab) {
       var panels = {
@@ -371,11 +397,8 @@
       if (btnEl) {
         btnEl.textContent = meta.btnLabel || '';
         btnEl.onclick = function () {
-          document.getElementById('jobForm')?.dispatchEvent(new Event('submit', { cancelable: true }));
+          runTabPrimaryAction(tab);
         };
-        if (tab === 'Diagnostics' && typeof refreshTaskQueueDiagnostics === 'function') {
-          btnEl.onclick = refreshTaskQueueDiagnostics;
-        }
       }
       if (tab === 'Face') {
         refreshFaceTab();
