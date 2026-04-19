@@ -69,36 +69,36 @@ graph TB
         A[Web前端 - React/Vue]
         B[数据大屏]
     end
-    
+
     subgraph "网关层 Gateway"
         C[API Gateway / Nginx]
     end
-    
+
     subgraph "业务服务层 Business Services"
         D["检测服务 Detection Service"]
         E["人脸识别服务 Face Recognition Service"]
         F["模型训练服务 Training Service"]
         G["任务管理服务 Task Management Service"]
     end
-    
+
     subgraph "核心引擎层 Core Engine"
         H["模型管理器 Model Manager"]
         I["推理引擎 Inference Engine"]
         J["数据管道 Data Pipeline"]
     end
-    
+
     subgraph "基础设施层 Infrastructure"
         K[Oracle DB]
         L[Redis Cache]
         M[文件存储]
         N[消息队列]
     end
-    
+
     subgraph "外部对接 External"
         O[省厅任务接口]
         P[视频流接入]
     end
-    
+
     A --> C
     B --> C
     C --> D
@@ -171,7 +171,7 @@ scenarios:
     classes: ["wheelie", "normal"]
     threshold: 0.75
     post_actions: ["classify", "package", "notify"]
-    
+
   - name: "人脸布控"
     model_id: "insightface-buffalo"
     task_type: "face_recognition"
@@ -287,21 +287,21 @@ gantt
     模型管理器          :a1, 2026-04-19, 2d
     统一推理引擎        :a2, after a1, 2d
     数据管道            :a3, after a1, 2d
-    
+
     section 第二阶段：业务服务
     检测服务重构        :b1, after a2, 2d
     人脸识别服务重构    :b2, after a2, 2d
     训练服务重构        :b3, after a3, 3d
-    
+
     section 第三阶段：对接集成
     省厅接口对接        :c1, after b1, 2d
     任务管理服务        :c2, after c1, 2d
-    
+
     section 第四阶段：前端与展示
     前端框架搭建        :d1, after a2, 3d
     数据大屏            :d2, after d1, 3d
     业务页面开发        :d3, after d1, 4d
-    
+
     section 第五阶段：打磨
     性能优化            :e1, after d3, 2d
     演示准备            :e2, after e1, 2d
