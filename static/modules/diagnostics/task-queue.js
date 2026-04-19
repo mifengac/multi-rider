@@ -176,7 +176,8 @@ function renderTaskQueueDiagnostics(payload) {
   }
 }
 
-function refreshTaskQueueDiagnostics() {
+function refreshTaskQueueDiagnostics(btn) {
+  if (btn && btn.classList) btn.classList.add('mr-btn--loading');
   var params = new URLSearchParams();
   var typeEl = document.getElementById('diagTaskTypeFilter');
   var statusEl = document.getElementById('diagStatusFilter');
@@ -205,6 +206,9 @@ function refreshTaskQueueDiagnostics() {
         body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-sm text-rose-600">' + diagEscapeHtml(error.message || '诊断加载失败') + '</td></tr>';
       }
       diagSetRemediation('诊断加载失败：请检查 Web 日志、SQLite 数据库路径和 /diagnostics/task-queue 接口返回。', 'error');
+    })
+    .finally(function () {
+      if (btn && btn.classList) btn.classList.remove('mr-btn--loading');
     });
 }
 

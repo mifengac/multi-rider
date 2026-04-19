@@ -21,6 +21,7 @@ filters.
 from __future__ import annotations
 
 import argparse
+from typing import Callable
 import signal
 import sys
 import time
@@ -194,7 +195,7 @@ def _handle_face_library(payload: dict) -> dict:
     return {"job_id": job.get("id"), "status": job.get("status")}
 
 
-HANDLERS: dict[str, callable] = {
+HANDLERS: dict[str, Callable] = {
     "detection": _handle_detection,
     "upload": _handle_upload,
     "train": _handle_train,

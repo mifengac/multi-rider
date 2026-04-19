@@ -1,4 +1,4 @@
-﻿    const APP_CONFIG = window.INDEX_PAGE_BOOTSTRAP || {};
+    const APP_CONFIG = window.INDEX_PAGE_BOOTSTRAP || {};
     const APP_URLS = APP_CONFIG.urls || {};
 
     const MODEL_UI = {
@@ -221,7 +221,10 @@
       }).join('');
     }
 
-    function refreshJobs() {
+    var _refreshTimer = null;
+    function refreshJobs(btn) {
+      if (btn && btn.classList) btn.classList.add('mr-btn--loading');
+      if (_refreshTimer) clearTimeout(_refreshTimer);
       fetch(APP_URLS.listJobs || '/jobs')
         .then(function (resp) { return resp.json(); })
         .then(function (data) {
@@ -243,7 +246,8 @@
         })
         .catch(function () {})
         .finally(function () {
-          window.setTimeout(refreshJobs, 3000);
+          if (btn && btn.classList) btn.classList.remove('mr-btn--loading');
+          _refreshTimer = window.setTimeout(refreshJobs, 3000);
         });
     }
 

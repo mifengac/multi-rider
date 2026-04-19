@@ -21,7 +21,7 @@
     <header class="grid gap-4 xl:grid-cols-[1.4fr,0.9fr]">
       <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
         <div class="flex flex-wrap items-center gap-3">
-          <a href="{{ url_for('job.index') }}" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+          <a href="{{ url_for('job.index') }}" class="mr-btn mr-btn--ghost">
             返回首页
           </a>
         </div>
@@ -57,7 +57,7 @@
           <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">部署位置</div>
           <h2 class="mt-2 text-2xl font-semibold text-slate-900">当前使用模型切换与回滚</h2>
         </div>
-        <button id="registryRefreshBtn" type="button" class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+        <button id="registryRefreshBtn" type="button" class="mr-btn mr-btn--ghost">
           刷新
         </button>
       </div>
@@ -147,7 +147,7 @@
           }).join('');
 
           return '' +
-            '<div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">' +
+            '<div class="mr-card mr-card--soft">' +
               '<div class="flex items-start justify-between gap-3">' +
                 '<div>' +
                   '<div class="text-sm font-semibold text-slate-900">' + escapeHtml(slot.label || slot.slot_key) + '</div>' +
@@ -170,8 +170,8 @@
                   '</select>' +
                 '</label>' +
                 '<div class="flex gap-2">' +
-                  '<button type="button" data-slot-apply="' + escapeHtml(slot.slot_key) + '" class="inline-flex flex-1 items-center justify-center rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700">应用切换</button>' +
-                  '<button type="button" data-slot-rollback="' + escapeHtml(slot.slot_key) + '" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 ' + ((slot.history && slot.history.length) ? '' : 'opacity-50 cursor-not-allowed') + '"' + ((slot.history && slot.history.length) ? '' : ' disabled') + '>回滚</button>' +
+                  '<button type="button" data-slot-apply="' + escapeHtml(slot.slot_key) + '" class="mr-btn mr-btn--ink">应用切换</button>' +
+                  '<button type="button" data-slot-rollback="' + escapeHtml(slot.slot_key) + '" class="mr-btn mr-btn--ghost"' + ((slot.history && slot.history.length) ? '' : ' disabled') + '>回滚</button>' +
                 '</div>' +
               '</div>' +
               '<div class="mt-4">' +
@@ -220,7 +220,7 @@
         var options = (state.registryOptions && state.registryOptions.usage_options) || [];
         return options.map(function (item) {
           var checked = (model.usages || []).indexOf(item.value) >= 0 ? ' checked' : '';
-          return '<label class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">' +
+          return '<label class="mr-btn mr-btn--ghost">' +
             '<input type="checkbox" data-model-usage="' + escapeHtml(item.value) + '" class="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"' + checked + ' />' +
             '<span>' + escapeHtml(item.label) + '</span>' +
           '</label>';
@@ -245,7 +245,7 @@
           }).join('');
 
           return '' +
-            '<article class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5" data-model-card="' + escapeHtml((model.name || '').toLowerCase()) + '">' +
+            '<article class="mr-card mr-card--soft" data-model-card="' + escapeHtml((model.name || '').toLowerCase()) + '">' +
               '<div class="flex flex-wrap items-center gap-2">' +
                 '<div class="text-base font-semibold text-slate-900">' + escapeHtml(model.display_name || model.name || '--') + '</div>' +
                 '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">' + escapeHtml(model.category_label || model.category || '自定义模型') + '</span>' +
@@ -267,9 +267,9 @@
                 '<div>元数据文件：' + escapeHtml(model.metadata_path || '--') + '</div>' +
               '</div>' +
               '<div class="mt-4 flex flex-wrap gap-2">' +
-                '<button type="button" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" data-quick-slot="upload_default" data-model-name="' + escapeHtml(model.name || '') + '">设为上传默认模型</button>' +
-                '<button type="button" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" data-quick-slot="general" data-model-name="' + escapeHtml(model.name || '') + '">设为通用巡检模型</button>' +
-                '<button type="button" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" data-quick-slot="bczj" data-model-name="' + escapeHtml(model.name || '') + '">设为专项巡检模型</button>' +
+                '<button type="button" class="mr-btn mr-btn--ghost" data-quick-slot="upload_default" data-model-name="' + escapeHtml(model.name || '') + '">设为上传默认模型</button>' +
+                '<button type="button" class="mr-btn mr-btn--ghost" data-quick-slot="general" data-model-name="' + escapeHtml(model.name || '') + '">设为通用巡检模型</button>' +
+                '<button type="button" class="mr-btn mr-btn--ghost" data-quick-slot="bczj" data-model-name="' + escapeHtml(model.name || '') + '">设为专项巡检模型</button>' +
               '</div>' +
               '<div class="mt-4 rounded-3xl border border-slate-200 bg-white p-4">' +
                 '<div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">注册信息</div>' +
@@ -292,7 +292,7 @@
                   '<textarea rows="2" data-model-note class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100">' + escapeHtml(model.note || '') + '</textarea>' +
                 '</label>' +
                 '<div class="mt-3 flex justify-end">' +
-                  '<button type="button" data-model-save="' + escapeHtml(model.name || '') + '" class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700">保存注册信息</button>' +
+                  '<button type="button" data-model-save="' + escapeHtml(model.name || '') + '" class="mr-btn mr-btn--ink">保存注册信息</button>' +
                 '</div>' +
               '</div>' +
             '</article>';

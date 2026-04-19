@@ -70,7 +70,7 @@
       body.innerHTML = items.map(function (item) {
         const meta = statusMeta(item.status);
         const downloadHtml = item.status === 'done'
-          ? '<a class="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700" href="' + item.download_url + '" target="_blank">下载结果</a>'
+          ? '<a class="mr-btn mr-btn--ink" href="' + item.download_url + '" target="_blank">下载结果</a>'
           : '<span class="text-xs text-slate-400">暂无下载</span>';
         return (
           '<tr class="transition hover:bg-slate-50/80">' +
@@ -90,7 +90,7 @@
             '<td class="px-4 py-4 align-top text-sm text-slate-600">' + identitySummaryText(item.identity_summary) + '</td>' +
             '<td class="px-4 py-4 align-top">' +
               '<div class="flex flex-wrap items-center gap-2">' +
-                '<a class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href="' + item.detail_url + '">查看详情</a>' +
+                '<a class="mr-btn mr-btn--ghost" href="' + item.detail_url + '">查看详情</a>' +
                 downloadHtml +
               '</div>' +
             '</td>' +

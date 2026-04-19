@@ -42,11 +42,11 @@ _load_env_file(
     os.path.join(BASE_DIR, "ops", "app.env"),
 )
 
-ORACLE_HOST = os.getenv("ORACLE_HOST", "10.45.100.147")
+ORACLE_HOST = os.getenv("ORACLE_HOST", "")
 ORACLE_PORT = int(os.getenv("ORACLE_PORT", "1521"))
-ORACLE_SERVICE = os.getenv("ORACLE_SERVICE", "yfgxpt")
-ORACLE_USER = os.getenv("ORACLE_USER", "yfzagk")
-ORACLE_PASSWORD = os.getenv("ORACLE_PASSWORD", "yfzagk")
+ORACLE_SERVICE = os.getenv("ORACLE_SERVICE", "")
+ORACLE_USER = os.getenv("ORACLE_USER", "")
+ORACLE_PASSWORD = os.getenv("ORACLE_PASSWORD", "")
 INSTANT_CLIENT_DIR = _resolve_path(os.getenv("ORACLE_IC_DIR", os.path.join(BASE_DIR, "instantclient_11_2")))
 SMS_ORACLE_HOST = os.getenv("SMS_ORACLE_HOST", ORACLE_HOST)
 SMS_ORACLE_PORT = int(os.getenv("SMS_ORACLE_PORT", str(ORACLE_PORT)))
@@ -142,7 +142,7 @@ DISPATCH_TASK_URL = os.getenv(
     "http://68.26.6.231:7204/xbrwzx_beta/api/WxtdjModule/receiveAndCreateRw",
 )
 DISPATCH_CLIENT_ID = os.getenv("DISPATCH_CLIENT_ID", "jcgkpt")
-DISPATCH_CLIENT_SECRET = os.getenv("DISPATCH_CLIENT_SECRET", "123456")
+DISPATCH_CLIENT_SECRET = os.getenv("DISPATCH_CLIENT_SECRET", "")
 DISPATCH_GRANT_TYPE = os.getenv("DISPATCH_GRANT_TYPE", "password")
 DISPATCH_RWYID = os.getenv("DISPATCH_RWYID", "ecfffc32c9aa4aabb75541cb23a3270f")
 DISPATCH_SJCSLY = os.getenv("DISPATCH_SJCSLY", "yfdjzldxwlxxwffzzx")
@@ -170,10 +170,10 @@ DISPATCH_SMS_DEFAULT_TEMPLATE = os.getenv(
     "【治安基础管控中心】{xm}，系统识别到您涉及“{illegal_type}”线索，请于{deadline}前主动配合核查。联系单位：{zbpcsmc}，联系电话：{ywfzrlxdh}。",
 )
 DISPATCH_SMS_USERID = os.getenv("DISPATCH_SMS_USERID", "admin")
-DISPATCH_SMS_PASSWORD = os.getenv("DISPATCH_SMS_PASSWORD", "yfga8130018")
+DISPATCH_SMS_PASSWORD = os.getenv("DISPATCH_SMS_PASSWORD", "")
 DISPATCH_SMS_USERPORT = os.getenv("DISPATCH_SMS_USERPORT", "0006")
 
-FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
+FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", os.urandom(24).hex())
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
 APP_PORT = int(os.getenv("APP_PORT", "5001"))
 

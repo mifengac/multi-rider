@@ -40,7 +40,7 @@
                 </select>
               </label>
 
-              <div class="xl:col-span-2 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="mr-card mr-card--soft">
                 <div class="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
                   <div>
                     <label for="classes" id="classesLabel" class="mb-2 block text-sm font-medium text-slate-700">检测提示词</label>
@@ -58,7 +58,7 @@
             </div>
 
             <div class="mt-5 grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
-              <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="mr-card mr-card--soft">
                 <div class="flex items-center justify-between">
                   <label for="confRange" class="text-sm font-medium text-slate-700">置信度阈值</label>
                   <span id="confValue" class="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">{{ conf_default }}</span>
@@ -71,11 +71,11 @@
               </div>
 
               <div class="grid gap-4 sm:grid-cols-2">
-                <label class="block rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                <label class="mr-card mr-card--soft">
                   <span class="mb-2 block text-sm font-medium text-slate-700">批大小</span>
                   <input type="number" id="batch_size" name="batch_size" value="{{ batch_default }}" min="1" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
                 </label>
-                <label class="block rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                <label class="mr-card mr-card--soft">
                   <span class="mb-2 block text-sm font-medium text-slate-700">图片尺寸</span>
                   <input type="number" id="imgsz" name="imgsz" value="{{ imgsz_default }}" min="64" step="32" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
                 </label>
@@ -92,11 +92,11 @@
               </div>
             </div>
 
-            <div class="mt-5 rounded-3xl border border-slate-200 bg-slate-50/80 p-4 md:p-5">
+            <div class="mr-card mr-card--soft">
               <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p class="text-sm leading-7 text-slate-500">多选小时，不选表示不过滤。数据库查询条件始终为 <code class="rounded bg-white px-2 py-1 text-xs text-slate-600 ring-1 ring-inset ring-slate-200">TIME BETWEEN</code>，飙车炸街模型会附加其专用动态条件。</p>
                 <div class="flex flex-wrap gap-2">
-                  <button type="button" onclick="checkAllHours(true)" class="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700">全选</button>
+                  <button type="button" onclick="checkAllHours(true)" class="mr-btn mr-btn--ink">全选</button>
                   <button type="button" onclick="checkAllHours(false)" class="rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">清空</button>
                 </div>
               </div>
@@ -116,7 +116,7 @@
             <div class="text-sm leading-7 text-slate-500">
               提交后会自动查询记录、下载图片并完成研判，结果会进入历史记录，便于后续身份核验、任务下发和训练样本沉淀。
             </div>
-            <button type="submit" class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:bg-slate-700">
+            <button type="submit" class="mr-btn mr-btn--ink">
               开始巡检研判
             </button>
           </div>
@@ -132,7 +132,7 @@
             </div>
             <div id="progressStatus" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset bg-sky-100 text-sky-700 ring-sky-200">运行中</div>
           </div>
-          <div class="mt-5 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+          <div class="mr-card mr-card--soft">
             <div id="progressText" class="text-sm font-medium text-slate-800">已处理 0 / 0</div>
             <div id="progressSubtext" class="mt-2 text-xs leading-6 text-slate-500">模型：通用 · 保留 0 · 404 0 · 失败 0</div>
             <div class="mt-4 h-3 rounded-full bg-slate-100">
@@ -141,8 +141,8 @@
           </div>
           <div id="downloadLinks" class="mt-5 hidden space-y-3">
             <a id="zipLink" href="#" target="_blank" class="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500">下载 ZIP</a>
-            <a id="sumLink" href="#" target="_blank" class="inline-flex w-full items-center justify-center rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-500">下载摘要说明</a>
-            <button type="button" onclick="cancelCurrent()" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">停止当前任务</button>
+            <a id="sumLink" href="#" target="_blank" class="mr-btn mr-btn--brand">下载摘要说明</a>
+            <button type="button" onclick="cancelCurrent()" class="mr-btn mr-btn--ghost">停止当前任务</button>
           </div>
         </div>
 
@@ -153,10 +153,10 @@
               <h3 class="mt-2 text-xl font-semibold text-slate-900">结果图身份识别</h3>
             </div>
             <div class="flex flex-wrap justify-end gap-2">
-              <button type="button" onclick="toggleAllResults('oracle', true)" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">全选</button>
-              <button type="button" onclick="toggleAllResults('oracle', false)" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">清空</button>
+              <button type="button" onclick="toggleAllResults('oracle', true)" class="mr-btn mr-btn--ghost">全选</button>
+              <button type="button" onclick="toggleAllResults('oracle', false)" class="mr-btn mr-btn--ghost">清空</button>
               <button id="oracleAddDatasetBtn" type="button" onclick="openResultImportModal('oracle')" class="rounded-full border border-teal-200 bg-white px-4 py-1.5 text-xs font-semibold text-teal-700 transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400">批量加入数据集</button>
-              <button id="oracleIdentifySelectedBtn" type="button" onclick="identifySelectedResults('oracle')" class="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">批量识别身份</button>
+              <button id="oracleIdentifySelectedBtn" type="button" onclick="identifySelectedResults('oracle')" class="mr-btn mr-btn--ink">批量识别身份</button>
             </div>
           </div>
           <div id="oracleResultSummary" class="mt-4 text-sm text-slate-600">暂无结果图</div>
@@ -173,12 +173,12 @@
               <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Inspection Tips</div>
               <h3 class="mt-2 text-xl font-semibold text-slate-900">巡检办理提示</h3>
             </div>
-            <span class="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">面向实战</span>
+            <span class="mr-btn mr-btn--ink">面向实战</span>
           </div>
           <div class="mt-5 space-y-4 text-sm leading-7 text-slate-600">
-            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">优先使用“专项违法行为识别”处理飙车炸街、翘头等固定违法场景。</div>
-            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">通用人车要素识别适合做前置粗筛，命中后可直接进入人脸识别与任务下发流程。</div>
-            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">统一任务中心已集中展示后台运行状态，无需在各模块重复查看。</div>
+            <div class="mr-card mr-card--soft">优先使用“专项违法行为识别”处理飙车炸街、翘头等固定违法场景。</div>
+            <div class="mr-card mr-card--soft">通用人车要素识别适合做前置粗筛，命中后可直接进入人脸识别与任务下发流程。</div>
+            <div class="mr-card mr-card--soft">统一任务中心已集中展示后台运行状态，无需在各模块重复查看。</div>
           </div>
         </div>
       </section>
