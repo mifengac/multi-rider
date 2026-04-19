@@ -5,15 +5,15 @@
         <div id="resultDetailSource" class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">结果详情</div>
         <h3 id="resultDetailTitle" class="mt-2 text-lg font-semibold text-slate-900">未选择图片</h3>
       </div>
-      <button type="button" onclick="closeResultDetail()" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">关闭</button>
+      <button type="button" onclick="closeResultDetail()" class="mr-btn mr-btn--ghost">关闭</button>
     </div>
     <div class="space-y-5 px-5 py-5">
       <img id="resultDetailPreview" src="" alt="" class="w-full rounded-[28px] bg-slate-100 object-cover shadow-sm shadow-slate-200/60" />
       <div id="resultDetailMeta" class="text-sm text-slate-500"></div>
       <div class="flex flex-wrap gap-2">
-        <button id="resultDetailSelectBtn" type="button" class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">加入批量识别</button>
+        <button id="resultDetailSelectBtn" type="button" class="mr-btn mr-btn--ghost">加入批量识别</button>
         <button id="resultDetailAddDatasetBtn" type="button" class="rounded-full border border-teal-200 bg-white px-4 py-2 text-sm font-semibold text-teal-700 transition hover:bg-teal-50">加入数据集</button>
-        <button id="resultDetailIdentifyBtn" type="button" class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700">识别当前图片</button>
+        <button id="resultDetailIdentifyBtn" type="button" class="mr-btn mr-btn--ink">识别当前图片</button>
       </div>
       <div id="resultDetailStatus"></div>
       <div id="resultDetailFaces" class="space-y-4"></div>

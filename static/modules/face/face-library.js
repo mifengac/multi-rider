@@ -8,6 +8,10 @@ function getFaceLibraryDom() {
   };
 }
 
+function isFaceLibraryTaskActive(task) {
+  return task && (task.status === 'queued' || task.status === 'running');
+}
+
 function setFaceLibraryTask(task) {
   if (!task) {
     FACE_LIBRARY_TASK_STATE.id = '';
@@ -65,7 +69,7 @@ function pollFaceLibraryTask(taskId) {
       if (!data.ok) return;
       var task = data.task || {};
       setFaceLibraryTask(task);
-      if (task.status === 'running') {
+      if (isFaceLibraryTaskActive(task)) {
         window.setTimeout(function () { pollFaceLibraryTask(taskId); }, 1200);
         return;
       }
@@ -130,7 +134,7 @@ function refreshFaceLibraryStatus(prefix) {
       });
       FACE_LIBRARY_STATE.library = data.library || null;
       if (data.task) {
-        var shouldPoll = data.task.status === 'running' && FACE_LIBRARY_TASK_STATE.id !== data.task.id;
+        var shouldPoll = isFaceLibraryTaskActive(data.task) && FACE_LIBRARY_TASK_STATE.id !== data.task.id;
         setFaceLibraryTask(data.task);
         if (shouldPoll) pollFaceLibraryTask(data.task.id);
       }

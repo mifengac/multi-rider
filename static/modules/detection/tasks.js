@@ -1,4 +1,4 @@
-﻿    const APP_CONFIG = window.INDEX_PAGE_BOOTSTRAP || {};
+    const APP_CONFIG = window.INDEX_PAGE_BOOTSTRAP || {};
     const APP_URLS = APP_CONFIG.urls || {};
 
     const MODEL_UI = {
@@ -52,6 +52,7 @@
     };
 
     const STATUS_UI = {
+      queued: { label: '排队中', badge: 'bg-slate-100 text-slate-700 ring-slate-200', bar: 'bg-slate-400' },
       running: { label: '运行中', badge: 'bg-sky-100 text-sky-700 ring-sky-200', bar: 'bg-sky-500' },
       done: { label: '已完成', badge: 'bg-emerald-100 text-emerald-700 ring-emerald-200', bar: 'bg-emerald-500' },
       error: { label: '失败', badge: 'bg-rose-100 text-rose-700 ring-rose-200', bar: 'bg-rose-500' },
@@ -220,7 +221,10 @@
       }).join('');
     }
 
-    function refreshJobs() {
+    var _refreshTimer = null;
+    function refreshJobs(btn) {
+      if (btn && btn.classList) btn.classList.add('mr-btn--loading');
+      if (_refreshTimer) clearTimeout(_refreshTimer);
       fetch(APP_URLS.listJobs || '/jobs')
         .then(function (resp) { return resp.json(); })
         .then(function (data) {
@@ -242,7 +246,8 @@
         })
         .catch(function () {})
         .finally(function () {
-          window.setTimeout(refreshJobs, 3000);
+          if (btn && btn.classList) btn.classList.remove('mr-btn--loading');
+          _refreshTimer = window.setTimeout(refreshJobs, 3000);
         });
     }
 
@@ -326,9 +331,36 @@
       Oracle:   { title: '数据检测与研判', subtitle: '查询 Oracle 内网数据库，对已采集的目标图像执行 AI 检测与结果研判', btnLabel: '▶ 新建检测任务' },
       Upload:   { title: '现场素材研判',   subtitle: '上传视频或图片，直接在系统内执行 AI 检测分析', btnLabel: '▶ 上传素材' },
       Face:     { title: '人脸识别与人员核验', subtitle: '识别结果人员与底库交叉比对，后台自动触发流转', btnLabel: '同步人脸库' },
-      Train:    { title: '模型自训练',     subtitle: '将实战结果数据回流训练集，沉淀专项识别能力', btnLabel: '开始训练' },
-      Dispatch: { title: '任务下发',       subtitle: '向现场执法单位推送告知单，提高处置响应速度', btnLabel: '下发全部' }
+      Train:    { title: '模型自训练',     subtitle: '将实战结果数据回流训练集，沉淀专项识别能力', btnLabel: '创建训练任务' },
+      Dispatch: { title: '任务下发',       subtitle: '向现场执法单位推送告知单，提高处置响应速度', btnLabel: '下发选中' },
+      Diagnostics: { title: '任务队列诊断', subtitle: '查看 SQLite 持久化队列、Worker 执行状态和陈旧任务风险', btnLabel: '刷新诊断' }
     };
+
+    function submitFormById(formId) {
+      var form = document.getElementById(formId);
+      if (!form) return false;
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      return true;
+    }
+
+    function runTabPrimaryAction(tab) {
+      if (tab === 'Oracle') return submitFormById('jobForm');
+      if (tab === 'Upload') return submitFormById('uploadForm');
+      if (tab === 'Train') return submitFormById('trainRunForm');
+      if (tab === 'Face' && typeof runFaceLibraryAction === 'function') {
+        runFaceLibraryAction('global', 'sync');
+        return true;
+      }
+      if (tab === 'Dispatch' && typeof sendDispatchTasks === 'function') {
+        sendDispatchTasks();
+        return true;
+      }
+      if (tab === 'Diagnostics' && typeof refreshTaskQueueDiagnostics === 'function') {
+        refreshTaskQueueDiagnostics();
+        return true;
+      }
+      return false;
+    }
 
     function switchTab(tab) {
       var panels = {
@@ -336,14 +368,16 @@
         Upload: document.getElementById('tabUpload'),
         Train: document.getElementById('tabTrain'),
         Dispatch: document.getElementById('tabDispatch'),
-        Face: document.getElementById('tabFace')
+        Face: document.getElementById('tabFace'),
+        Diagnostics: document.getElementById('tabDiagnostics')
       };
       var buttons = {
         Oracle: document.getElementById('tabBtnOracle'),
         Upload: document.getElementById('tabBtnUpload'),
         Train: document.getElementById('tabBtnTrain'),
         Dispatch: document.getElementById('tabBtnDispatch'),
-        Face: document.getElementById('tabBtnFace')
+        Face: document.getElementById('tabBtnFace'),
+        Diagnostics: document.getElementById('tabBtnDiagnostics')
       };
       Object.keys(panels).forEach(function (key) {
         if (panels[key]) panels[key].classList.add('hidden');
@@ -364,13 +398,24 @@
       var btnEl   = document.getElementById('headerPrimaryBtn');
       if (titleEl) titleEl.textContent = meta.title || tab;
       if (subEl)   subEl.textContent   = meta.subtitle || '';
-      if (btnEl)   btnEl.textContent   = meta.btnLabel || '';
+      if (btnEl) {
+        btnEl.textContent = meta.btnLabel || '';
+        btnEl.onclick = function () {
+          runTabPrimaryAction(tab);
+        };
+      }
       if (tab === 'Face') {
         refreshFaceTab();
       } else if (tab === 'Train') {
         refreshTrainTab();
       } else if (tab === 'Dispatch' && typeof refreshDispatchTab === 'function') {
         refreshDispatchTab();
+      } else if (tab === 'Diagnostics' && typeof refreshTaskQueueDiagnostics === 'function') {
+        refreshTaskQueueDiagnostics();
+      }
+      if (typeof setTaskQueueAutoRefresh === 'function') {
+        var auto = document.getElementById('diagAutoRefresh');
+        setTaskQueueAutoRefresh(tab === 'Diagnostics' && (!auto || auto.checked));
       }
       try { localStorage.setItem('bczj_active_tab', tab); } catch (e) {}
     }

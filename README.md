@@ -25,6 +25,8 @@
 ```
 multi-rider/
 ├── app.py                   # Flask 入口，注册各业务模块 Blueprint
+├── worker.py                # 后台任务 Worker 入口
+├── docker-compose.yml       # Ubuntu Docker Compose 编排：Web + Worker
 ├── requirements.txt         # 直接依赖
 ├── requirements.lock        # uv 生成的完整锁文件
 ├── modules/
@@ -48,10 +50,13 @@ multi-rider/
 ├── docs/                    # 方案文档、交接记录、设计稿、辅助脚本
 ├── ops/
 │   ├── Dockerfile           # Linux Docker 镜像定义
-│   └── app.env.example      # 环境变量模板
+│   ├── app.env.example      # Windows 10 + uv 本地运行环境变量模板
+│   ├── app.env.local.example # Windows 本地演示安全模板（默认 mock 外部下发、人脸 SQL）
+│   ├── smoke_check.py       # 本地部署 smoke 检查脚本
+│   └── app.env.ubuntu.example # Ubuntu 22 + Docker Compose 环境变量模板
 ├── model/                   # 模型文件（不入库）
 ├── output/                  # 推理结果 ZIP 输出目录
-├── upload_tmp/              # 视频上传临时目录（推理后自动清理）
+├── upload_tmp/              # 上传源文件暂存目录（Worker 完成后按历史清理策略删除）
 └── instantclient_11_2/      # Oracle Instant Client（不入库，Windows/Linux 版本不同）
 ```
 
@@ -73,7 +78,7 @@ multi-rider/
 ## 运行目录维护
 
 - `output/`：检测结果 ZIP 和 `_results/` 清单目录。需要保留历史结果时不要直接清空；如仅做演示，可定期删除旧任务目录与旧 ZIP。
-- `upload_tmp/`：上传过程中的临时目录。正常结束后会自动清理；若异常中断后残留，可手动清空。
+- `upload_tmp/`：上传源文件暂存目录。为支持 Worker 重试，文件不会在任务结束瞬间删除，而是随旧任务清理策略统一删除。
 - `logs/`：启动器和运行日志。当前仓库里常见的是 `app.stdout.log`、`app.stderr.log`；可按时间轮转或定期删除旧日志。
 - `train_runs/`：训练运行输出目录。仅在实际训练后产生内容，通常体积较大，建议按任务完成情况归档或清理。
 - `datasets/`：训练数据集目录。这里是业务数据，不应像缓存目录那样随意清空。
@@ -94,9 +99,15 @@ multi-rider/
 | `MAX_WORKERS` | `8` | 并发下载线程数 |
 | `BATCH_SIZE` | `8` | YOLO 推理批大小 |
 | `IMGSZ` | `640` | 推理输入尺寸 |
+| `TORCH_NUM_THREADS` | `0` | PyTorch CPU 线程数，`0` 表示不主动设置 |
+| `OPENCV_NUM_THREADS` | `0` | OpenCV CPU 线程数，`0` 表示不主动设置 |
 | `VIDEO_FRAME_INTERVAL` | `5` | 视频每隔 N 帧取一帧 |
 | `MAX_UPLOAD_BYTES` | `524288000` (500 MB) | 上传文件大小上限 |
+| `SQLITE_DB_PATH` | `./jobs.sqlite3` | SQLite 历史、任务状态与队列数据库 |
 | `OUTPUT_DIR` | `./output` | 结果 ZIP 目录 |
+| `DATASETS_DIR` | `./datasets` | 训练数据集目录 |
+| `FACE_DATA_DIR` | `./face_data` | 人脸库照片、特征和缓存 |
+| `TRAIN_RUNS_DIR` | `./train_runs` | 训练运行产物目录 |
 | `YOLO_TELEMETRY` | `false` | **禁用 ultralytics 联网检测**（内网必须保持 false） |
 
 ---
@@ -143,6 +154,15 @@ uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua
 
 ### 2. 配置环境变量
 
+推荐先复制安全本地模板。该模板默认 `DISPATCH_MOCK_MODE=true`、`FACE_SQL_ENABLED=false`，适合开发机和演示环境，不会主动调用真实下发平台或人脸 SQL：
+
+```powershell
+Copy-Item .\ops\app.env.local.example .\app.env
+notepad .\app.env
+```
+
+如果需要连接真实 Oracle、下发平台或人脸库 SQL，再把 `app.env` 里的 `CHANGE_ME` 和 mock 开关改成目标环境值。
+
 在 PowerShell 中临时设置（每次启动前执行），或写入系统环境变量：
 
 ```powershell
@@ -156,8 +176,26 @@ $env:FLASK_SECRET_KEY = "改成随机字符串"
 ### 3. 启动服务
 
 ```powershell
-python app.py
+.\.venv\Scripts\python.exe app.py
 ```
+
+训练、批量预标注和人脸库同步/重建任务采用独立 Worker 执行。另开一个 PowerShell 窗口，启动：
+
+```powershell
+.\.venv\Scripts\python.exe worker.py
+```
+
+如需只处理某一类任务，可按类型启动：
+
+```powershell
+.\.venv\Scripts\python.exe worker.py --type detection
+.\.venv\Scripts\python.exe worker.py --type upload
+.\.venv\Scripts\python.exe worker.py --type train
+.\.venv\Scripts\python.exe worker.py --type auto_annotate
+.\.venv\Scripts\python.exe worker.py --type face_library
+```
+
+未启动 Worker 时，数据库检测、本地上传检测、训练、批量预标注和人脸库任务会停留在 `queued`，这是预期状态。
 
 服务默认监听 `0.0.0.0:5001`，浏览器访问：
 
@@ -169,6 +207,33 @@ http://localhost:5001/
 
 ```
 http://本机IP:5001/
+```
+
+健康检查：
+
+```
+http://localhost:5001/livez
+http://localhost:5001/healthz
+```
+
+`/livez` 只表示 Flask 进程可响应，适合判断服务是否存活。`/healthz` 是严格健康检查，返回 `200` 表示 SQLite、输出目录、模型文件和任务队列状态正常；返回 `503` 表示至少一项检查失败。
+
+任务队列诊断：
+
+```
+http://localhost:5001/diagnostics/task-queue
+```
+
+该接口和工作台里的“任务队列诊断”页只读展示 Worker 队列状态、陈旧运行任务和最近任务列表，不会重置、重试或删除任务。
+
+本地 smoke 检查：
+
+```powershell
+# Web 和 Worker 已启动时执行完整检查
+.\.venv\Scripts\python.exe .\ops\smoke_check.py --base-url http://127.0.0.1:5001
+
+# 未启动 Web 时，仅验证 SQLite 队列 claim/complete 链路，使用临时测试库
+.\.venv\Scripts\python.exe .\ops\smoke_check.py --queue-only
 ```
 
 ### 4. 开机自启（可选）
@@ -191,9 +256,9 @@ http://本机IP:5001/
 
 ---
 
-## 部署方式二：Linux + Docker（内网服务器）
+## 部署方式二：Ubuntu 22 + Docker Compose（内网服务器）
 
-适用于 CentOS / Debian / Ubuntu 等 Linux 内网服务器，推荐生产环境使用。
+适用于后续部署到 Ubuntu 22 内网服务器长期运行。推荐使用 Docker Compose 同时管理 Web 和 Worker，不再手工 `docker exec` 进入容器启动 Worker。
 
 ### 前提条件（构建机，需能访问互联网或清华镜像源）
 
@@ -201,7 +266,7 @@ http://本机IP:5001/
 2. Oracle Instant Client **Linux 版**（`.so` 文件），解压到 `instantclient_11_2/`
    - 需包含 `libclntsh.so.11.1`
 3. `static/tailwind.min.js` 已存在（已包含在仓库）
-4. 构建机已安装 Docker
+4. 构建机已安装 Docker / Docker Compose
 
 ### 1. 构建镜像并导出
 
@@ -220,6 +285,7 @@ sha256sum multi-rider_latest.tar > multi-rider_latest.tar.sha256
 - torch/torchvision 使用 CPU-only wheel（PyTorch 官方 whl 索引）
 - 其余依赖来自 `requirements.lock`（清华 PyPI 源）
 - 构建时自动检查模型文件和 Instant Client，缺失则报错退出
+- 镜像内默认使用 Linux 路径：`/app/data`、`/app/output`、`/app/datasets`、`/app/face_data`、`/app/train_runs`、`/app/upload_tmp`
 
 ### 2. 传输到内网服务器
 
@@ -228,10 +294,11 @@ sha256sum multi-rider_latest.tar > multi-rider_latest.tar.sha256
 ```
 multi-rider_latest.tar
 multi-rider_latest.tar.sha256
-ops/app.env.example
+docker-compose.yml
+ops/app.env.ubuntu.example
 ```
 
-### 3. 在内网服务器上部署
+### 3. 在 Ubuntu 服务器上部署
 
 ```bash
 # 校验文件完整性
@@ -241,21 +308,29 @@ sha256sum -c multi-rider_latest.tar.sha256
 sudo docker load -i multi-rider_latest.tar
 
 # 准备目录和配置文件
-sudo mkdir -p /opt/multi-rider/output /opt/multi-rider/upload_tmp
-sudo cp ops/app.env.example /opt/multi-rider/app.env
+sudo mkdir -p /opt/multi-rider
+sudo cp docker-compose.yml /opt/multi-rider/docker-compose.yml
+sudo cp ops/app.env.ubuntu.example /opt/multi-rider/app.env
+cd /opt/multi-rider
 sudo vi /opt/multi-rider/app.env
-# 至少修改以下两项：
+# 至少修改以下几项：
 #   ORACLE_PASSWORD=你的数据库密码
 #   FLASK_SECRET_KEY=改成随机字符串
+#   DISPATCH_CLIENT_SECRET=下发平台密钥
+#   DISPATCH_SMS_PASSWORD=短信平台密码
 
-# 启动容器
-sudo docker run -d \
-  --name multi-rider \
-  --restart unless-stopped \
-  -p 5001:5001 \
-  --env-file /opt/multi-rider/app.env \
-  -v /opt/multi-rider/output:/app/output \
-  multi-rider:latest
+# 先验证 Compose 配置解析
+sudo docker compose config
+
+# 一条命令启动 Web + Worker
+sudo docker compose up -d
+```
+
+仓库根目录本地预检时，如果还没有 `./app.env`，可临时指定示例文件解析 Compose：
+
+```powershell
+$env:APP_ENV_FILE='ops/app.env.ubuntu.example'
+docker compose config
 ```
 
 访问地址：
@@ -264,23 +339,55 @@ sudo docker run -d \
 http://服务器IP:5001/
 ```
 
+健康检查：
+
+```
+http://服务器IP:5001/livez
+http://服务器IP:5001/healthz
+```
+
+任务队列诊断：
+
+```
+http://服务器IP:5001/diagnostics/task-queue
+```
+
+Compose 会启动两个容器：
+
+| 容器 | 命令 | 作用 |
+|---|---|---|
+| `multi-rider-web` | `python app.py` | 页面和 API，只负责创建任务、查询状态 |
+| `multi-rider-worker` | `python worker.py` | 执行数据库检测、本地上传检测、训练、批量预标注、人脸库任务 |
+
+Worker 不需要进入容器手工运行；Compose 会自动启动并在异常退出后重启。
+
+默认数据目录在 `/opt/multi-rider/runtime/`：
+
+```
+/opt/multi-rider/runtime/data/jobs.sqlite3
+/opt/multi-rider/runtime/output/
+/opt/multi-rider/runtime/datasets/
+/opt/multi-rider/runtime/face_data/
+/opt/multi-rider/runtime/train_runs/
+/opt/multi-rider/runtime/upload_tmp/
+```
+
 ### 4. 更新容器
 
 ```bash
-# 导入新镜像后
-sudo docker stop multi-rider
-sudo docker rm multi-rider
-# 重新执行 docker run 命令
+# 导入新镜像后，在 /opt/multi-rider 下执行
+sudo docker compose up -d
 ```
 
 ### 5. 常用运维命令
 
 ```bash
-sudo docker ps                    # 查看容器状态
-sudo docker logs -f multi-rider   # 查看实时日志
-sudo docker restart multi-rider   # 重启容器
-sudo docker stop multi-rider      # 停止容器
-sudo docker rm -f multi-rider     # 删除容器
+sudo docker compose ps              # 查看 Web / Worker 状态
+sudo docker compose logs -f web      # 查看 Web 日志
+sudo docker compose logs -f worker   # 查看 Worker 日志
+sudo docker compose restart worker   # 单独重启 Worker
+sudo docker compose restart web      # 单独重启 Web
+sudo docker compose down             # 停止 Web + Worker
 ```
 
 ### 6. 防火墙
@@ -297,9 +404,10 @@ sudo ufw allow 5001/tcp
 ### 注意事项
 
 - `instantclient_11_2/` 必须是 **Linux `.so`** 版本（容器内为 Debian 用户态）
-- `output/` 挂载到宿主机，容器重建后历史 ZIP 不丢失
-- 上传任务进度存于容器内存，容器重启后运行中的上传任务状态会丢失
+- `runtime/` 挂载到宿主机，容器重建后 SQLite、历史 ZIP、数据集、人脸库和训练产物不丢失
+- 上传检测任务状态已持久化到 SQLite；Worker 重启后会按队列状态继续处理或重试
 - `YOLO_TELEMETRY=false` 已在 Dockerfile ENV 中预设，无需手动添加
+- 16 核 CPU 无 GPU 环境建议先保持一个 Worker；训练任务最好放在低峰期运行
 
 ---
 

@@ -21,6 +21,7 @@
     let IMPORT_STATE = { assetIds: [], datasets: [], loading: false };
 
     const STATUS_UI = {
+      queued: { label: '排队中', badge: 'bg-slate-100 text-slate-700 ring-slate-200' },
       running: { label: '运行中', badge: 'bg-sky-100 text-sky-700 ring-sky-200' },
       done: { label: '已完成', badge: 'bg-emerald-100 text-emerald-700 ring-emerald-200' },
       error: { label: '失败', badge: 'bg-rose-100 text-rose-700 ring-rose-200' },
@@ -157,13 +158,13 @@
       const actions = document.getElementById('jobActions');
       const buttons = [];
       if (job.status === 'done' && job.download_url) {
-        buttons.push('<a class="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700" href="' + job.download_url + '" target="_blank">下载结果 ZIP</a>');
+        buttons.push('<a class="mr-btn mr-btn--ink" href="' + job.download_url + '" target="_blank">下载结果 ZIP</a>');
       }
       if (job.summary_url) {
-        buttons.push('<a class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href="' + job.summary_url + '" target="_blank">下载摘要</a>');
+        buttons.push('<a class="mr-btn mr-btn--ghost" href="' + job.summary_url + '" target="_blank">下载摘要</a>');
       }
       (job.download_parts || []).forEach(function (part) {
-        buttons.push('<a class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" href="' + part.url + '" target="_blank">' + escapeHtml(part.name) + '</a>');
+        buttons.push('<a class="mr-btn mr-btn--ghost" href="' + part.url + '" target="_blank">' + escapeHtml(part.name) + '</a>');
       });
       actions.innerHTML = buttons.join('');
     }
@@ -224,10 +225,10 @@
                   '<div class="text-right text-xs font-semibold text-slate-500">检测分 ' + escapeHtml(face.det_score || '-') + '</div>' +
                 '</div>'
               );
-            }).join('') : '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-500">该人脸暂无匹配结果。</div>';
+            }).join('') : '<div class="mr-card mr-card--soft">该人脸暂无匹配结果。</div>';
 
             return (
-              '<div class="mt-4 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">' +
+              '<div class="mr-card mr-card--soft">' +
                 '<div class="flex flex-wrap items-center justify-between gap-3">' +
                   '<div class="text-sm font-semibold text-slate-800">人脸 ' + (index + 1) + '</div>' +
                   '<span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ' + faceMeta.badge + '">' + faceMeta.label + '</span>' +
@@ -481,19 +482,19 @@
       </div>
 
       <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+        <div class="mr-card mr-card--soft">
           <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">来源</div>
           <div id="jobSource" class="mt-2 text-sm font-semibold text-slate-800"></div>
         </div>
-        <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+        <div class="mr-card mr-card--soft">
           <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">模型</div>
           <div id="jobModel" class="mt-2 text-sm font-semibold text-slate-800"></div>
         </div>
-        <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+        <div class="mr-card mr-card--soft">
           <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">时间</div>
           <div id="jobTime" class="mt-2 text-sm font-semibold text-slate-800"></div>
         </div>
-        <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+        <div class="mr-card mr-card--soft">
           <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">识别摘要</div>
           <div id="jobFaces" class="mt-2 text-sm font-semibold text-slate-800"></div>
         </div>
@@ -523,7 +524,7 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <button id="importAllBtn" type="button" onclick="importAllResults()" class="inline-flex items-center justify-center rounded-full border border-teal-200 bg-white px-5 py-3 text-sm font-semibold text-teal-700 transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400">全部加入数据集</button>
-          <button id="reidentifyAllBtn" type="button" onclick="rerunIdentifyAll()" class="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">重新识别全部结果图</button>
+          <button id="reidentifyAllBtn" type="button" onclick="rerunIdentifyAll()" class="mr-btn mr-btn--ink">重新识别全部结果图</button>
         </div>
       </div>
     </section>
@@ -550,10 +551,10 @@
         <div class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Add To Dataset</div>
         <h3 id="importTitle" class="mt-2 text-lg font-semibold text-slate-900">导入结果图</h3>
       </div>
-      <button type="button" onclick="closeImportDrawer()" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">关闭</button>
+      <button type="button" onclick="closeImportDrawer()" class="mr-btn mr-btn--ghost">关闭</button>
     </div>
     <div class="space-y-5 px-5 py-5">
-      <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+      <div class="mr-card mr-card--soft">
         <div id="importMeta" class="text-sm leading-7 text-slate-600">当前没有可导入的结果图。</div>
       </div>
       <label class="block">
@@ -562,13 +563,13 @@
           <option value="">请先在首页创建数据集</option>
         </select>
       </label>
-      <div class="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-7 text-slate-600">
+      <div class="mr-card mr-card--soft">
         导入后会把结果图复制到训练数据集的 <code class="rounded bg-white px-2 py-1 text-xs text-slate-700">images</code> 目录，用于后续标注和训练，不会影响原有任务记录。
       </div>
       <div id="importFeedback" class="hidden"></div>
       <div class="flex flex-wrap justify-end gap-2">
-        <a href="{{ url_for('job.index') }}" class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">前往首页</a>
-        <button id="importSubmitBtn" type="button" onclick="submitImport()" class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">确认导入</button>
+        <a href="{{ url_for('job.index') }}" class="mr-btn mr-btn--ghost">前往首页</a>
+        <button id="importSubmitBtn" type="button" onclick="submitImport()" class="mr-btn mr-btn--ink">确认导入</button>
       </div>
     </div>
   </aside>

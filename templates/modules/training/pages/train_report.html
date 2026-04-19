@@ -36,10 +36,10 @@
     <header class="grid gap-4 xl:grid-cols-[1.4fr,0.9fr]">
       <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
         <div class="flex flex-wrap items-center gap-3">
-          <a href="{{ url_for('job.index') }}" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+          <a href="{{ url_for('job.index') }}" class="mr-btn mr-btn--ghost">
             返回首页
           </a>
-          <a href="{{ url_for('job.history_page') }}" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+          <a href="{{ url_for('job.history_page') }}" class="mr-btn mr-btn--ghost">
             历史记录
           </a>
         </div>
@@ -101,17 +101,17 @@
             {{ report.assessment.summary }}
           </p>
           <div class="mt-5 grid gap-4 sm:grid-cols-3">
-            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs text-slate-500">样本量判断</div>
               <div class="mt-2 text-lg font-semibold text-slate-900">{{ report.assessment.sample_text }}</div>
               <div class="mt-1 text-sm text-slate-500">已标注 {{ report.assessment.sample_count }} 张</div>
             </div>
-            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs text-slate-500">训练 / 验证</div>
               <div class="mt-2 text-lg font-semibold text-slate-900">{{ report.assessment.train_count }} / {{ report.assessment.val_count }}</div>
               <div class="mt-1 text-sm text-slate-500">建议验证集尽量充足</div>
             </div>
-            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs text-slate-500">最佳轮次</div>
               <div class="mt-2 text-lg font-semibold text-slate-900">第 {{ report.assessment.best_epoch.epoch or '--' }} 轮</div>
               <div class="mt-1 text-sm text-slate-500">
@@ -140,29 +140,29 @@
             </div>
           </div>
           <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs text-slate-500">查准率</div>
               <div class="mt-2 text-3xl font-bold text-slate-900">{{ report.metrics.precision }}</div>
             </div>
-            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs text-slate-500">查全率</div>
               <div class="mt-2 text-3xl font-bold text-slate-900">{{ report.metrics.recall }}</div>
             </div>
-            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs text-slate-500">综合指标 mAP50</div>
               <div class="mt-2 text-3xl font-bold text-emerald-600">{{ report.metrics.mAP50 }}</div>
             </div>
-            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs text-slate-500">综合指标 mAP50-95</div>
               <div class="mt-2 text-3xl font-bold text-amber-500">{{ report.metrics.mAP50_95 }}</div>
             </div>
           </div>
           <div class="mt-4 grid gap-4 sm:grid-cols-2">
-            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs text-slate-500">框损失（Box Loss）</div>
               <div class="mt-2 text-2xl font-bold text-slate-900">{{ report.losses.box_loss }}</div>
             </div>
-            <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs text-slate-500">分类损失（Cls Loss）</div>
               <div class="mt-2 text-2xl font-bold text-slate-900">{{ report.losses.cls_loss }}</div>
             </div>
@@ -191,7 +191,7 @@
             {% endfor %}
           </div>
           {% else %}
-          <div class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
+          <div class="mr-card mr-card--soft">
             当前任务还没有可展示的评估图像。
           </div>
           {% endif %}
@@ -238,7 +238,7 @@
             </div>
           </div>
           {% else %}
-          <div class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
+          <div class="mr-card mr-card--soft">
             当前任务还没有可展示的训练历史。
           </div>
           {% endif %}
@@ -264,7 +264,7 @@
                 class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100" />
             </label>
             <button id="publishModelBtn" type="button"
-              class="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700">
+              class="mr-btn mr-btn--ink">
               一键发布到模型目录
             </button>
             <div id="publishFeedback" class="hidden"></div>
@@ -275,19 +275,19 @@
           <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">关键文件</div>
           <h2 class="mt-2 text-2xl font-semibold text-slate-900">训练产物路径</h2>
           <div class="mt-6 space-y-3 text-sm leading-7 text-slate-600">
-            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">训练目录</div>
               <div class="mt-2 break-all font-mono text-xs text-slate-600">{{ report.paths.run_dir or '--' }}</div>
             </div>
-            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">产物目录</div>
               <div class="mt-2 break-all font-mono text-xs text-slate-600">{{ report.paths.artifact_dir or '--' }}</div>
             </div>
-            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">最佳权重</div>
               <div class="mt-2 break-all font-mono text-xs text-slate-600">{{ report.paths.best_weights or '--' }}</div>
             </div>
-            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <div class="mr-card mr-card--soft">
               <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">指标文件</div>
               <div class="mt-2 break-all font-mono text-xs text-slate-600">{{ report.paths.results_csv or '--' }}</div>
             </div>
@@ -300,13 +300,13 @@
           <div id="publishedModelList" class="mt-6 space-y-3">
             {% if report.publish.published_models %}
               {% for item in report.publish.published_models %}
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm leading-7 text-slate-600">
+              <div class="mr-card mr-card--soft">
                 <div class="font-semibold text-slate-900">{{ item.model_name }}</div>
                 <div class="mt-1 break-all font-mono text-xs text-slate-500">{{ item.model_path }}</div>
               </div>
               {% endfor %}
             {% else %}
-              <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">
+              <div class="mr-card mr-card--soft">
                 当前任务还没有发布记录。
               </div>
             {% endif %}

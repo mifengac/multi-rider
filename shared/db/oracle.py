@@ -163,9 +163,6 @@ def build_query_and_binds(
             binds[key] = hour
         sql += f" AND HOUR IN ({','.join(placeholders)})"
 
-    if model_key == "bczj":
-        sql += " AND 1=1"
-
     return sql, binds
 
 

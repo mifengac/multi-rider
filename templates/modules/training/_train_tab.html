@@ -38,7 +38,7 @@
                 <code class="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">exports/</code>。
               </div>
               <button id="trainDatasetSubmit" type="submit"
-                class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:bg-slate-700">
+                class="mr-btn mr-btn--ink">
                 创建数据集
               </button>
             </div>
@@ -72,7 +72,7 @@
                 </label>
               </div>
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-7 text-slate-600">
+              <div class="mr-card mr-card--soft">
                 支持 ZIP 内包含
                 <code class="rounded bg-white px-2 py-1 text-xs text-slate-700">jpg / jpeg / png / bmp / tif / tiff / webp</code>
                 图片。非图片文件会自动跳过，导入结果会同步更新到下方数据集列表。
@@ -85,7 +85,7 @@
                   第一阶段只做图片归档和元数据入库。后续会在这批图片上继续接历史结果回流、标注和训练任务。
                 </div>
                 <button id="trainImportSubmit" type="submit"
-                  class="inline-flex items-center justify-center rounded-full bg-teal-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-600/20 transition hover:-translate-y-0.5 hover:bg-teal-500"
+                  class="mr-btn mr-btn--brand"
                   disabled>
                   导入 ZIP
                 </button>
@@ -100,12 +100,12 @@
                 <h3 class="mt-2 text-xl font-semibold text-slate-900">现有数据集</h3>
               </div>
               <button type="button" onclick="refreshTrainTab()"
-                class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                class="mr-btn mr-btn--ghost">
                 刷新
               </button>
             </div>
             <div id="trainDatasetList" class="mt-5 space-y-4">
-              <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">正在加载数据集...</div>
+              <div class="mr-card mr-card--soft">正在加载数据集...</div>
             </div>
           </div>
         </section>
@@ -149,7 +149,7 @@
                     <option value="lowmem">低算力模式 · 512 / 50 轮</option>
                   </select>
                 </label>
-                <div class="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-7 text-slate-600">
+                <div class="mr-card mr-card--soft">
                   <div class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Preset Note</div>
                   <div id="trainPresetHint" class="mt-2">
                     适合快速验证数据集流程，默认使用较小模型和较短轮数。
@@ -175,12 +175,12 @@
                 </label>
               </div>
 
-              <label class="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
+              <label class="mr-card mr-card--soft">
                 <input id="trainConfirmedOnly" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
                 仅使用已确认样本参与训练
               </label>
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-7 text-slate-600">
+              <div class="mr-card mr-card--soft">
                 训练任务会在
                 <code class="rounded bg-white px-2 py-1 text-xs text-slate-700">train_runs/&lt;job_id&gt;</code>
                 下生成参数快照、数据集 YAML、训练日志和产物目录，适合内网低算力环境逐步验证专项模型效果。
@@ -190,12 +190,12 @@
 
               <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
                 <button type="button" onclick="refreshTrainJobs()"
-                  class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                  class="mr-btn mr-btn--ghost">
                   刷新任务
                 </button>
                 <button id="trainRunSubmit" type="submit"
                   disabled
-                  class="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">
+                  class="mr-btn mr-btn--ink">
                   创建训练任务
                 </button>
               </div>
@@ -209,12 +209,12 @@
                 <h3 class="mt-2 text-xl font-semibold text-slate-900">最近训练任务</h3>
               </div>
               <button type="button" onclick="refreshTrainJobs()"
-                class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                class="mr-btn mr-btn--ghost">
                 刷新
               </button>
             </div>
             <div id="trainJobList" class="mt-5 space-y-4">
-              <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-500">正在加载训练任务...</div>
+              <div class="mr-card mr-card--soft">正在加载训练任务...</div>
             </div>
           </div>
 
@@ -222,19 +222,19 @@
             <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">数据集状态</div>
             <h3 class="mt-2 text-xl font-semibold text-slate-900">工作区概览</h3>
             <div class="mt-5 grid gap-4 sm:grid-cols-2">
-              <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="mr-card mr-card--soft">
                 <div class="text-xs text-slate-500">数据集</div>
                 <div id="trainMetricDatasets" class="mt-2 text-2xl font-bold text-slate-900">0</div>
               </div>
-              <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="mr-card mr-card--soft">
                 <div class="text-xs text-slate-500">图片数</div>
                 <div id="trainMetricImages" class="mt-2 text-2xl font-bold text-slate-900">0</div>
               </div>
-              <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="mr-card mr-card--soft">
                 <div class="text-xs text-slate-500">已标注</div>
                 <div id="trainMetricLabeled" class="mt-2 text-2xl font-bold text-emerald-600">0</div>
               </div>
-              <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="mr-card mr-card--soft">
                 <div class="text-xs text-slate-500">已复核</div>
                 <div id="trainMetricReviewed" class="mt-2 text-2xl font-bold text-amber-500">0</div>
               </div>
@@ -245,10 +245,10 @@
             <div class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Workflow</div>
             <h3 class="mt-2 text-xl font-semibold text-slate-900">当前训练闭环</h3>
             <div class="mt-5 space-y-3 text-sm leading-7 text-slate-600">
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持把 Oracle 巡检结果和本地素材研判结果回流为训练样本。</div>
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持图片导入、人工框标、预标注、复核和仅用已确认样本训练。</div>
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持发起真实训练任务，生成评估页面，并一键发布训练结果到模型目录。</div>
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">支持模型注册与用途管理，便于区分训练底模、预标注模型和线上识别模型。</div>
+              <div class="mr-card mr-card--soft">支持把 Oracle 巡检结果和本地素材研判结果回流为训练样本。</div>
+              <div class="mr-card mr-card--soft">支持图片导入、人工框标、预标注、复核和仅用已确认样本训练。</div>
+              <div class="mr-card mr-card--soft">支持发起真实训练任务，生成评估页面，并一键发布训练结果到模型目录。</div>
+              <div class="mr-card mr-card--soft">支持模型注册与用途管理，便于区分训练底模、预标注模型和线上识别模型。</div>
             </div>
           </div>
 
@@ -259,15 +259,15 @@
                 <h3 class="mt-2 text-xl font-semibold text-slate-900">模型版本管理</h3>
               </div>
               <a href="{{ url_for('train.train_model_registry_page') }}" target="_blank" rel="noreferrer"
-                class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                class="mr-btn mr-btn--ghost">
                 打开管理页
               </a>
             </div>
             <div class="mt-5 space-y-3 text-sm leading-7 text-slate-600">
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="mr-card mr-card--soft">
                 现在可以集中查看已发布模型、基础模型和线上使用中的模型版本。
               </div>
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <div class="mr-card mr-card--soft">
                 支持一键切换本地上传默认模型、数据库检测通用模型、数据库检测专用模型，并保留最近回滚历史。
               </div>
             </div>
@@ -280,7 +280,7 @@
               <div class="rounded-2xl border border-dashed border-teal-200 bg-teal-50/60 p-4 text-sm leading-7 text-teal-800">
                 当前已经支持历史结果回流、框标注、真实训练、评估页和模型版本管理。下一步可以继续补训练结果对比和导出能力。
               </div>
-              <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm leading-7 text-slate-600">
+              <div class="mr-card mr-card--soft">
                 训练预设、预标注模型选择，以及发布到
                 <code class="rounded bg-white px-2 py-1 text-xs text-slate-700">model/</code>
                 的能力已经接通；接下来重点会放在版本对比、导出和长期归档。
