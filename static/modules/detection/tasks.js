@@ -328,7 +328,7 @@
     // ==================== UPLOAD TAB ====================
 
     var TAB_META = {
-      Oracle:   { title: '数据检测与研判', subtitle: '查询 Oracle 内网数据库，对已采集的目标图像执行 AI 检测与结果研判', btnLabel: '▶ 新建检测任务' },
+      Oracle:   { title: '数据监测与研判', subtitle: '查询 Oracle 内网数据库，对已采集的目标图像执行 AI 检测与结果研判', btnLabel: '▶ 新建检测任务' },
       Upload:   { title: '现场素材研判',   subtitle: '上传视频或图片，直接在系统内执行 AI 检测分析', btnLabel: '▶ 上传素材' },
       Face:     { title: '人脸识别与人员核验', subtitle: '识别结果人员与底库交叉比对，后台自动触发流转', btnLabel: '同步人脸库' },
       Train:    { title: '模型自训练',     subtitle: '将实战结果数据回流训练集，沉淀专项识别能力', btnLabel: '创建训练任务' },

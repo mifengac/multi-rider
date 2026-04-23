@@ -532,8 +532,8 @@ body.mr-editorial {
 }
 
 .mr-mini-stat .value {
-  margin-top: 8px;
-  font-size: 28px;
+  margin-top: 4px;
+  font-size: 20px;
   font-family: Georgia, "Times New Roman", serif;
   color: var(--mr-text);
 }
@@ -637,15 +637,16 @@ body.mr-editorial {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
   background: rgba(245, 244, 237, 0.9);
 }
 
 .mr-main-header {
-  padding: 18px 22px 0;
+  padding: 10px 16px 0;
 }
 
 .mr-main-header-card {
-  padding: 22px 24px;
+  padding: 12px 20px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -663,19 +664,19 @@ body.mr-editorial {
 }
 
 .mr-stat-strip {
-  padding: 16px 22px 0;
+  padding: 10px 22px 0;
   display: grid;
-  gap: 12px;
+  gap: 8px;
   grid-template-columns: repeat(5, 1fr);
 }
 
 .mr-stat-card {
-  padding: 16px 18px;
+  padding: 10px 14px;
 }
 
 .mr-stat-card .value {
-  margin-top: 10px;
-  font-size: 34px;
+  margin-top: 4px;
+  font-size: 22px;
   font-family: Georgia, "Times New Roman", serif;
 }
 
@@ -691,17 +692,19 @@ body.mr-editorial {
 .mr-content-scroll {
   flex: 1;
   overflow: auto;
-  padding: 18px 22px 24px;
+  min-height: 0;
+  padding: 14px 22px 24px;
 }
 
 .mr-rail {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 18px 16px;
+  padding: 14px 14px;
   border-left: 1px solid var(--mr-line);
   background: rgba(250, 249, 245, 0.88);
   overflow-y: auto;
+  min-height: 0;
 }
 
 .mr-rail-card {
@@ -711,7 +714,16 @@ body.mr-editorial {
 .mr-rail-summary {
   display: grid;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 12px;
+  font-size: 0; /* collapse any orphan text nodes */
+}
+
+.mr-rail-summary .mr-kicker {
+  font-size: 11px;
+}
+
+.mr-rail-summary .value {
+  font-size: 20px;
 }
 
 .mr-rail-metric {
@@ -722,8 +734,8 @@ body.mr-editorial {
 }
 
 .mr-rail-metric .value {
-  margin-top: 8px;
-  font-size: 32px;
+  margin-top: 4px;
+  font-size: 20px;
   font-family: Georgia, "Times New Roman", serif;
   color: var(--mr-paper);
 }
@@ -737,7 +749,7 @@ body.mr-editorial {
 .mr-action-card {
   border-radius: var(--mr-radius-md);
   background: #f6f3e9;
-  padding: 16px;
+  padding: 10px;
   box-shadow: 0 0 0 1px var(--mr-line);
   color: var(--mr-text-soft);
   cursor: pointer;

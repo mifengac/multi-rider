@@ -214,18 +214,12 @@
           <div class="mr-nav-label">Detection</div>
           <a id="tabBtnOracle" class="mr-nav-item active" href="#" onclick="switchTab('Oracle');return false;">
             <span class="mr-nav-icon">01</span>
-            <span class="mr-nav-copy">
-              <strong>数据检测与研判</strong>
-              <span>Oracle 巡检与结果沉淀</span>
-            </span>
+            <span class="mr-nav-copy"><strong>数据监测与研判</strong></span>
             <span class="mr-pill mr-pill--soft mr-nav-badge">Oracle</span>
           </a>
           <a id="tabBtnUpload" class="mr-nav-item" href="#" onclick="switchTab('Upload');return false;">
             <span class="mr-nav-icon">02</span>
-            <span class="mr-nav-copy">
-              <strong>现场素材研判</strong>
-              <span>ZIP 图包与视频抽帧检测</span>
-            </span>
+            <span class="mr-nav-copy"><strong>现场素材研判</strong></span>
           </a>
         </div>
 
@@ -233,10 +227,7 @@
           <div class="mr-nav-label">Identity</div>
           <a id="tabBtnFace" class="mr-nav-item" href="#" onclick="switchTab('Face');return false;">
             <span class="mr-nav-icon">03</span>
-            <span class="mr-nav-copy">
-              <strong>人脸识别与核验</strong>
-              <span>底库同步、特征检索、人工复核</span>
-            </span>
+            <span class="mr-nav-copy"><strong>人脸识别与核验</strong></span>
           </a>
         </div>
 
@@ -244,10 +235,7 @@
           <div class="mr-nav-label">Disposition</div>
           <a id="tabBtnDispatch" class="mr-nav-item" href="#" onclick="switchTab('Dispatch');return false;">
             <span class="mr-nav-icon">04</span>
-            <span class="mr-nav-copy">
-              <strong>任务下发</strong>
-              <span>自动流转、草稿编辑、短信提醒</span>
-            </span>
+            <span class="mr-nav-copy"><strong>任务下发</strong></span>
             <span class="mr-pill mr-pill--brand mr-nav-badge" id="navBadgePending">0</span>
           </a>
         </div>
@@ -256,10 +244,7 @@
           <div class="mr-nav-label">Training</div>
           <a id="tabBtnTrain" class="mr-nav-item" href="#" onclick="switchTab('Train');return false;">
             <span class="mr-nav-icon">05</span>
-            <span class="mr-nav-copy">
-              <strong>模型自训练</strong>
-              <span>数据集、标注、训练与发布</span>
-            </span>
+            <span class="mr-nav-copy"><strong>模型自训练</strong></span>
           </a>
         </div>
 
@@ -267,10 +252,7 @@
           <div class="mr-nav-label">System</div>
           <a id="tabBtnDiagnostics" class="mr-nav-item" href="#" onclick="switchTab('Diagnostics');return false;">
             <span class="mr-nav-icon">06</span>
-            <span class="mr-nav-copy">
-              <strong>任务队列诊断</strong>
-              <span>Worker 队列、健康状态与最近任务</span>
-            </span>
+            <span class="mr-nav-copy"><strong>任务队列诊断</strong></span>
           </a>
         </div>
       </section>
@@ -289,9 +271,8 @@
       <div class="mr-main-header">
         <section class="mr-card mr-main-header-card">
           <div>
-            <div class="mr-kicker">Workspace</div>
-            <h1 id="contentTitle" class="mr-serif" style="margin-top: 10px; font-size: 38px; line-height: 1.08;">数据检测与研判</h1>
-            <p id="contentSubtitle" class="mr-page-copy">
+            <h1 id="contentTitle" style="font-size: 17px; font-weight: 700; margin: 0; color: var(--mr-text);">数据监测与研判</h1>
+            <p id="contentSubtitle" style="margin: 4px 0 0; font-size: 12px; color: var(--mr-text-muted); line-height: 1.5;">
               查询 Oracle 内网数据库，对已采集的目标图像执行 AI 检测与结果研判。
             </p>
           </div>
@@ -352,12 +333,8 @@
 
     <aside class="mr-rail">
       <section class="mr-card mr-card--dark mr-rail-card">
-        <div class="mr-kicker">Batch Summary</div>
-        <h2 class="mr-serif" style="margin-top: 12px; font-size: 30px; line-height: 1.14;">右侧只保留“这批结果下一步怎么处理”的摘要。</h2>
-        <p class="mr-page-copy" style="margin-top: 14px; color: #b8b3a6;">
-          用于承接实时任务、命中摘要、下一步建议和快速动作，不再和中间工作台争抢注意力。
-        </p>
-        <div class="mr-rail-summary">
+        <div class="mr-kicker">批次摘要</div>
+        <div class="mr-rail-summary" style="margin-top: 12px;">“”
           <div class="mr-rail-metric">
             <div class="mr-kicker" style="color: #b8b3a6;">今日命中</div>
             <div class="value" id="panelStatHit">--</div>
@@ -371,7 +348,7 @@
 
       <section class="mr-card mr-rail-card">
         <div class="mr-kicker">Running Tasks</div>
-        <h3 class="mr-serif" style="margin-top: 10px; font-size: 24px;">实时任务</h3>
+        <h3 style="margin-top: 6px; font-size: 15px; font-weight: 600; color: var(--mr-text);">实时任务</h3>
         <div id="jobsInfo" style="margin-top: 14px;">
           <div class="mr-task-placeholder flex flex-col items-center justify-center p-6 text-center" style="color: var(--mr-text-soft);">
             <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-3 opacity-40">
@@ -386,7 +363,7 @@
 
       <section class="mr-card mr-rail-card">
         <div class="mr-kicker">Match Stream</div>
-        <h3 class="mr-serif" style="margin-top: 10px; font-size: 24px;">命中流水</h3>
+        <h3 style="margin-top: 6px; font-size: 15px; font-weight: 600; color: var(--mr-text);">命中流水</h3>
         <div id="faceMatchStream" style="margin-top: 14px;">
           <div class="mr-stream-placeholder flex flex-col items-center justify-center p-6 text-center" style="color: var(--mr-text-soft);">
             <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-3 opacity-40">
@@ -401,23 +378,19 @@
 
       <section class="mr-card mr-rail-card">
         <div class="mr-kicker">Quick Actions</div>
-        <h3 class="mr-serif" style="margin-top: 10px; font-size: 24px;">快捷动作</h3>
-        <div class="mr-action-grid" style="margin-top: 14px;">
+        <h3 style="margin-top: 6px; font-size: 15px; font-weight: 600; color: var(--mr-text);">快捷动作</h3>
+        <div class="mr-action-grid" style="margin-top: 10px;">
           <div class="mr-action-card" onclick="switchTab('Upload')">
-            <div class="mr-kicker">Upload</div>
-            <div class="mr-serif" style="margin-top: 8px; font-size: 20px;">上传素材</div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--mr-text-soft);">上传素材</div>
           </div>
           <div class="mr-action-card" onclick="switchTab('Face')">
-            <div class="mr-kicker">Face</div>
-            <div class="mr-serif" style="margin-top: 8px; font-size: 20px;">同步人脸库</div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--mr-text-soft);">人脸库</div>
           </div>
           <div class="mr-action-card" onclick="switchTab('Dispatch')">
-            <div class="mr-kicker">Dispatch</div>
-            <div class="mr-serif" style="margin-top: 8px; font-size: 20px;">任务下发</div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--mr-text-soft);">任务下发</div>
           </div>
           <div class="mr-action-card" onclick="window.open('{{ url_for('job.history_page') }}')">
-            <div class="mr-kicker">History</div>
-            <div class="mr-serif" style="margin-top: 8px; font-size: 20px;">结果历史</div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--mr-text-soft);">历史记录</div>
           </div>
         </div>
       </section>
