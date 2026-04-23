@@ -15,3 +15,14 @@ dist/
 deploy/
 *.tar
 *.tar.gz
+wheels/*
+!wheels/clip-1.0-py3-none-any.whl
+tests/
+CLIP/
+.playwright-mcp/
+output/
+upload_tmp/
+train_runs/
+datasets/
+face_data/
+jobs.sqlite3

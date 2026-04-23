@@ -40,6 +40,7 @@ def _load_env_file(*paths: str) -> None:
 _load_env_file(
     os.path.join(BASE_DIR, "app.env"),
     os.path.join(BASE_DIR, "ops", "app.env"),
+    os.path.join(BASE_DIR, ".env"),
 )
 
 ORACLE_HOST = os.getenv("ORACLE_HOST", "")

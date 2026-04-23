@@ -12,7 +12,8 @@ from shared.config.config import (
     MODEL_DEFAULT,
     logger,
 )
-from shared.db.sqlite import cleanup_old_jobs, init_db
+from shared.db.oracle import oracle_thick_mode_requested
+from shared.db.sqlite import cleanup_old_jobs, init_db, mark_running_jobs_interrupted
 from shared.health import get_health_report
 from modules.diagnostics.routes import diagnostics_bp
 from modules.detection.file_routes import file_bp
@@ -67,9 +68,10 @@ def create_app() -> Flask:
 def bootstrap_app() -> None:
     init_db()
     cleanup_old_jobs(7)
+    mark_running_jobs_interrupted()
 
-    if not os.path.isdir(INSTANT_CLIENT_DIR):
-        logger.warning("instantclient directory not found: %s", INSTANT_CLIENT_DIR)
+    if oracle_thick_mode_requested() and not os.path.isdir(INSTANT_CLIENT_DIR):
+        logger.warning("oracle thick mode requested but instantclient directory not found: %s", INSTANT_CLIENT_DIR)
 
     try:
         get_model(MODEL_DEFAULT)

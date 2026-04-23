@@ -33,6 +33,30 @@ else:
 _ORACLE_CLIENT_READY = False
 
 
+def _parse_bool_env(name: str) -> bool | None:
+    raw = os.getenv(name)
+    if raw is None:
+        return None
+    value = raw.strip().lower()
+    if not value:
+        return None
+    return value in {"1", "true", "yes", "on"}
+
+
+def oracle_thick_mode_requested() -> bool:
+    explicit = _parse_bool_env("ORACLE_USE_THICK_MODE")
+    if explicit is not None:
+        return explicit
+    if not os.path.isdir(INSTANT_CLIENT_DIR):
+        return False
+    if os.name == "nt":
+        return os.path.isfile(os.path.join(INSTANT_CLIENT_DIR, "oci.dll"))
+    try:
+        return any(name.startswith("libclntsh.so") for name in os.listdir(INSTANT_CLIENT_DIR))
+    except OSError:
+        return False
+
+
 def _prepare_windows_oracle_dll_path() -> None:
     if os.name != "nt":
         return
@@ -49,6 +73,11 @@ def _prepare_windows_oracle_dll_path() -> None:
 def init_oracle_client_if_needed() -> None:
     global _ORACLE_CLIENT_READY
     if _ORACLE_CLIENT_READY:
+        return
+
+    if not oracle_thick_mode_requested():
+        _ORACLE_CLIENT_READY = True
+        logger.info("Oracle thick mode disabled or client libraries unavailable; using thin mode")
         return
 
     _prepare_windows_oracle_dll_path()

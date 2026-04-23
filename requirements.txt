@@ -18,6 +18,10 @@ onnx>=1.18,<2
 tqdm==4.67.1
 psycopg2-binary==2.9.10
 
+# Ultralytics CLIP for YOLO-World prompt inference.
+# Keep wheels/clip-1.0-py3-none-any.whl available for offline installs.
+./wheels/clip-1.0-py3-none-any.whl
+
 # Oracle database driver
 oracledb==3.4.0
 
@@ -26,3 +30,5 @@ oracledb==3.4.0
 #    uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 # 2. If you need the pinned dependency set, use:
 #    uv pip sync --python .\.venv\Scripts\python.exe requirements.lock
+# 3. For offline intranet installs, use the local wheels/ directory:
+#    uv pip install --python .\.venv\Scripts\python.exe --no-index --find-links .\wheels -r requirements.txt
