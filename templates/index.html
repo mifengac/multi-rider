@@ -1,12 +1,121 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>猎影哨兵</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='falcon-badge.svg') }}" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+  </style>
+
+  <!-- Tailwind CDN script as requested by stitch/code.html -->
   <script src="{{ url_for('static', filename='tailwind.min.js') }}"></script>
+  <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-low": "#f5f4ed",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#ffb59d",
+                        "tertiary-fixed": "#e3e2df",
+                        "surface-container-high": "#e9e8e1",
+                        "surface-tint": "#9d4324",
+                        "surface-container": "#efeee7",
+                        "secondary-container": "#e2dfdc",
+                        "on-primary-fixed": "#390b00",
+                        "on-error": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed-variant": "#464744",
+                        "surface-variant": "#e3e3dc",
+                        "on-tertiary-container": "#fefcf8",
+                        "surface": "#fbf9f2",
+                        "on-primary-fixed-variant": "#7e2c0e",
+                        "on-tertiary-fixed": "#1b1c1a",
+                        "secondary": "#5f5e5c",
+                        "outline-variant": "#dcc1b8",
+                        "secondary-fixed": "#e5e2df",
+                        "on-primary": "#ffffff",
+                        "on-secondary-container": "#636260",
+                        "on-primary-container": "#fffbff",
+                        "surface-bright": "#fbf9f2",
+                        "primary-fixed": "#ffdbd0",
+                        "tertiary-container": "#747572",
+                        "on-background": "#1b1c18",
+                        "secondary-fixed-dim": "#c8c6c3",
+                        "on-secondary-fixed-variant": "#474745",
+                        "primary-container": "#b95837",
+                        "on-surface": "#1b1c18",
+                        "primary": "#9a4021",
+                        "surface-dim": "#dbdad3",
+                        "on-secondary-fixed": "#1b1c1a",
+                        "inverse-surface": "#30312c",
+                        "outline": "#89726b",
+                        "on-surface-variant": "#56423c",
+                        "inverse-on-surface": "#f2f1ea",
+                        "background": "#fbf9f2",
+                        "tertiary-fixed-dim": "#c7c7c3",
+                        "on-error-container": "#93000a",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "tertiary": "#5b5c59",
+                        "surface-container-highest": "#e3e3dc",
+                        "error": "#ba1a1a",
+                        "primary-fixed-dim": "#ffb59d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "lg": "40px",
+                        "sm": "12px",
+                        "xl": "64px",
+                        "base": "8px",
+                        "xs": "4px",
+                        "md": "24px",
+                        "margin": "32px"
+                    },
+                    "fontFamily": {
+                        "display-xl": ["Newsreader", "serif"],
+                        "label-sm": ["Work Sans", "sans-serif"],
+                        "body-lg": ["Work Sans", "sans-serif"],
+                        "body-md": ["Work Sans", "sans-serif"],
+                        "headline-md": ["Newsreader", "serif"],
+                        "headline-lg": ["Newsreader", "serif"],
+                        "sans": ["Work Sans", "sans-serif"],
+                        "serif": ["Newsreader", "serif"]
+                    },
+                    "fontSize": {
+                        "display-xl": ["48px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "label-sm": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.3", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+  </script>
+  
+  <!-- Remove old custom css, let tailwind handle it -->
+  <!-- <link rel="stylesheet" href="{{ url_for('static', filename='shared/css/editorial-ui.css') }}" /> -->
+  <!-- We still need editorial ui for other tabs, let's keep it but prepend it so tailwind takes precedence -->
   <link rel="stylesheet" href="{{ url_for('static', filename='shared/css/editorial-ui.css') }}" />
+  
   <script>
     window.INDEX_PAGE_BOOTSTRAP = {
       uploadModels: {{ upload_models | tojson }},
@@ -32,368 +141,329 @@
   <script src="{{ url_for('static', filename='modules/diagnostics/task-queue.js') }}" defer></script>
   <script src="{{ url_for('static', filename='shared/js/auth.js') }}" defer></script>
   <script src="{{ url_for('static', filename='shared/js/bootstrap.js') }}" defer></script>
+
+  <style>
+    /* Override mr-editorial overrides for this new layout */
+    body { background-color: transparent !important; }
+    /* Fix tab switching display */
+    #authShell.hidden, #appShell.hidden, [id^="tab"].hidden, [id^="authPanel"].hidden { display: none !important; }
+    .mr-nav-item.active {
+        background-color: #f5f4ed;
+        border-left: 4px solid #c96442;
+        color: #c96442;
+    }
+  </style>
 </head>
-<body class="mr-editorial">
+<body class="bg-surface-container-low text-on-surface font-body-md h-screen overflow-hidden flex flex-col antialiased">
 
-<div id="authShell" class="mr-auth-shell">
-  <div class="mr-container">
-    <section class="mr-auth-grid">
-      <section class="mr-auth-hero">
-        <div class="mr-auth-top">
-          <div class="mr-auth-mark" aria-hidden="true">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-              <path d="M12 20L5 7h14L12 20Z" fill="#c96442"></path>
-              <circle cx="12" cy="10" r="2.4" fill="#141413"></circle>
-              <path d="M8.5 14.1c1.9-1 5.1-1 7 0" stroke="#141413" stroke-width="1.5" stroke-linecap="round"></path>
-            </svg>
+<!-- AUTH SHELL -->
+<div id="authShell" class="flex flex-1 items-center justify-center p-6 bg-surface-container-low z-50 fixed inset-0">
+  <div class="max-w-4xl w-full grid md:grid-cols-2 gap-12 items-center">
+    <section>
+      <div class="flex items-center gap-4 mb-6">
+        <div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center border border-outline-variant">
+          <span class="material-symbols-outlined text-on-surface-variant text-2xl">shield</span>
+        </div>
+        <div>
+          <h1 class="font-display-xl text-4xl text-primary font-bold">猎影哨兵</h1>
+          <h1 class="font-display-xl text-4xl text-primary font-bold">猎影哨兵</h1>
+        </div>
+      </div>
+      <h2 class="font-headline-md text-headline-md text-on-surface mb-4">给基层巡检和专项处置准备的一体化研判工作台。</h2>
+      <p class="font-body-md text-on-surface-variant mb-6">
+        这套界面不再强调“后台系统感”，而是把重点放在工作线索、处置顺序和结果沉淀上。你可以从 Oracle 巡检、现场素材、人员核验、任务下发到模型训练一路流转，所有关键动作都保留在这套系统中。
+      </p>
+      
+      <div class="space-y-4 border-l-2 border-outline-variant pl-4">
+        <div>
+          <strong class="font-label-sm text-on-surface uppercase tracking-widest">数据监测</strong>
+          <div class="font-body-md text-on-surface-variant text-sm mt-1">数据检测、本地素材和命中结果不再分散，统一在同一层级里查看和追踪。</div>
+        </div>
+        <div>
+          <strong class="font-label-sm text-on-surface uppercase tracking-widest">人员核验</strong>
+          <div class="font-body-md text-on-surface-variant text-sm mt-1">人脸命中不是终点，后续核验、下发和样本沉淀都能直接承接。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-8 shadow-sm">
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <h2 class="font-headline-md text-headline-md text-on-surface">进入系统</h2>
+          <p class="font-body-md text-sm text-on-surface-variant mt-2">支持账号登录和演示进入</p>
+        </div>
+        <button type="button" onclick="quickEnterApp()" class="bg-primary text-on-primary font-label-sm text-label-sm px-4 py-2 rounded-lg hover:bg-surface-tint transition-colors">演示进入</button>
+      </div>
+
+      <div class="flex gap-4 border-b border-outline-variant mb-6">
+        <button id="authTabLogin" type="button" class="pb-2 font-label-sm text-primary border-b-2 border-primary" onclick="switchAuthPanel('login')">登录</button>
+        <button id="authTabRegister" type="button" class="pb-2 font-label-sm text-on-surface-variant border-b-2 border-transparent" onclick="switchAuthPanel('register')">注册</button>
+      </div>
+
+      <form id="authPanelLogin" class="space-y-6" onsubmit="return handleLogin(event)">
+        <div class="space-y-base">
+          <label class="font-label-sm text-label-sm text-on-surface block">警号 / 用户名</label>
+          <input id="authLoginUsername" type="text" value="44170201" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
+        </div>
+        <div class="space-y-base">
+          <label class="font-label-sm text-label-sm text-on-surface block">登录密码</label>
+          <input id="authLoginPassword" type="password" value="123456" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
+        </div>
+        <div class="bg-surface-container-low rounded-lg p-4 text-sm text-on-surface-variant">
+          默认演示账号为 <code>44170201</code> / <code>123456</code>
+        </div>
+        <div id="authLoginFeedback" class="text-sm text-error"></div>
+        <div class="flex items-center gap-4 pt-4">
+          <button type="submit" class="bg-surface-variant text-on-surface-variant font-label-sm px-6 py-3 rounded-lg hover:bg-outline-variant transition-colors flex-1">登录进入</button>
+        </div>
+      </form>
+
+      <form id="authPanelRegister" class="hidden space-y-6" onsubmit="return handleRegister(event)">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-base">
+            <label class="font-label-sm text-label-sm text-on-surface block">姓名</label>
+            <input id="authRegisterName" type="text" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
           </div>
-          <div>
-            <div class="mr-kicker">Operational Console</div>
-            <div class="mr-serif" style="font-size: 28px; line-height: 1.1;">猎影哨兵</div>
-            <div class="mr-brand-copy">把巡检、核验、下发、训练落在一张工作台里</div>
+          <div class="space-y-base">
+            <label class="font-label-sm text-label-sm text-on-surface block">警号</label>
+            <input id="authRegisterUsername" type="text" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
           </div>
         </div>
-
-        <h1 class="mr-auth-title mr-serif">给基层巡检和专项处置准备的一体化研判工作台。</h1>
-        <p class="mr-auth-copy">
-          这套界面不再强调“后台系统感”，而是把重点放在工作线索、处置顺序和结果沉淀上。
-          你可以从 Oracle 巡检、现场素材、人员核验、任务下发到模型训练一路流转，所有关键动作都保留在同一套暖纸面语言里。
-        </p>
-
-        <div class="mr-auth-notes">
-          <article class="mr-auth-note">
-            <div class="mr-kicker">Detection</div>
-            <strong class="mr-serif">巡检像翻案头账</strong>
-            <div class="mr-page-copy" style="margin-top: 8px;">
-              数据检测、本地素材和命中结果不再分散，统一在同一层级里查看和追踪。
-            </div>
-          </article>
-          <article class="mr-auth-note">
-            <div class="mr-kicker">Identity</div>
-            <strong class="mr-serif">识别后立刻流转</strong>
-            <div class="mr-page-copy" style="margin-top: 8px;">
-              人脸命中不是终点，后续核验、下发和样本沉淀都能直接承接。
-            </div>
-          </article>
-          <article class="mr-auth-note">
-            <div class="mr-kicker">Training</div>
-            <strong class="mr-serif">结果继续长成能力</strong>
-            <div class="mr-page-copy" style="margin-top: 8px;">
-              一线结果可以直接回流数据集、做标注复核、训练和发布，不再重复搬运。
-            </div>
-          </article>
+        <div class="space-y-base">
+          <label class="font-label-sm text-label-sm text-on-surface block">所属单位</label>
+          <input id="authRegisterUnit" type="text" value="云浮市公安局治安管理支队" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
         </div>
-      </section>
-
-      <section class="mr-auth-panel">
-        <div class="mr-auth-actions">
-          <div>
-            <div class="mr-kicker">Auth</div>
-            <h2 class="mr-serif" style="margin-top: 12px; font-size: 40px; line-height: 1.08;">进入系统</h2>
-            <p class="mr-page-copy" style="margin-top: 12px;">
-              支持演示进入、账号登录和登记新用户。当前默认演示账号已保留，方便你现场快速进入主工作台。
-            </p>
-          </div>
-          <button type="button" onclick="quickEnterApp()" class="mr-btn mr-btn--brand">演示进入</button>
+        <div class="space-y-base">
+          <label class="font-label-sm text-label-sm text-on-surface block">设置密码</label>
+          <input id="authRegisterPassword" type="password" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
         </div>
-
-        <div style="margin-top: 28px;" class="mr-auth-tabs">
-          <button id="authTabLogin" type="button" class="auth-tab active" onclick="switchAuthPanel('login')">登录</button>
-          <button id="authTabRegister" type="button" class="auth-tab" onclick="switchAuthPanel('register')">注册申请</button>
+        <div id="authRegisterFeedback" class="text-sm text-primary"></div>
+        <div class="flex items-center gap-4 pt-4">
+          <button type="submit" class="bg-primary text-on-primary font-label-sm px-6 py-3 rounded-lg hover:bg-surface-tint transition-colors flex-1">提交申请</button>
         </div>
-
-        <form id="authPanelLogin" class="mt-8 space-y-6" onsubmit="return handleLogin(event)">
-          <label class="block">
-            <span class="mb-2 block text-sm font-medium text-slate-700">警号 / 用户名</span>
-            <input id="authLoginUsername" type="text" value="44170201" />
-          </label>
-          <label class="block">
-            <span class="mb-2 block text-sm font-medium text-slate-700">登录密码</span>
-            <input id="authLoginPassword" type="password" value="123456" />
-          </label>
-          <div class="mr-card mr-card--soft" style="padding: 16px 18px;">
-            <div class="mr-kicker">Demo Account</div>
-            <div class="mr-page-copy" style="margin-top: 8px;">
-              默认演示账号为 <code>44170201</code> / <code>123456</code>，也可以直接在右侧登记一个新账号用于内网演示。
-            </div>
-          </div>
-          <div id="authLoginFeedback" class="text-sm" style="color: var(--mr-danger-text);"></div>
-          <div class="mr-auth-actions">
-            <button type="button" onclick="switchAuthPanel('register')" class="mr-btn mr-btn--soft">去注册</button>
-            <button type="submit" class="mr-btn mr-btn--ink">登录并进入工作台</button>
-          </div>
-        </form>
-
-        <form id="authPanelRegister" class="mt-8 hidden space-y-6" onsubmit="return handleRegister(event)">
-          <div class="grid gap-5 md:grid-cols-2">
-            <label class="block">
-              <span class="mb-2 block text-sm font-medium text-slate-700">姓名</span>
-              <input id="authRegisterName" type="text" />
-            </label>
-            <label class="block">
-              <span class="mb-2 block text-sm font-medium text-slate-700">警号</span>
-              <input id="authRegisterUsername" type="text" />
-            </label>
-            <label class="block">
-              <span class="mb-2 block text-sm font-medium text-slate-700">所属单位</span>
-              <input id="authRegisterUnit" type="text" value="云浮市公安局治安管理支队" />
-            </label>
-            <label class="block">
-              <span class="mb-2 block text-sm font-medium text-slate-700">联系电话</span>
-              <input id="authRegisterPhone" type="text" />
-            </label>
-          </div>
-          <label class="block">
-            <span class="mb-2 block text-sm font-medium text-slate-700">设置密码</span>
-            <input id="authRegisterPassword" type="password" />
-          </label>
-          <div class="mr-card mr-card--soft" style="padding: 16px 18px;">
-            <div class="mr-kicker">Register Note</div>
-            <div class="mr-page-copy" style="margin-top: 8px;">
-              当前注册信息会保存在本地浏览器，用于内网试用和现场演示，不影响业务数据。
-            </div>
-          </div>
-          <div id="authRegisterFeedback" class="text-sm" style="color: var(--mr-success-text);"></div>
-          <div class="mr-auth-actions">
-            <button type="button" onclick="switchAuthPanel('login')" class="mr-btn mr-btn--soft">返回登录</button>
-            <button type="submit" class="mr-btn mr-btn--brand">提交申请</button>
-          </div>
-        </form>
-      </section>
+      </form>
     </section>
   </div>
 </div>
 
-<section id="appShell" class="mr-shell-screen hidden">
-  <div class="mr-shell-topbar">
-    <span class="mr-top-dot"></span>
-    <span>系统状态 <strong>运行正常</strong></span>
-    <span>Oracle 连接池 <strong id="topBarPool">--</strong></span>
-    <span>今日命中 <strong id="topBarHit">--</strong></span>
-    <span>待下发 <strong id="topBarPending">--</strong></span>
-    <span class="mr-sep"></span>
-    <span id="topClock" style="font-variant-numeric: tabular-nums;"></span>
-    <span>云浮市公安局治安管理支队</span>
-  </div>
-
-  <div class="mr-shell-body">
-    <nav class="mr-sidebar">
-      <section class="mr-sidebar-brand">
-        <div class="mr-brand-row">
-          <div class="mr-brand-mark" aria-hidden="true">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M12 20L5 7h14L12 20Z" fill="#c96442"></path>
-              <circle cx="12" cy="10" r="2.2" fill="#141413"></circle>
-              <path d="M8.6 14.1c1.8-1 5-1 6.8 0" stroke="#141413" stroke-width="1.4" stroke-linecap="round"></path>
-            </svg>
-          </div>
-          <div>
-            <div class="mr-kicker">Shadow Sentinel</div>
-            <div class="mr-brand-name mr-serif">猎影哨兵</div>
-            <div class="mr-brand-copy">统一巡检、核验、下发、训练</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="mr-sidebar-block">
-        <div class="mr-kicker">Live Metrics</div>
-        <div class="mr-sidebar-stats" style="margin-top: 14px;">
-          <div class="mr-mini-stat">
-            <div class="label">今日命中</div>
-            <div class="value" id="statTodayMatched">--</div>
-          </div>
-          <div class="mr-mini-stat">
-            <div class="label">待下发</div>
-            <div class="value" id="statPendingDispatch">--</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="mr-sidebar-block">
-        <div class="mr-nav-group">
-          <div class="mr-nav-label">Detection</div>
-          <a id="tabBtnOracle" class="mr-nav-item active" href="#" onclick="switchTab('Oracle');return false;">
-            <span class="mr-nav-icon">01</span>
-            <span class="mr-nav-copy"><strong>数据监测与研判</strong></span>
-            <span class="mr-pill mr-pill--soft mr-nav-badge">Oracle</span>
-          </a>
-          <a id="tabBtnUpload" class="mr-nav-item" href="#" onclick="switchTab('Upload');return false;">
-            <span class="mr-nav-icon">02</span>
-            <span class="mr-nav-copy"><strong>现场素材研判</strong></span>
-          </a>
-        </div>
-
-        <div class="mr-nav-group">
-          <div class="mr-nav-label">Identity</div>
-          <a id="tabBtnFace" class="mr-nav-item" href="#" onclick="switchTab('Face');return false;">
-            <span class="mr-nav-icon">03</span>
-            <span class="mr-nav-copy"><strong>人脸识别与核验</strong></span>
-          </a>
-        </div>
-
-        <div class="mr-nav-group">
-          <div class="mr-nav-label">Disposition</div>
-          <a id="tabBtnDispatch" class="mr-nav-item" href="#" onclick="switchTab('Dispatch');return false;">
-            <span class="mr-nav-icon">04</span>
-            <span class="mr-nav-copy"><strong>任务下发</strong></span>
-            <span class="mr-pill mr-pill--brand mr-nav-badge" id="navBadgePending">0</span>
-          </a>
-        </div>
-
-        <div class="mr-nav-group">
-          <div class="mr-nav-label">Training</div>
-          <a id="tabBtnTrain" class="mr-nav-item" href="#" onclick="switchTab('Train');return false;">
-            <span class="mr-nav-icon">05</span>
-            <span class="mr-nav-copy"><strong>模型自训练</strong></span>
-          </a>
-        </div>
-
-        <div class="mr-nav-group">
-          <div class="mr-nav-label">System</div>
-          <a id="tabBtnDiagnostics" class="mr-nav-item" href="#" onclick="switchTab('Diagnostics');return false;">
-            <span class="mr-nav-icon">06</span>
-            <span class="mr-nav-copy"><strong>任务队列诊断</strong></span>
-          </a>
-        </div>
-      </section>
-
-      <section class="mr-sidebar-user">
-        <div class="mr-user-avatar">值</div>
-        <div class="mr-user-copy">
-          <strong id="currentUserName">值班员</strong>
-          <span id="currentUserUnit">基层民警</span>
-        </div>
-        <button type="button" class="mr-btn mr-btn--soft" style="padding: 9px 12px;" onclick="logoutApp()">退出</button>
-      </section>
+<!-- APP SHELL -->
+<section id="appShell" class="hidden flex flex-col h-full w-full">
+  <!-- TopAppBar -->
+  <header class="bg-[#f5f4ed] text-[#c96442] font-serif tracking-tight border-b border-[#e8e6dc] flex justify-between items-center w-full px-8 h-16 shrink-0 z-50 relative">
+    <div class="flex items-center gap-gutter">
+      <h1 class="font-serif text-3xl font-bold tracking-widest text-[#c96442]">猎影哨兵</h1>
+    </div>
+    <nav class="hidden md:flex items-center h-full">
+      <ul class="flex h-full">
+        <li class="h-full flex items-center px-4 cursor-pointer text-[#c96442] font-bold border-b-2 border-[#c96442] transition-colors">
+            系统状态: 运行正常
+        </li>
+        <li class="h-full flex items-center px-4 cursor-pointer text-stone-500 font-sans text-xs uppercase tracking-widest transition-colors">
+            Oracle 连接池: <span id="topBarPool" class="ml-1">--</span>
+        </li>
+        <li class="h-full flex items-center px-4 cursor-pointer text-stone-500 font-sans text-xs uppercase tracking-widest transition-colors">
+            今日命中: <span id="topBarHit" class="ml-1">--</span>
+        </li>
+        <li class="h-full flex items-center px-4 cursor-pointer text-stone-500 font-sans text-xs uppercase tracking-widest transition-colors">
+            待下发: <span id="topBarPending" class="ml-1">--</span>
+        </li>
+        <li class="h-full flex items-center px-4 cursor-pointer text-stone-500 font-sans text-xs uppercase tracking-widest transition-colors">
+            <span id="topClock">--:--:--</span>
+        </li>
+      </ul>
     </nav>
+    <div class="flex items-center gap-4">
+      <span class="text-sm font-label-sm text-stone-600">云浮市公安局</span>
+      <button onclick="logoutApp()" class="ml-4 text-sm font-label-sm text-stone-500 hover:text-[#c96442] flex items-center gap-1 transition-colors">
+        <span class="material-symbols-outlined text-[18px]">logout</span> 退出
+      </button>
+    </div>
+  </header>
 
-    <main class="mr-main">
-      <div class="mr-main-header">
-        <section class="mr-card mr-main-header-card">
-          <div>
-            <h1 id="contentTitle" style="font-size: 17px; font-weight: 700; margin: 0; color: var(--mr-text);">数据监测与研判</h1>
-            <p id="contentSubtitle" style="margin: 4px 0 0; font-size: 12px; color: var(--mr-text-muted); line-height: 1.5;">
-              查询 Oracle 内网数据库，对已采集的目标图像执行 AI 检测与结果研判。
-            </p>
+  <div class="flex flex-1 overflow-hidden relative">
+    <!-- SideNavBar -->
+    <aside class="flex bg-[#faf9f5] text-[#c96442] font-sans text-stone-700 w-64 border-r border-[#e8e6dc] shadow-sm flex-col justify-between py-6 h-full shrink-0 z-40 relative">
+      <div>
+        <div class="px-6 mb-8 flex items-center gap-4">
+          <div class="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center shrink-0 border border-outline-variant">
+            <span class="material-symbols-outlined text-on-surface-variant">shield</span>
           </div>
-          <div class="mr-main-actions">
-            <button class="mr-btn mr-btn--soft" onclick="refreshJobs(this)">刷新状态</button>
-            <button class="mr-btn mr-btn--brand" id="headerPrimaryBtn" onclick="runTabPrimaryAction('Oracle')">新建检测任务</button>
+          <div>
+            <h2 class="font-headline-md text-headline-md text-on-surface">猎影哨兵</h2>
+            <p class="font-label-sm text-label-sm text-on-surface-variant">AI 工作台</p>
+          </div>
+        </div>
+        <nav class="flex flex-col gap-2 px-4">
+          <a id="tabBtnOracle" class="mr-nav-item active flex items-center justify-between gap-3 px-4 py-3 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-[#f5f4ed] transition-all duration-200 ease-in-out border-l-4 border-transparent" href="#" onclick="switchTab('Oracle');return false;">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined">auto_awesome</span>
+              数据巡检
+            </div>
+          </a>
+          <a id="tabBtnUpload" class="mr-nav-item flex items-center justify-between gap-3 px-4 py-3 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-[#f5f4ed] transition-all duration-200 ease-in-out border-l-4 border-transparent" href="#" onclick="switchTab('Upload');return false;">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined">upload_file</span>
+              本地素材
+            </div>
+          </a>
+          <a id="tabBtnFace" class="mr-nav-item flex items-center justify-between gap-3 px-4 py-3 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-[#f5f4ed] transition-all duration-200 ease-in-out border-l-4 border-transparent" href="#" onclick="switchTab('Face');return false;">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined">face</span>
+              人员库
+            </div>
+          </a>
+          <a id="tabBtnDispatch" class="mr-nav-item flex items-center justify-between gap-3 px-4 py-3 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-[#f5f4ed] transition-all duration-200 ease-in-out border-l-4 border-transparent" href="#" onclick="switchTab('Dispatch');return false;">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined">send</span>
+              任务下发
+            </div>
+            <span id="navBadgePending" class="bg-primary text-on-primary text-[10px] px-2 py-0.5 rounded-full">0</span>
+          </a>
+          <a id="tabBtnTrain" class="mr-nav-item flex items-center justify-between gap-3 px-4 py-3 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-[#f5f4ed] transition-all duration-200 ease-in-out border-l-4 border-transparent" href="#" onclick="switchTab('Train');return false;">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined">model_training</span>
+              模型训练
+            </div>
+          </a>
+          <a id="tabBtnDiagnostics" class="mr-nav-item flex items-center justify-between gap-3 px-4 py-3 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-[#f5f4ed] transition-all duration-200 ease-in-out border-l-4 border-transparent" href="#" onclick="switchTab('Diagnostics');return false;">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined">settings_suggest</span>
+              系统诊断
+            </div>
+          </a>
+        </nav>
+      </div>
+      <div class="px-4 border-t border-outline-variant pt-4 mt-auto">
+        <div class="flex items-center gap-3 px-4 py-3">
+          <div class="w-8 h-8 bg-surface-variant rounded-full flex items-center justify-center text-xs">值</div>
+          <div>
+            <div id="currentUserName" class="text-sm font-bold text-stone-800">值班员</div>
+            <div id="currentUserUnit" class="text-xs text-stone-500">基层民警</div>
+          </div>
+        </div>
+        <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-[#f5f4ed] transition-all duration-200 ease-in-out cursor-pointer" onclick="logoutApp()">
+          <span class="material-symbols-outlined">logout</span>
+          退出登录
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Canvas -->
+    <main class="flex-1 overflow-y-auto px-lg py-lg relative z-10 mr-main">
+      <div class="max-w-6xl mx-auto space-y-xl">
+        
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="space-y-2 mb-6">
+          {% for msg in messages %}
+          <div class="bg-surface ring-1 ring-primary/20 rounded-xl p-4 text-sm text-primary">{{ msg }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Stat Strip -->
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div class="bg-surface ring-1 ring-[#e8e6dc] rounded-xl p-4 shadow-sm">
+            <p class="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">已完成</p>
+            <p class="font-headline-md text-on-surface" id="qs-done">--</p>
+          </div>
+          <div class="bg-surface ring-1 ring-[#e8e6dc] rounded-xl p-4 shadow-sm">
+            <p class="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">运行中</p>
+            <p class="font-headline-md text-on-surface text-primary" id="runningCount">0</p>
+          </div>
+          <div class="bg-surface ring-1 ring-[#e8e6dc] rounded-xl p-4 shadow-sm">
+            <p class="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">待处理</p>
+            <p class="font-headline-md text-on-surface" id="qs-pending">--</p>
+          </div>
+          <div class="bg-surface ring-1 ring-[#e8e6dc] rounded-xl p-4 shadow-sm">
+            <p class="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-widest mb-1">已保留</p>
+            <p class="font-headline-md text-on-surface" id="qs-kept">--</p>
+          </div>
+          <div class="bg-surface ring-1 ring-[#e8e6dc] rounded-xl p-4 shadow-sm">
+            <p class="font-label-sm text-[10px] text-error uppercase tracking-widest mb-1">失败</p>
+            <p class="font-headline-md text-error" id="qs-failed">--</p>
           </div>
         </section>
-      </div>
 
-      <section class="mr-stat-strip">
-        <article class="mr-card mr-stat-card">
-          <div class="mr-kicker">Completed</div>
-          <div class="value" id="qs-done">--</div>
-          <div class="label">已完成任务</div>
-        </article>
-        <article class="mr-card mr-stat-card">
-          <div class="mr-kicker">Running</div>
-          <div class="value" id="runningCount">0</div>
-          <div class="label">后台运行中</div>
-        </article>
-        <article class="mr-card mr-stat-card">
-          <div class="mr-kicker">Pending</div>
-          <div class="value" id="qs-pending">--</div>
-          <div class="label">排队与等待</div>
-        </article>
-        <article class="mr-card mr-stat-card">
-          <div class="mr-kicker">Kept</div>
-          <div class="value" id="qs-kept">--</div>
-          <div class="label">今日保留结果</div>
-        </article>
-        <article class="mr-card mr-stat-card">
-          <div class="mr-kicker">Failed</div>
-          <div class="value" id="qs-failed">--</div>
-          <div class="label">失败任务</div>
-        </article>
-      </section>
+        <!-- Header -->
+        <header class="border-b border-outline-variant pb-md flex justify-between items-end">
+          <div>
+            <h2 id="contentTitle" class="font-display-xl text-3xl text-on-surface tracking-tight">数据监测与研判</h2>
+            <p id="contentSubtitle" class="font-body-lg text-base text-on-surface-variant mt-2 max-w-3xl">分析传入的数据流，配置检测参数，并对潜在的命中结果进行研判。</p>
+          </div>
+          <div class="flex gap-3">
+            <button class="bg-surface ring-1 ring-[#e8e6dc] text-on-surface font-label-sm px-4 py-2 rounded-lg hover:bg-surface-variant transition-colors" onclick="refreshJobs(this)">刷新</button>
+            <button id="headerPrimaryBtn" class="bg-primary text-on-primary font-label-sm px-4 py-2 rounded-lg hover:bg-surface-tint transition-colors" onclick="runTabPrimaryAction('Oracle')">新建检测任务</button>
+          </div>
+        </header>
 
-      {% with messages = get_flashed_messages() %}
-      {% if messages %}
-      <div class="mr-flash-wrap">
-        {% for msg in messages %}
-        <div class="mr-card mr-card--soft" style="padding: 14px 16px; margin-bottom: 10px;">{{ msg }}</div>
-        {% endfor %}
-      </div>
-      {% endif %}
-      {% endwith %}
-
-      <div class="mr-content-scroll">
-        {% include 'modules/detection/_oracle_tab.html' %}
-        {% include 'modules/detection/_upload_tab.html' %}
-        {% include 'modules/training/_train_tab.html' %}
-        {% include 'modules/dispatch/_dispatch_tab.html' %}
-        {% include 'modules/face/_face_tab.html' %}
-        {% include 'modules/diagnostics/_task_queue_tab.html' %}
+        <!-- Tabs Content -->
+        <div class="mr-content-scroll">
+          {% include 'modules/detection/_oracle_tab.html' %}
+          {% include 'modules/detection/_upload_tab.html' %}
+          {% include 'modules/training/_train_tab.html' %}
+          {% include 'modules/dispatch/_dispatch_tab.html' %}
+          {% include 'modules/face/_face_tab.html' %}
+          {% include 'modules/diagnostics/_task_queue_tab.html' %}
+        </div>
       </div>
     </main>
 
-    <aside class="mr-rail">
-      <section class="mr-card mr-card--dark mr-rail-card">
-        <div class="mr-kicker">批次摘要</div>
-        <div class="mr-rail-summary" style="margin-top: 12px;">“”
-          <div class="mr-rail-metric">
-            <div class="mr-kicker" style="color: #b8b3a6;">今日命中</div>
-            <div class="value" id="panelStatHit">--</div>
+    <!-- NavigationDrawer (Right Rail) -->
+    <aside class="flex xl:flex bg-[#faf9f5] font-sans text-xs uppercase tracking-widest w-72 border-l border-[#e8e6dc] flex-col p-6 h-full shrink-0 z-40 relative">
+      <div class="mb-lg">
+        <h3 class="font-serif font-bold text-stone-800 text-lg mb-md capitalize normal-case">快捷侧栏</h3>
+        <div class="bg-surface ring-1 ring-[#e8e6dc] rounded-lg p-3">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] text-stone-500">今日命中</span>
+            <span class="font-bold text-stone-800" id="panelStatHit">--</span>
           </div>
-          <div class="mr-rail-metric">
-            <div class="mr-kicker" style="color: #b8b3a6;">待下发</div>
-            <div class="value" id="panelStatPending">--</div>
+          <div class="flex justify-between items-center">
+            <span class="text-[10px] text-stone-500">待下发</span>
+            <span class="font-bold text-primary" id="panelStatPending">--</span>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section class="mr-card mr-rail-card">
-        <div class="mr-kicker">Running Tasks</div>
-        <h3 style="margin-top: 6px; font-size: 15px; font-weight: 600; color: var(--mr-text);">实时任务</h3>
-        <div id="jobsInfo" style="margin-top: 14px;">
-          <div class="mr-task-placeholder flex flex-col items-center justify-center p-6 text-center" style="color: var(--mr-text-soft);">
-            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-3 opacity-40">
-              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-            </svg>
-            <div class="text-sm font-medium">当前很清闲</div>
-            <div class="text-xs mt-1 opacity-70">去左侧发起一轮新的巡检吧</div>
+      <nav class="flex flex-col gap-6 flex-1 overflow-y-auto">
+        <!-- Running Tasks Section -->
+        <div>
+          <h4 class="text-[#c96442] font-bold flex items-center gap-2 mb-4 cursor-pointer hover:text-stone-900">
+            <span class="material-symbols-outlined text-sm">pending_actions</span>
+            运行中的任务
+          </h4>
+          <div id="jobsInfo" class="space-y-4 pl-6">
+            <div class="text-stone-400 normal-case">当前没有运行的任务</div>
           </div>
         </div>
-      </section>
 
-      <section class="mr-card mr-rail-card">
-        <div class="mr-kicker">Match Stream</div>
-        <h3 style="margin-top: 6px; font-size: 15px; font-weight: 600; color: var(--mr-text);">命中流水</h3>
-        <div id="faceMatchStream" style="margin-top: 14px;">
-          <div class="mr-stream-placeholder flex flex-col items-center justify-center p-6 text-center" style="color: var(--mr-text-soft);">
-            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-3 opacity-40">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-            <div class="text-sm font-medium">无命中记录</div>
-            <div class="text-xs mt-1 opacity-70">等待新的高频特征命中</div>
+        <!-- Match Stream Section -->
+        <div class="mt-8">
+          <h4 class="text-stone-500 flex items-center gap-2 mb-4 cursor-pointer hover:text-stone-900">
+            <span class="material-symbols-outlined text-sm">stream</span>
+            命中流水
+          </h4>
+          <div id="faceMatchStream" class="grid grid-cols-2 gap-2 pl-6">
+             <div class="text-stone-400 normal-case col-span-2">无命中记录</div>
           </div>
         </div>
-      </section>
 
-      <section class="mr-card mr-rail-card">
-        <div class="mr-kicker">Quick Actions</div>
-        <h3 style="margin-top: 6px; font-size: 15px; font-weight: 600; color: var(--mr-text);">快捷动作</h3>
-        <div class="mr-action-grid" style="margin-top: 10px;">
-          <div class="mr-action-card" onclick="switchTab('Upload')">
-            <div style="font-size: 13px; font-weight: 600; color: var(--mr-text-soft);">上传素材</div>
-          </div>
-          <div class="mr-action-card" onclick="switchTab('Face')">
-            <div style="font-size: 13px; font-weight: 600; color: var(--mr-text-soft);">人脸库</div>
-          </div>
-          <div class="mr-action-card" onclick="switchTab('Dispatch')">
-            <div style="font-size: 13px; font-weight: 600; color: var(--mr-text-soft);">任务下发</div>
-          </div>
-          <div class="mr-action-card" onclick="window.open('{{ url_for('job.history_page') }}')">
-            <div style="font-size: 13px; font-weight: 600; color: var(--mr-text-soft);">历史记录</div>
+        <!-- Quick Actions Section -->
+        <div class="mt-8">
+          <h4 class="text-stone-500 flex items-center gap-2 mb-4 cursor-pointer hover:text-stone-900">
+            <span class="material-symbols-outlined text-sm">bolt</span>
+            快捷操作
+          </h4>
+          <div class="space-y-2 pl-6">
+            <button class="w-full text-left font-label-sm text-[10px] text-stone-600 hover:text-stone-900 py-1 border-b border-transparent hover:border-stone-300 transition-all" onclick="switchTab('Upload')">上传素材</button>
+            <button class="w-full text-left font-label-sm text-[10px] text-stone-600 hover:text-stone-900 py-1 border-b border-transparent hover:border-stone-300 transition-all" onclick="switchTab('Face')">人脸库</button>
+            <button class="w-full text-left font-label-sm text-[10px] text-stone-600 hover:text-stone-900 py-1 border-b border-transparent hover:border-stone-300 transition-all" onclick="switchTab('Dispatch')">任务下发</button>
+            <button class="w-full text-left font-label-sm text-[10px] text-stone-600 hover:text-stone-900 py-1 border-b border-transparent hover:border-stone-300 transition-all" onclick="window.open('{{ url_for('job.history_page') }}')">历史记录</button>
           </div>
         </div>
-      </section>
+      </nav>
     </aside>
   </div>
 
