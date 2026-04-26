@@ -6,8 +6,11 @@ __pycache__/
 *.pyd
 .env
 .mcp/
+node_modules/
 
 dist/
+!static/dist/
+!static/dist/tailwind.css
 .remote_check_*/
 
 output/

@@ -5,117 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>猎影哨兵</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='falcon-badge.svg') }}" />
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com" rel="preconnect"/>
-  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet"/>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-  <style>
-    .material-symbols-outlined {
-      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-    }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dist/tailwind.css') }}" />
 
-  <!-- Tailwind CDN script as requested by stitch/code.html -->
-  <script src="{{ url_for('static', filename='tailwind.min.js') }}"></script>
-  <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    "colors": {
-                        "surface-container-low": "#f5f4ed",
-                        "on-secondary": "#ffffff",
-                        "inverse-primary": "#ffb59d",
-                        "tertiary-fixed": "#e3e2df",
-                        "surface-container-high": "#e9e8e1",
-                        "surface-tint": "#9d4324",
-                        "surface-container": "#efeee7",
-                        "secondary-container": "#e2dfdc",
-                        "on-primary-fixed": "#390b00",
-                        "on-error": "#ffffff",
-                        "on-tertiary": "#ffffff",
-                        "on-tertiary-fixed-variant": "#464744",
-                        "surface-variant": "#e3e3dc",
-                        "on-tertiary-container": "#fefcf8",
-                        "surface": "#fbf9f2",
-                        "on-primary-fixed-variant": "#7e2c0e",
-                        "on-tertiary-fixed": "#1b1c1a",
-                        "secondary": "#5f5e5c",
-                        "outline-variant": "#dcc1b8",
-                        "secondary-fixed": "#e5e2df",
-                        "on-primary": "#ffffff",
-                        "on-secondary-container": "#636260",
-                        "on-primary-container": "#fffbff",
-                        "surface-bright": "#fbf9f2",
-                        "primary-fixed": "#ffdbd0",
-                        "tertiary-container": "#747572",
-                        "on-background": "#1b1c18",
-                        "secondary-fixed-dim": "#c8c6c3",
-                        "on-secondary-fixed-variant": "#474745",
-                        "primary-container": "#b95837",
-                        "on-surface": "#1b1c18",
-                        "primary": "#9a4021",
-                        "surface-dim": "#dbdad3",
-                        "on-secondary-fixed": "#1b1c1a",
-                        "inverse-surface": "#30312c",
-                        "outline": "#89726b",
-                        "on-surface-variant": "#56423c",
-                        "inverse-on-surface": "#f2f1ea",
-                        "background": "#fbf9f2",
-                        "tertiary-fixed-dim": "#c7c7c3",
-                        "on-error-container": "#93000a",
-                        "surface-container-lowest": "#ffffff",
-                        "error-container": "#ffdad6",
-                        "tertiary": "#5b5c59",
-                        "surface-container-highest": "#e3e3dc",
-                        "error": "#ba1a1a",
-                        "primary-fixed-dim": "#ffb59d"
-                    },
-                    "borderRadius": {
-                        "DEFAULT": "0.25rem",
-                        "lg": "0.5rem",
-                        "xl": "0.75rem",
-                        "full": "9999px"
-                    },
-                    "spacing": {
-                        "gutter": "24px",
-                        "lg": "40px",
-                        "sm": "12px",
-                        "xl": "64px",
-                        "base": "8px",
-                        "xs": "4px",
-                        "md": "24px",
-                        "margin": "32px"
-                    },
-                    "fontFamily": {
-                        "display-xl": ["Newsreader", "serif"],
-                        "label-sm": ["Work Sans", "sans-serif"],
-                        "body-lg": ["Work Sans", "sans-serif"],
-                        "body-md": ["Work Sans", "sans-serif"],
-                        "headline-md": ["Newsreader", "serif"],
-                        "headline-lg": ["Newsreader", "serif"],
-                        "sans": ["Work Sans", "sans-serif"],
-                        "serif": ["Newsreader", "serif"]
-                    },
-                    "fontSize": {
-                        "display-xl": ["48px", { "lineHeight": "1.2", "fontWeight": "600" }],
-                        "label-sm": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "600" }],
-                        "body-lg": ["18px", { "lineHeight": "1.6", "letterSpacing": "-0.01em", "fontWeight": "400" }],
-                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
-                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "500" }],
-                        "headline-lg": ["32px", { "lineHeight": "1.3", "fontWeight": "500" }]
-                    }
-                }
-            }
-        }
-  </script>
-  
-  <!-- Remove old custom css, let tailwind handle it -->
-  <!-- <link rel="stylesheet" href="{{ url_for('static', filename='shared/css/editorial-ui.css') }}" /> -->
-  <!-- We still need editorial ui for other tabs, let's keep it but prepend it so tailwind takes precedence -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='shared/css/editorial-ui.css') }}" />
-  
   <script>
     window.INDEX_PAGE_BOOTSTRAP = {
       uploadModels: {{ upload_models | tojson }},
@@ -141,108 +32,141 @@
   <script src="{{ url_for('static', filename='modules/diagnostics/task-queue.js') }}" defer></script>
   <script src="{{ url_for('static', filename='shared/js/auth.js') }}" defer></script>
   <script src="{{ url_for('static', filename='shared/js/bootstrap.js') }}" defer></script>
-
-  <style>
-    /* Override mr-editorial overrides for this new layout */
-    body { background-color: transparent !important; }
-    /* Fix tab switching display */
-    #authShell.hidden, #appShell.hidden, [id^="tab"].hidden, [id^="authPanel"].hidden { display: none !important; }
-    .mr-nav-item.active {
-        background-color: #f5f4ed;
-        border-left: 4px solid #c96442;
-        color: #c96442;
-    }
-  </style>
 </head>
 <body class="bg-surface-container-low text-on-surface font-body-md h-screen overflow-hidden flex flex-col antialiased">
 
 <!-- AUTH SHELL -->
-<div id="authShell" class="flex flex-1 items-center justify-center p-6 bg-surface-container-low z-50 fixed inset-0">
-  <div class="max-w-4xl w-full grid md:grid-cols-2 gap-12 items-center">
-    <section>
-      <div class="flex items-center gap-4 mb-6">
-        <div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center border border-outline-variant">
-          <span class="material-symbols-outlined text-on-surface-variant text-2xl">shield</span>
-        </div>
-        <div>
-          <h1 class="font-display-xl text-4xl text-primary font-bold">猎影哨兵</h1>
-          <h1 class="font-display-xl text-4xl text-primary font-bold">猎影哨兵</h1>
-        </div>
-      </div>
-      <h2 class="font-headline-md text-headline-md text-on-surface mb-4">给基层巡检和专项处置准备的一体化研判工作台。</h2>
-      <p class="font-body-md text-on-surface-variant mb-6">
-        这套界面不再强调“后台系统感”，而是把重点放在工作线索、处置顺序和结果沉淀上。你可以从 Oracle 巡检、现场素材、人员核验、任务下发到模型训练一路流转，所有关键动作都保留在这套系统中。
-      </p>
-      
-      <div class="space-y-4 border-l-2 border-outline-variant pl-4">
-        <div>
-          <strong class="font-label-sm text-on-surface uppercase tracking-widest">数据监测</strong>
-          <div class="font-body-md text-on-surface-variant text-sm mt-1">数据检测、本地素材和命中结果不再分散，统一在同一层级里查看和追踪。</div>
-        </div>
-        <div>
-          <strong class="font-label-sm text-on-surface uppercase tracking-widest">人员核验</strong>
-          <div class="font-body-md text-on-surface-variant text-sm mt-1">人脸命中不是终点，后续核验、下发和样本沉淀都能直接承接。</div>
-        </div>
-      </div>
-    </section>
+<div id="authShell" class="auth-screen fixed inset-0 z-50 overflow-hidden">
+  <!-- Background effects -->
+  <div class="auth-bg-grid"></div>
+  <div class="auth-scan-line"></div>
+  <div class="auth-glow-orb auth-glow-orb--1"></div>
+  <div class="auth-glow-orb auth-glow-orb--2"></div>
 
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-8 shadow-sm">
-      <div class="flex items-center justify-between mb-8">
-        <div>
-          <h2 class="font-headline-md text-headline-md text-on-surface">进入系统</h2>
-          <p class="font-body-md text-sm text-on-surface-variant mt-2">支持账号登录和演示进入</p>
-        </div>
-        <button type="button" onclick="quickEnterApp()" class="bg-primary text-on-primary font-label-sm text-label-sm px-4 py-2 rounded-lg hover:bg-surface-tint transition-colors">演示进入</button>
-      </div>
+  <div class="relative z-10 flex h-full items-center justify-center overflow-y-auto px-6 py-10">
+    <div class="grid w-full max-w-[1100px] items-center gap-10 lg:grid-cols-[1.4fr_1fr] xl:gap-16">
 
-      <div class="flex gap-4 border-b border-outline-variant mb-6">
-        <button id="authTabLogin" type="button" class="pb-2 font-label-sm text-primary border-b-2 border-primary" onclick="switchAuthPanel('login')">登录</button>
-        <button id="authTabRegister" type="button" class="pb-2 font-label-sm text-on-surface-variant border-b-2 border-transparent" onclick="switchAuthPanel('register')">注册</button>
-      </div>
+      <!-- Hero -->
+      <section>
+        <div class="auth-badge mb-8">
+          <span class="auth-badge__dot"></span>
+          云浮市公安局治安管理支队基础管控中心
+        </div>
 
-      <form id="authPanelLogin" class="space-y-6" onsubmit="return handleLogin(event)">
-        <div class="space-y-base">
-          <label class="font-label-sm text-label-sm text-on-surface block">警号 / 用户名</label>
-          <input id="authLoginUsername" type="text" value="44170201" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
-        </div>
-        <div class="space-y-base">
-          <label class="font-label-sm text-label-sm text-on-surface block">登录密码</label>
-          <input id="authLoginPassword" type="password" value="123456" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
-        </div>
-        <div class="bg-surface-container-low rounded-lg p-4 text-sm text-on-surface-variant">
-          默认演示账号为 <code>44170201</code> / <code>123456</code>
-        </div>
-        <div id="authLoginFeedback" class="text-sm text-error"></div>
-        <div class="flex items-center gap-4 pt-4">
-          <button type="submit" class="bg-surface-variant text-on-surface-variant font-label-sm px-6 py-3 rounded-lg hover:bg-outline-variant transition-colors flex-1">登录进入</button>
-        </div>
-      </form>
-
-      <form id="authPanelRegister" class="hidden space-y-6" onsubmit="return handleRegister(event)">
-        <div class="grid grid-cols-2 gap-4">
-          <div class="space-y-base">
-            <label class="font-label-sm text-label-sm text-on-surface block">姓名</label>
-            <input id="authRegisterName" type="text" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
+        <div class="mb-6 flex items-center gap-5">
+          <div class="auth-logo-icon">
+            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 20 L4 7 L20 7 Z" fill="rgba(255,255,255,0.25)"/>
+              <circle cx="12" cy="10.5" r="2.2" fill="white" opacity="0.9"/>
+              <path d="M9 14.5 Q12 13 15 14.5" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.9"/>
+              <rect x="9" y="18.5" width="6" height="2.5" rx="1.25" fill="white"/>
+              <path d="M4 7 L1.5 4" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-linecap="round"/>
+              <path d="M20 7 L22.5 4" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-linecap="round"/>
+              <path d="M12 7 L12 2.5" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-linecap="round"/>
+            </svg>
           </div>
-          <div class="space-y-base">
-            <label class="font-label-sm text-label-sm text-on-surface block">警号</label>
-            <input id="authRegisterUsername" type="text" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
+          <div>
+            <div class="mb-1 text-[11px] font-bold uppercase tracking-[0.35em] text-blue-300/70">SHADOW SENTINEL · AI PLATFORM</div>
+            <h1 class="auth-title-glow text-[3.8rem] font-black leading-none">猎影哨兵</h1>
           </div>
         </div>
-        <div class="space-y-base">
-          <label class="font-label-sm text-label-sm text-on-surface block">所属单位</label>
-          <input id="authRegisterUnit" type="text" value="云浮市公安局治安管理支队" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
+
+        <p class="mb-3 max-w-[460px] text-[1.2rem] font-semibold leading-[1.45] text-slate-200">
+          面向基层公安的智能视觉协同平台
+        </p>
+        <p class="mb-11 max-w-[420px] text-[13px] leading-[1.85] text-slate-400">
+          将违法行为识别、人员核验、模型沉淀和任务下发做成一条闭环，强调实用、好上手、少录入。
+        </p>
+
+        <div class="grid max-w-[460px] grid-cols-3 gap-3.5">
+          <div class="auth-feature-card">
+            <div class="auth-feature-icon">🎯</div>
+            <div class="mb-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-sky-300">检测研判</div>
+            <div class="text-[11px] leading-normal text-slate-400">历史巡检 + 现场素材</div>
+          </div>
+          <div class="auth-feature-card">
+            <div class="auth-feature-icon">🔍</div>
+            <div class="mb-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-sky-300">身份核验</div>
+            <div class="text-[11px] leading-normal text-slate-400">识别后自动流转</div>
+          </div>
+          <div class="auth-feature-card">
+            <div class="auth-feature-icon">🧠</div>
+            <div class="mb-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-sky-300">能力成长</div>
+            <div class="text-[11px] leading-normal text-slate-400">基层可用自训练</div>
+          </div>
         </div>
-        <div class="space-y-base">
-          <label class="font-label-sm text-label-sm text-on-surface block">设置密码</label>
-          <input id="authRegisterPassword" type="password" class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm" />
+      </section>
+
+      <!-- Login Card -->
+      <section class="auth-login-card">
+        <div class="mb-6 flex items-start justify-between gap-3">
+          <div>
+            <div class="mb-2 text-[10px] font-bold uppercase tracking-[0.3em] text-sky-300/55">AUTHENTICATION</div>
+            <h2 class="mb-1 text-[1.45rem] font-extrabold text-slate-50">系统登录</h2>
+            <p class="text-[11px] text-slate-600">支持注册申请、账号登录、演示模式进入</p>
+          </div>
+          <button type="button" onclick="quickEnterApp()" class="auth-submit-btn shrink-0 whitespace-nowrap px-[18px] py-2 text-xs">演示进入</button>
         </div>
-        <div id="authRegisterFeedback" class="text-sm text-primary"></div>
-        <div class="flex items-center gap-4 pt-4">
-          <button type="submit" class="bg-primary text-on-primary font-label-sm px-6 py-3 rounded-lg hover:bg-surface-tint transition-colors flex-1">提交申请</button>
+
+        <div class="auth-tab-bar mb-6">
+          <button id="authTabLogin" type="button" class="auth-tab active" onclick="switchAuthPanel('login')">登录</button>
+          <button id="authTabRegister" type="button" class="auth-tab" onclick="switchAuthPanel('register')">注册申请</button>
         </div>
-      </form>
-    </section>
+
+        <form id="authPanelLogin" class="space-y-5" onsubmit="return handleLogin(event)">
+          <label class="block">
+            <span class="auth-label">警号 / 用户名</span>
+            <input id="authLoginUsername" type="text" value="44170201" class="auth-input" placeholder="请输入警号或用户名" />
+          </label>
+          <label class="block">
+            <span class="auth-label">登录密码</span>
+            <input id="authLoginPassword" type="password" value="123456" class="auth-input" placeholder="请输入密码" />
+          </label>
+          <div class="auth-demo-hint">
+            演示账号：<code>44170201</code> &nbsp;/&nbsp; <code>123456</code>，也可直接注册新账号。
+          </div>
+          <div id="authLoginFeedback" class="min-h-[18px] text-[13px] text-red-400"></div>
+          <div class="flex items-center justify-between gap-3 pt-1">
+            <button type="button" onclick="switchAuthPanel('register')" class="bg-transparent p-0 text-[13px] font-medium text-slate-600 transition hover:text-sky-300">去注册 →</button>
+            <button type="submit" class="auth-submit-btn">登录并进入系统</button>
+          </div>
+        </form>
+
+        <form id="authPanelRegister" class="hidden" onsubmit="return handleRegister(event)">
+          <div class="mb-[18px] grid grid-cols-2 gap-3.5">
+            <label class="block">
+              <span class="auth-label">姓名</span>
+              <input id="authRegisterName" type="text" class="auth-input" />
+            </label>
+            <label class="block">
+              <span class="auth-label">警号</span>
+              <input id="authRegisterUsername" type="text" class="auth-input" />
+            </label>
+          </div>
+          <label class="mb-[18px] block">
+            <span class="auth-label">所属单位</span>
+            <input id="authRegisterUnit" type="text" value="云浮市公安局治安管理支队" class="auth-input" />
+          </label>
+          <label class="mb-[18px] block">
+            <span class="auth-label">联系电话</span>
+            <input id="authRegisterPhone" type="text" class="auth-input" />
+          </label>
+          <label class="mb-[18px] block">
+            <span class="auth-label">设置密码</span>
+            <input id="authRegisterPassword" type="password" class="auth-input" />
+          </label>
+          <div class="auth-demo-hint auth-demo-hint--warning">
+            注册后可直接使用该账号登录，当前用于演示和内部试用。
+          </div>
+          <div id="authRegisterFeedback" class="mb-3 min-h-[18px] text-[13px] text-emerald-400"></div>
+          <div class="flex items-center justify-between gap-3">
+            <button type="button" onclick="switchAuthPanel('login')" class="bg-transparent p-0 text-[13px] font-medium text-slate-600 transition hover:text-sky-300">← 返回登录</button>
+            <button type="submit" class="auth-submit-btn">提交申请</button>
+          </div>
+        </form>
+      </section>
+
+    </div>
   </div>
 </div>
 

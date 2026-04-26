@@ -4,17 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>任务详情</title>
-  <script src="{{ url_for('static', filename='tailwind.min.js') }}"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='shared/css/editorial-ui.css') }}" />
-  <style>
-    body {
-      font-family: "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(153, 246, 228, 0.55), transparent 30%),
-        radial-gradient(circle at bottom right, rgba(191, 219, 254, 0.7), transparent 28%),
-        linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%);
-    }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dist/tailwind.css') }}" />
   <script>
     const JOB_ID = {{ job_id|tojson }};
     let DETAIL_STATE = { job: null, items: [], identitySummary: {}, library: null, loading: false };
@@ -443,7 +433,7 @@
     window.addEventListener('load', loadDetail);
   </script>
 </head>
-<body class="mr-editorial min-h-screen text-slate-900">
+<body class="mr-editorial mr-history-page min-h-screen text-slate-900">
   <div class="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-10">
     <header class="mb-8 grid gap-4 xl:grid-cols-[1.35fr,1fr]">
       <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">

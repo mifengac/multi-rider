@@ -12,6 +12,9 @@ pkgs/
 README*
 bczj.md
 dist/
+!static/dist/
+!static/dist/tailwind.css
+node_modules/
 deploy/
 *.tar
 *.tar.gz

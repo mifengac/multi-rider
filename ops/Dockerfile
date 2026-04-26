@@ -63,6 +63,7 @@ RUN test -f /app/model/biaochezhajiev2.pt || (echo "Missing model/biaochezhajiev
     && test -f /app/model/yolov8s-worldv2.pt || (echo "Missing model/yolov8s-worldv2.pt" >&2; exit 1) \
     && test -f /app/model/det_10g.onnx || (echo "Missing model/det_10g.onnx" >&2; exit 1) \
     && test -f /app/model/w600k_r50.onnx || (echo "Missing model/w600k_r50.onnx" >&2; exit 1) \
+    && test -f /app/static/dist/tailwind.css || (echo "Missing built Tailwind CSS at static/dist/tailwind.css; run npm run build:css before docker build" >&2; exit 1) \
     && test -f /app/instantclient_11_2/libclntsh.so.11.1 || (echo "Missing Linux Oracle Instant Client under instantclient_11_2/" >&2; exit 1) \
     && mkdir -p /data/output /data/upload_tmp /data/face_data /data/datasets /data/train_runs
 

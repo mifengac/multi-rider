@@ -19,7 +19,7 @@
 - `wheels\`
 - `instantclient_11_2\`
 - `model\`
-- `static\tailwind.min.js`
+- `static\dist\tailwind.css`
 - `requirements.txt`
 - `requirements-dev.txt`
 - `requirements.lock`
@@ -28,6 +28,7 @@
 
 - `CLIP\` 源码目录不是运行必须项，真正安装时使用的是 `wheels\clip-1.0-py3-none-any.whl`
 - 如果只需要运行，不需要测试，可不安装 `requirements-dev.txt`
+- 前端样式已由联网构建机用 npm 预编译到 `static\dist\tailwind.css`，内网运行机器不需要 Node.js。
 
 ## 目录检查
 

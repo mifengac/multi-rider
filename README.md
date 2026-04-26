@@ -45,7 +45,10 @@ multi-rider/
 ├── static/
 │   ├── modules/             # 按模块拆分的前端脚本
 │   ├── shared/              # 共享前端脚本
-│   └── tailwind.min.js      # Tailwind CSS 本地文件（内网无需 CDN）
+│   ├── src/tailwind.css     # Tailwind 输入文件，汇总自定义组件样式
+│   └── dist/tailwind.css    # npm 构建后的生产 CSS，页面离线引用
+├── package.json             # Tailwind/PostCSS 构建脚本
+├── tailwind.config.js       # Tailwind v3 配置，目标 Chrome 88+
 ├── docs/                    # 方案文档、交接记录、设计稿、辅助脚本
 ├── ops/
 │   ├── Dockerfile           # Linux Docker 镜像定义
@@ -70,6 +73,17 @@ multi-rider/
 - 模块前端脚本：`static/modules/`
 - 运维与部署材料：`ops/`
 - 方案、交接、设计稿：`docs/`
+
+## 前端样式构建
+
+项目使用 `tailwindcss@3.4.17`，原因是 Tailwind v4 官方要求 Chrome 111+，而本项目要求 Chrome 88+。Tailwind 不在浏览器里运行，开发或构建机通过 npm 预编译出 `static/dist/tailwind.css`，Flask 页面只引用这个静态 CSS 文件。
+
+```powershell
+npm install
+npm run build:css
+```
+
+日常改模板或 class 后需要重新执行 `npm run build:css`。Docker 离线部署只需要打包已经生成的 `static/dist/tailwind.css`，运行容器时不需要 Node.js 或 npm。
 
 ## 运行目录维护
 
@@ -112,7 +126,7 @@ multi-rider/
 - Oracle Instant Client **Windows 版**（`.dll` 文件），解压到 `instantclient_11_2`
   - 需包含 `oci.dll`、`oraocci11.dll`、`oraociei11.dll` 等
 - 模型文件已放入 `model\`：`biaochezhajiev2.pt`、`yolov8s-worldv2.pt`
-- `static\tailwind.min.js` 已存在（已包含在仓库）
+- `static\dist\tailwind.css` 已存在；如修改过模板 class，在联网构建机上执行 `npm run build:css` 后再带入内网
 - 建议使用 [uv](https://github.com/astral-sh/uv) 管理虚拟环境（也可用标准 `venv`）
 
 ### 1. 创建虚拟环境并安装依赖
