@@ -8,6 +8,7 @@ from shared.config.config import (
     APP_PORT,
     FLASK_SECRET_KEY,
     INSTANT_CLIENT_DIR,
+    JOB_RETENTION_DAYS,
     MAX_UPLOAD_BYTES,
     MODEL_DEFAULT,
     logger,
@@ -67,7 +68,12 @@ def create_app() -> Flask:
 
 def bootstrap_app() -> None:
     init_db()
-    cleanup_old_jobs(7)
+    if JOB_RETENTION_DAYS > 0:
+        deleted = cleanup_old_jobs(JOB_RETENTION_DAYS)
+        if deleted:
+            logger.info("cleaned up %s old detection jobs older than %s days", deleted, JOB_RETENTION_DAYS)
+    else:
+        logger.info("job retention cleanup disabled; saved detection history is persistent")
     mark_running_jobs_interrupted()
 
     if oracle_thick_mode_requested() and not os.path.isdir(INSTANT_CLIENT_DIR):

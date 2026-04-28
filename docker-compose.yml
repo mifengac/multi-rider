@@ -8,6 +8,7 @@ x-app-common: &app-common
   env_file:
     - ${APP_ENV_FILE:-./app.env}
   volumes:
+    - ${MULTI_RIDER_ROOT:-./runtime}/data:/data
     - ${MULTI_RIDER_ROOT:-./runtime}/data:/app/data
     - ${MULTI_RIDER_ROOT:-./runtime}/output:/app/output
     - ${MULTI_RIDER_ROOT:-./runtime}/datasets:/app/datasets

@@ -25,7 +25,7 @@ from modules.face.services.library_task_service import (
     start_face_library_task,
 )
 from shared.config.config import logger
-from shared.ownership.ownership import get_request_owner, job_matches_owner
+from shared.ownership.ownership import get_request_owner
 
 
 face_bp = Blueprint("face", __name__, url_prefix="/face")
@@ -50,9 +50,8 @@ def _job_manifest(job_id: str) -> tuple[dict | None, dict | None]:
 
 @face_bp.get("/results/<job_id>")
 def list_job_results(job_id: str):
-    owner_key, owner_ip = get_request_owner(request)
     job, manifest = _job_manifest(job_id)
-    if job is None or not job_matches_owner(job, owner_key, owner_ip):
+    if job is None:
         return jsonify({"ok": False, "error": "job not found"}), 404
     if manifest is None:
         return jsonify({"ok": False, "error": "result manifest not found"}), 404
@@ -90,9 +89,8 @@ def list_job_results(job_id: str):
 
 @face_bp.get("/results/<job_id>/asset/<asset_id>")
 def result_asset(job_id: str, asset_id: str):
-    owner_key, owner_ip = get_request_owner(request)
     job, manifest = _job_manifest(job_id)
-    if manifest is None or not job_matches_owner(job, owner_key, owner_ip):
+    if job is None or manifest is None:
         return "result manifest not found", 404
 
     safe_asset_id = os.path.basename(asset_id)
@@ -183,7 +181,7 @@ def identify_faces():
         return jsonify({"ok": False, "error": "asset_ids is required"}), 400
 
     job, manifest = _job_manifest(job_id)
-    if manifest is None or not job_matches_owner(job, owner_key, owner_ip):
+    if job is None or manifest is None:
         return jsonify({"ok": False, "error": "result manifest not found"}), 404
 
     selected = []

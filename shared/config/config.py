@@ -117,6 +117,7 @@ TRAIN_RUNS_DIR = _resolve_path(os.getenv("TRAIN_RUNS_DIR", os.path.join(BASE_DIR
 UPLOAD_TEMP_DIR = _resolve_path(os.getenv("UPLOAD_TEMP_DIR", os.path.join(BASE_DIR, "upload_tmp")))
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(1024 * 1024 * 1024)))
 VIDEO_FRAME_INTERVAL = int(os.getenv("VIDEO_FRAME_INTERVAL", "5"))
+JOB_RETENTION_DAYS = int(os.getenv("JOB_RETENTION_DAYS", "0"))
 
 FACE_MODEL_DET = _resolve_path(os.getenv("FACE_MODEL_DET", os.path.join(MODEL_DIR, "det_10g.onnx")))
 FACE_MODEL_REC = _resolve_path(os.getenv("FACE_MODEL_REC", os.path.join(MODEL_DIR, "w600k_r50.onnx")))

@@ -1292,6 +1292,21 @@ def list_jobs(owner_key: str, owner_ip: str, limit: int = 50) -> list[dict[str, 
     return [_row_to_job(row) for row in rows if row is not None]
 
 
+def list_all_jobs(limit: int = 50) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(int(limit or 50), 500))
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM jobs
+            ORDER BY start_ts DESC, id DESC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        ).fetchall()
+    return [_row_to_job(row) for row in rows if row is not None]
+
+
 def cleanup_old_jobs(days: int = 7) -> int:
     cutoff = int(time.time()) - max(days, 0) * 24 * 60 * 60
     with _connect() as conn:

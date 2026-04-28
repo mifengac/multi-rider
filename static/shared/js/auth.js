@@ -54,6 +54,44 @@ function clearAuthSession() {
   } catch (e) {}
 }
 
+function getAuthOwnerUsername() {
+  var session = getAuthSession();
+  return session && session.username ? String(session.username).trim() : '';
+}
+
+function installAuthFetchBridge() {
+  if (window.__multiRiderAuthFetchInstalled || typeof window.fetch !== 'function') {
+    return;
+  }
+  var nativeFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    var options = init ? Object.assign({}, init) : {};
+    var requestUrl = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+    var sameOrigin = true;
+    try {
+      if (requestUrl) {
+        sameOrigin = new URL(requestUrl, window.location.href).origin === window.location.origin;
+      }
+    } catch (e) {
+      sameOrigin = true;
+    }
+    if (sameOrigin) {
+      var username = getAuthOwnerUsername();
+      if (username) {
+        var headers = new Headers(options.headers || (input && input.headers ? input.headers : undefined));
+        if (!headers.has('X-Multi-Rider-User')) {
+          headers.set('X-Multi-Rider-User', username);
+        }
+        options.headers = headers;
+      }
+    }
+    return nativeFetch(input, options);
+  };
+  window.__multiRiderAuthFetchInstalled = true;
+}
+
+installAuthFetchBridge();
+
 function switchAuthPanel(name) {
   ['login', 'register'].forEach(function (panelName) {
     var button = document.getElementById('authTab' + panelName.charAt(0).toUpperCase() + panelName.slice(1));

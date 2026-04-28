@@ -3,7 +3,6 @@ import os
 from flask import Blueprint, jsonify, render_template, request, send_file, url_for
 
 from shared.config.config import MODEL_DIR, get_upload_model_options, logger
-from shared.db.sqlite import get_job as get_saved_job
 from shared.job_lookup import resolve_job
 from modules.detection.services.result_store_service import load_result_manifest
 from modules.training.services.auto_annotate_service import auto_annotate_dataset_assets
@@ -550,7 +549,6 @@ def dataset_import_zip(dataset_id: str):
 
 @train_bp.post("/datasets/<dataset_id>/import-results")
 def dataset_import_results(dataset_id: str):
-    owner_key, owner_ip = get_request_owner(request)
     payload = request.get_json(silent=True) or request.form or {}
     job_id = (payload.get("job_id", "") or "").strip()
     asset_ids = payload.get("asset_ids") or []
@@ -561,7 +559,7 @@ def dataset_import_results(dataset_id: str):
         return jsonify({"ok": False, "error": "asset_ids is required"}), 400
 
     job = _resolve_result_job(job_id)
-    if job is None or not job_matches_owner(job, owner_key, owner_ip):
+    if job is None:
         return jsonify({"ok": False, "error": "job not found"}), 404
 
     manifest_path = job.get("result_manifest_path")

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>任务历史</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='dist/tailwind.css') }}" />
+  <script src="{{ url_for('static', filename='shared/js/auth.js') }}"></script>
   <script>
     const STATUS_UI = {
       queued: { label: '排队中', badge: 'bg-slate-100 text-slate-700 ring-slate-200' },
@@ -110,7 +111,7 @@
         <div class="text-xs font-semibold uppercase tracking-[0.35em] text-sky-600">History</div>
         <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">任务历史</h1>
         <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
-          这里展示当前访问 IP 的任务历史。除了检测结果下载外，现在也会保留身份识别摘要，便于回看每个任务识别了多少张图片、命中了多少人脸。
+          这里展示系统已保存的全部检测任务历史。除了检测结果下载外，现在也会保留身份识别摘要，换浏览器、换终端或服务重启后都可以继续回看。
         </p>
       </section>
 

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>任务详情</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='dist/tailwind.css') }}" />
+  <script src="{{ url_for('static', filename='shared/js/auth.js') }}"></script>
   <script>
     const JOB_ID = {{ job_id|tojson }};
     let DETAIL_STATE = { job: null, items: [], identitySummary: {}, library: null, loading: false };

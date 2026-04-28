@@ -15,7 +15,7 @@ from shared.config.config import (
 )
 from shared.db.oracle import fetch_image_urls
 from shared.db.sqlite import get_job as get_saved_job
-from shared.db.sqlite import list_jobs as list_saved_jobs
+from shared.db.sqlite import list_all_jobs as list_all_saved_jobs
 from modules.detection.services.job_service import (
     get_job_snapshot,
     list_running_jobs,
@@ -87,10 +87,6 @@ def _history_summary_payload(record: dict) -> dict:
         "detail_url": url_for("job.history_detail_page", job_id=record.get("id")),
         "download_url": url_for("file.download_zip", job_id=record.get("id")),
     }
-
-
-def _is_visible_job(record: dict | None, owner_key: str, owner_ip: str) -> bool:
-    return job_matches_owner(record, owner_key, owner_ip)
 
 
 @job_bp.route("/", methods=["GET", "POST"])
@@ -225,14 +221,13 @@ def list_jobs():
 
 @job_bp.get("/history")
 def history():
-    owner_key, owner_ip = get_request_owner(request)
     limit_raw = request.args.get("limit", "50")
     try:
         limit = int(limit_raw)
     except Exception:
         limit = 50
 
-    records = list_saved_jobs(owner_key, owner_ip, limit=limit)
+    records = list_all_saved_jobs(limit=limit)
     items = [_history_summary_payload(record) for record in records]
     return jsonify({"ok": True, "jobs": items})
 
@@ -249,9 +244,8 @@ def history_detail_page(job_id: str):
 
 @job_bp.get("/history/<job_id>")
 def history_detail(job_id: str):
-    owner_key, owner_ip = get_request_owner(request)
     record = get_saved_job(job_id)
-    if not job_matches_owner(record, owner_key, owner_ip):
+    if record is None:
         return jsonify({"ok": False, "error": "job not found"}), 404
 
     manifest = None

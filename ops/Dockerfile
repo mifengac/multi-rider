@@ -4,6 +4,8 @@ FROM ${BASE_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin \
     PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     ORACLE_IC_DIR=/app/instantclient_11_2 \
@@ -19,6 +21,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     YOLO_TELEMETRY=false
 
 RUN set -eux; \
+    cp -a /etc/apt/sources.list /tmp/sources.list.official; \
     if [ -f /etc/apt/sources.list ]; then \
         sed -i -e 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' \
                -e 's|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list; \
@@ -27,15 +30,37 @@ RUN set -eux; \
         sed -i -e 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' \
                -e 's|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources; \
     fi; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
+    if ! apt-get update; then \
+        echo "Tsinghua apt mirror failed, falling back to official Debian sources"; \
+        cp -a /tmp/sources.list.official /etc/apt/sources.list; \
+        if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+            sed -i -e 's|mirrors.tuna.tsinghua.edu.cn|deb.debian.org|g' /etc/apt/sources.list.d/debian.sources; \
+        fi; \
+        apt-get update; \
+    fi; \
+    if ! apt-get install -y --no-install-recommends \
         ca-certificates \
         libaio1 \
         libglib2.0-0 \
         libgl1 \
         libsm6 \
         libxext6 \
-        libxrender1; \
+        libxrender1; then \
+        echo "Tsinghua apt install failed, falling back to official Debian sources"; \
+        cp -a /tmp/sources.list.official /etc/apt/sources.list; \
+        if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+            sed -i -e 's|mirrors.tuna.tsinghua.edu.cn|deb.debian.org|g' /etc/apt/sources.list.d/debian.sources; \
+        fi; \
+        apt-get update; \
+        apt-get install -y --no-install-recommends \
+            ca-certificates \
+            libaio1 \
+            libglib2.0-0 \
+            libgl1 \
+            libsm6 \
+            libxext6 \
+            libxrender1; \
+    fi; \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -44,12 +69,20 @@ COPY requirements.txt requirements.lock ./
 COPY wheels/clip-1.0-py3-none-any.whl ./wheels/
 
 RUN grep -Ev '^(torch|torchvision|triton|nvidia-[^=]+)==' requirements.lock > requirements.docker.lock \
-    && /usr/local/bin/python -m pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
+    && /usr/local/bin/python -m pip install --no-cache-dir --no-deps \
+        --index-url https://download.pytorch.org/whl/cpu \
         torch==2.8.0+cpu \
         torchvision==0.23.0 \
-    && /usr/local/bin/python -m pip install --no-cache-dir -r requirements.docker.lock
+    && (/usr/local/bin/python -m pip install --no-cache-dir \
+        --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+        -r requirements.docker.lock \
+        || (echo "Tsinghua pip mirror failed, falling back to official PyPI" \
+            && /usr/local/bin/python -m pip install --no-cache-dir \
+                --index-url https://pypi.org/simple \
+                -r requirements.docker.lock))
 
 # Copy application source (module-oriented structure)
+RUN rm -rf /app/app.py /app/worker.py /app/shared /app/modules /app/templates /app/static /app/model /app/instantclient_11_2
 COPY app.py ./
 COPY worker.py ./
 COPY shared ./shared
