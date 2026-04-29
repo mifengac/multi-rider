@@ -1,5 +1,3 @@
---find-links ./vendor/wheels
-
 # Web framework
 Flask==3.0.0
 
@@ -11,9 +9,6 @@ ultralytics==8.4.27
 torch==2.11.0
 torchvision==0.26.0
 
-# Local wheel for the Ultralytics CLIP dependency used by YOLOE / YOLO-World.
-./vendor/wheels/clip-1.0-py3-none-any.whl
-
 # Numerical / image processing
 numpy==2.0.2
 opencv-python-headless>=4.8,<5
@@ -23,12 +18,17 @@ onnx>=1.18,<2
 tqdm==4.67.1
 psycopg2-binary==2.9.10
 
+# Ultralytics CLIP for YOLO-World prompt inference.
+# Keep wheels/clip-1.0-py3-none-any.whl available for offline installs.
+./wheels/clip-1.0-py3-none-any.whl
+
 # Oracle database driver
 oracledb==3.4.0
 
-# Offline installation notes:
-# 1. Download all wheels into ./vendor/wheels first.
-# 2. Then install with:
-#    uv pip install --python .\.venv\Scripts\python.exe --offline -r requirements.txt
-# 3. If you need the pinned dependency set, use:
+# Installation notes:
+# 1. Install with a mirror, for example:
+#    uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+# 2. If you need the pinned dependency set, use:
 #    uv pip sync --python .\.venv\Scripts\python.exe requirements.lock
+# 3. For offline intranet installs, use the local wheels/ directory:
+#    uv pip install --python .\.venv\Scripts\python.exe --no-index --find-links .\wheels -r requirements.txt

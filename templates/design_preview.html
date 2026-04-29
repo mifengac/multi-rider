@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multi-Rider Design Preview</title>
+  <style>
+    :root {
+      --bg-page: #f5f4ed;
+      --bg-surface: #faf9f5;
+      --bg-paper: #ffffff;
+      --bg-warm: #e8e6dc;
+      --bg-dark: #141413;
+      --bg-dark-soft: #30302e;
+      --text-strong: #141413;
+      --text-body: #5e5d59;
+      --text-muted: #87867f;
+      --text-dark-soft: #b0aea5;
+      --border-light: #f0eee6;
+      --ring-soft: #d1cfc5;
+      --ring-deep: #c2c0b6;
+      --brand: #c96442;
+      --brand-soft: #d97757;
+      --olive: #6d7763;
+      --shadow-whisper: rgba(20, 20, 19, 0.05) 0 4px 24px;
+      --container: 1240px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+      --radius-hero: 32px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg-page);
+      color: var(--text-strong);
+      font-family: Arial, "Helvetica Neue", sans-serif;
+      line-height: 1.6;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    .page-shell { min-height: 100vh; overflow-x: hidden; }
+    .container { width: min(var(--container), calc(100vw - 40px)); margin: 0 auto; }
+    .serif { font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(18px);
+      background: rgba(245, 244, 237, 0.88);
+      border-bottom: 1px solid var(--border-light);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px 0;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 14px; }
+    .nav-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: var(--bg-paper);
+      box-shadow: 0 0 0 1px var(--ring-soft);
+      display: grid;
+      place-items: center;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      color: var(--text-body);
+      font-size: 15px;
+    }
+    .nav-actions { display: flex; align-items: center; gap: 10px; }
+    .btn {
+      border: 0;
+      border-radius: var(--radius-md);
+      padding: 10px 16px;
+      transition: 180ms ease;
+    }
+    .btn-sand {
+      background: var(--bg-warm);
+      color: #4d4c48;
+      box-shadow: 0 0 0 1px var(--ring-soft);
+    }
+    .btn-sand:hover {
+      box-shadow: 0 0 0 1px var(--ring-deep);
+      transform: translateY(-1px);
+    }
+    .btn-brand {
+      background: var(--brand);
+      color: var(--bg-surface);
+      box-shadow: 0 0 0 1px var(--brand);
+    }
+    .btn-brand:hover {
+      background: var(--brand-soft);
+      box-shadow: 0 0 0 1px var(--brand-soft);
+      transform: translateY(-1px);
+    }
+
+    .hero { padding: 48px 0 32px; }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 28px;
+      align-items: stretch;
+    }
+    .hero-title {
+      margin: 18px 0 0;
+      font-size: clamp(40px, 6vw, 68px);
+      line-height: 1.08;
+      max-width: 10.5em;
+    }
+    .hero-desc {
+      margin: 22px 0 0;
+      max-width: 640px;
+      color: var(--text-body);
+      font-size: 19px;
+    }
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 28px;
+      flex-wrap: wrap;
+    }
+    .hero-notes {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 40px;
+    }
+    .note-card {
+      padding: 18px;
+      background: var(--bg-surface);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 0 0 1px var(--border-light);
+    }
+    .note-card strong {
+      display: block;
+      margin-top: 10px;
+      font-size: 18px;
+      color: var(--text-strong);
+    }
+
+    .illustration-card {
+      position: relative;
+      min-height: 460px;
+      padding: 28px;
+      background: var(--bg-surface);
+      border-radius: var(--radius-hero);
+      box-shadow: 0 0 0 1px var(--border-light), var(--shadow-whisper);
+      overflow: hidden;
+    }
+    .illustration-caption {
+      position: relative;
+      z-index: 2;
+      max-width: 280px;
+    }
+    .illustration-caption h2 {
+      margin: 12px 0 0;
+      font-size: 34px;
+      line-height: 1.16;
+    }
+    .illustration-caption p {
+      margin: 16px 0 0;
+      color: var(--text-body);
+      font-size: 16px;
+    }
+    .illustration-board {
+      position: absolute;
+      right: 26px;
+      bottom: 26px;
+      width: min(86%, 420px);
+      aspect-ratio: 0.95;
+      border-radius: 28px;
+      background: #f0ede2;
+      box-shadow: 0 0 0 1px #e1ddd0;
+      overflow: hidden;
+    }
+    .organic-shape { position: absolute; border-radius: 999px; }
+    .shape-terra { background: #c96442; }
+    .shape-green { background: #6d7763; }
+    .shape-ink { background: #141413; }
+    .board-card {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.76);
+      backdrop-filter: blur(8px);
+      border-radius: 18px;
+      box-shadow: 0 0 0 1px rgba(209, 207, 197, 0.9);
+      padding: 16px;
+    }
+
+    .preview-shell { padding: 18px 0 72px; }
+    .preview-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 22px;
+    }
+    .preview-title {
+      margin: 8px 0 0;
+      font-size: clamp(30px, 4.6vw, 52px);
+      line-height: 1.12;
+    }
+    .preview-layout {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr) 300px;
+      gap: 18px;
+      align-items: start;
+    }
+    .panel {
+      background: var(--bg-surface);
+      border-radius: var(--radius-xl);
+      box-shadow: 0 0 0 1px var(--border-light), var(--shadow-whisper);
+    }
+    .sidebar-panel, .rail-panel {
+      padding: 22px;
+      position: sticky;
+      top: 92px;
+    }
+    .sidebar-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .sidebar-link {
+      padding: 14px 14px 14px 16px;
+      border-radius: 16px;
+      background: #f2efe5;
+      color: var(--text-body);
+      box-shadow: 0 0 0 1px #e3dfd2;
+      transition: 180ms ease;
+    }
+    .sidebar-link.active {
+      background: var(--bg-paper);
+      color: var(--text-strong);
+      box-shadow: 0 0 0 1px var(--ring-soft), 0 12px 24px rgba(20, 20, 19, 0.04);
+    }
+    .sidebar-link small {
+      display: block;
+      margin-top: 4px;
+      color: var(--text-muted);
+    }
+    .workspace-panel { overflow: hidden; }
+    .workspace-top {
+      padding: 22px 24px 20px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .workspace-switcher {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px;
+      border-radius: 999px;
+      background: #efebe0;
+      box-shadow: 0 0 0 1px #e2ddcf;
+    }
+    .switch-btn {
+      border: 0;
+      background: transparent;
+      color: var(--text-body);
+      border-radius: 999px;
+      padding: 10px 14px;
+    }
+    .switch-btn.active {
+      background: var(--bg-paper);
+      color: var(--text-strong);
+      box-shadow: 0 0 0 1px var(--ring-soft);
+    }
+    .workspace-body {
+      padding: 24px;
+      background:
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.22)),
+        var(--bg-surface);
+    }
+    .preview-pane { display: none; }
+    .preview-pane.active { display: block; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .summary-card {
+      background: var(--bg-paper);
+      padding: 18px;
+      border-radius: 18px;
+      box-shadow: 0 0 0 1px var(--border-light);
+    }
+    .summary-card .value {
+      font-size: 30px;
+      line-height: 1;
+      margin-top: 8px;
+      color: var(--text-strong);
+    }
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 14px;
+      border-radius: 20px;
+      background: #f1eee4;
+      box-shadow: 0 0 0 1px #e2ddcf;
+      margin-bottom: 16px;
+    }
+    .filter-pill {
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: var(--bg-paper);
+      color: var(--text-body);
+      box-shadow: 0 0 0 1px var(--ring-soft);
+      font-size: 14px;
+    }
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 16px;
+    }
+    .card {
+      background: var(--bg-paper);
+      border-radius: 22px;
+      box-shadow: 0 0 0 1px var(--border-light);
+      padding: 20px;
+    }
+    .record-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .record-item {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 18px;
+      background: #f8f6ee;
+      box-shadow: 0 0 0 1px #ece8dc;
+    }
+    .record-thumb {
+      width: 72px;
+      aspect-ratio: 1;
+      border-radius: 16px;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(201, 100, 66, 0.35), transparent 55%),
+        linear-gradient(180deg, #ebe4d5 0%, #dfd6c3 100%);
+      box-shadow: inset 0 0 0 1px rgba(109, 119, 99, 0.15);
+    }
+    .record-meta strong {
+      display: block;
+      font-size: 18px;
+      color: var(--text-strong);
+    }
+    .record-meta small {
+      display: block;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-size: 13px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .badge-brand { color: var(--bg-surface); background: var(--brand); }
+    .badge-soft { color: var(--text-body); background: #ece8dc; }
+    .badge-success { color: #44604a; background: #dde4d8; }
+    .metric-stack { display: grid; gap: 10px; margin-top: 14px; }
+    .metric-row {
+      padding: 14px;
+      border-radius: 16px;
+      background: #f8f6ee;
+      box-shadow: 0 0 0 1px #ece8dc;
+    }
+    .metric-row span {
+      display: block;
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .metric-row strong {
+      font-size: 22px;
+      color: var(--text-strong);
+    }
+    .dark-band {
+      margin: 12px 0 0;
+      background: var(--bg-dark);
+      color: var(--bg-surface);
+    }
+    .dark-band .container {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 24px;
+      padding: 56px 0;
+    }
+    .dark-card {
+      padding: 26px;
+      border-radius: 24px;
+      background: var(--bg-dark-soft);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+    .dark-card p,
+    .dark-card li { color: var(--text-dark-soft); }
+    .dark-card ul { margin: 16px 0 0; padding-left: 18px; }
+
+    .rail-panel {
+      background: var(--bg-dark);
+      color: var(--bg-surface);
+      box-shadow: 0 0 0 1px rgba(20, 20, 19, 0.08);
+    }
+    .rail-panel p,
+    .rail-panel li,
+    .rail-panel small { color: var(--text-dark-soft); }
+    .rail-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.08);
+      margin: 18px 0;
+    }
+    .timeline {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 22px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+    }
+    .timeline-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      margin-top: 8px;
+      background: var(--brand);
+      box-shadow: 0 0 0 4px rgba(201, 100, 66, 0.12);
+    }
+    .footer-note {
+      padding: 24px 0 56px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 1120px) {
+      .hero-grid,
+      .preview-layout,
+      .dark-band .container,
+      .content-grid { grid-template-columns: 1fr; }
+      .sidebar-panel,
+      .rail-panel { position: static; }
+    }
+
+    @media (max-width: 780px) {
+      .nav-inner,
+      .preview-head,
+      .workspace-top { flex-direction: column; align-items: start; }
+      .nav-links,
+      .hero-notes,
+      .summary-grid {
+        grid-template-columns: 1fr;
+        display: grid;
+        width: 100%;
+      }
+      .nav-links { gap: 10px; }
+      .workspace-switcher {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-radius: 18px;
+      }
+      .record-item { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="nav">
+      <div class="container nav-inner">
+        <div class="nav-brand">
+          <div class="nav-mark" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M12 20L5 7h14L12 20Z" fill="#c96442"></path>
+              <circle cx="12" cy="10" r="2.4" fill="#141413"></circle>
+              <path d="M8.5 14.2c2-1 5-1 7 0" stroke="#141413" stroke-width="1.5" stroke-linecap="round"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="eyebrow">Design Preview</div>
+            <div class="serif" style="font-size:22px;">猎影哨兵新模板</div>
+          </div>
+        </div>
+        <nav class="nav-links">
+          <a href="#shell">工作台壳层</a>
+          <a href="#modules">模块内容</a>
+          <a href="#notes">风格说明</a>
+        </nav>
+        <div class="nav-actions">
+          <a class="btn btn-sand" href="{{ url_for('job.index') }}">返回当前系统</a>
+          <button class="btn btn-brand" type="button">用于确认方向</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <div class="eyebrow">Warm editorial shell for public-safety workflow</div>
+            <h1 class="hero-title serif">把公安研判工作台，从“系统页面”改成“可读、可信、可讲述”的工作界面。</h1>
+            <p class="hero-desc">
+              这版模板严格按 <code>DESIGN.md</code> 的 Claude 风格走：暖纸色底、书卷感标题、暖灰中性色、陶土色主按钮、
+              ring shadow 深度、深浅章节切换。它先展示整体壳层和一个通用模块模板，确认方向后我再把检测、人脸、下发、训练页面逐页落进去。
+            </p>
+            <div class="hero-actions">
+              <button class="btn btn-brand" type="button">确认这条视觉方向</button>
+              <button class="btn btn-sand" type="button">下一步套用到业务页</button>
+            </div>
+            <div class="hero-notes">
+              <div class="note-card">
+                <div class="eyebrow">Atmosphere</div>
+                <strong class="serif">像案卷室，不像驾驶舱</strong>
+                <div style="margin-top:8px;color:var(--text-body);font-size:14px;">温暖、克制、有阅读节奏，降低技术系统的紧张感。</div>
+              </div>
+              <div class="note-card">
+                <div class="eyebrow">Hierarchy</div>
+                <strong class="serif">标题有书名感</strong>
+                <div style="margin-top:8px;color:var(--text-body);font-size:14px;">Serif 负责判断与信息重心，Sans 负责可操作性。</div>
+              </div>
+              <div class="note-card">
+                <div class="eyebrow">Interaction</div>
+                <strong class="serif">边界靠 ring，不靠重阴影</strong>
+                <div style="margin-top:8px;color:var(--text-body);font-size:14px;">更安静，也更符合内网工作台长期使用的气质。</div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="illustration-card" aria-label="设计氛围插画">
+            <div class="illustration-caption">
+              <div class="eyebrow">Concept board</div>
+              <h2 class="serif">同一套壳层里，能容纳检测、人脸、下发和训练四种工作语境。</h2>
+              <p>这一版先做统一骨架：左侧导航、中央工作台、右侧案情摘要与操作带。后面每个模块只替换中间内容，不换设计语言。</p>
+            </div>
+            <div class="illustration-board">
+              <div class="organic-shape shape-terra" style="width:180px;height:180px;left:-36px;top:42px;"></div>
+              <div class="organic-shape shape-green" style="width:110px;height:110px;right:20px;top:28px;"></div>
+              <div class="organic-shape shape-ink" style="width:220px;height:220px;right:-58px;bottom:-70px;opacity:0.92;"></div>
+              <div class="board-card" style="left:28px;top:28px;width:220px;">
+                <div class="eyebrow">Case overview</div>
+                <div class="serif" style="margin-top:8px;font-size:25px;line-height:1.2;">夜间摩托聚集行为筛查</div>
+                <p style="margin:10px 0 0;color:var(--text-body);font-size:14px;">从“命中了几张图”升级成“这批结果该如何流转”。</p>
+              </div>
+              <div class="board-card" style="right:22px;top:126px;width:180px;">
+                <div style="font-size:12px;color:var(--text-muted);">Identity</div>
+                <div style="margin-top:8px;font-size:28px;color:var(--text-strong);">12</div>
+                <div style="font-size:13px;color:var(--text-body);">张资产进入身份核验</div>
+              </div>
+              <div class="board-card" style="left:44px;bottom:26px;width:250px;">
+                <div style="font-size:12px;color:var(--text-muted);">Disposition</div>
+                <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                  <span class="badge badge-brand">待下发 4</span>
+                  <span class="badge badge-soft">需补手机号 2</span>
+                  <span class="badge badge-success">已核验 9</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="preview-shell" id="shell">
+        <div class="container">
+          <div class="preview-head">
+            <div>
+              <div class="eyebrow">Template sample</div>
+              <h2 class="preview-title serif">这是给整套系统统一替换的“工作台模板”基底，不是单独某个模块的临时美化。</h2>
+            </div>
+            <div style="max-width:320px;color:var(--text-body);font-size:15px;">
+              我先做壳层和一套模块样板。你确认后，我会把内部业务块按同一语法拆进去，保证一体化而不是拼贴。
+            </div>
+          </div>
+
+          <div class="preview-layout">
+            <aside class="panel sidebar-panel">
+              <div class="eyebrow">System map</div>
+              <div class="serif" style="margin-top:10px;font-size:28px;line-height:1.16;">左侧导航像目录，不像菜单。</div>
+              <div style="margin-top:12px;color:var(--text-body);font-size:15px;">
+                导航信息收敛，使用暖色卡片层次，不再用高饱和运营后台风格。
+              </div>
+              <div class="sidebar-list">
+                <a class="sidebar-link active" href="#modules">数据检测与研判<small>Oracle 巡检 / 本地素材 / 结果沉淀</small></a>
+                <a class="sidebar-link" href="#modules">人脸识别与核验<small>命中筛查 / 底库特征 / 识别回填</small></a>
+                <a class="sidebar-link" href="#modules">任务下发<small>处置队列 / 短信通知 / 平台对接</small></a>
+                <a class="sidebar-link" href="#modules">模型自训练<small>数据集 / 预标注 / 训练发布</small></a>
+              </div>
+            </aside>
+
+            <section class="panel workspace-panel" id="modules">
+              <div class="workspace-top">
+                <div>
+                  <div class="eyebrow">Workspace center</div>
+                  <div class="serif" style="margin-top:10px;font-size:34px;line-height:1.14;">中间区域是一张“可切换章节的案头工作页”。</div>
+                </div>
+                <div class="workspace-switcher" role="tablist" aria-label="模块预览切换">
+                  <button class="switch-btn active" type="button" data-preview-switch="detect">检测</button>
+                  <button class="switch-btn" type="button" data-preview-switch="face">核验</button>
+                  <button class="switch-btn" type="button" data-preview-switch="dispatch">下发</button>
+                  <button class="switch-btn" type="button" data-preview-switch="train">训练</button>
+                </div>
+              </div>
+
+              <div class="workspace-body">
+                <div class="preview-pane active" data-preview-pane="detect">
+                  <div class="summary-grid">
+                    <div class="summary-card"><div class="eyebrow">今日任务</div><div class="value serif">18</div></div>
+                    <div class="summary-card"><div class="eyebrow">保留结果</div><div class="value serif">64</div></div>
+                    <div class="summary-card"><div class="eyebrow">进入核验</div><div class="value serif">12</div></div>
+                    <div class="summary-card"><div class="eyebrow">疑似重点</div><div class="value serif">4</div></div>
+                  </div>
+                  <div class="filter-bar">
+                    <span class="filter-pill">时间范围: 2026-04-15 18:00 - 23:00</span>
+                    <span class="filter-pill">模型: 通用人车要素识别</span>
+                    <span class="filter-pill">提示词: person, motorcycle, car</span>
+                    <span class="filter-pill">阈值: 0.10</span>
+                  </div>
+                  <div class="content-grid">
+                    <div class="card">
+                      <div class="eyebrow">Result ledger</div>
+                      <div class="serif" style="margin-top:10px;font-size:28px;line-height:1.18;">命中结果列表像台账，不像文件浏览器。</div>
+                      <div class="record-list">
+                        <article class="record-item">
+                          <div class="record-thumb"></div>
+                          <div class="record-meta">
+                            <strong>路口机位 04 / 19:42:18</strong>
+                            <small>检测到人员、摩托车叠加出现，已保留原图与结果清单，可继续做人脸识别。</small>
+                          </div>
+                          <span class="badge badge-brand">待核验</span>
+                        </article>
+                        <article class="record-item">
+                          <div class="record-thumb"></div>
+                          <div class="record-meta">
+                            <strong>快速路入口 / 20:16:52</strong>
+                            <small>系统判断为高关注画面，已落地到 manifest，可直接导入训练样本池。</small>
+                          </div>
+                          <span class="badge badge-soft">可导入训练</span>
+                        </article>
+                      </div>
+                    </div>
+                    <div class="card">
+                      <div class="eyebrow">Operational summary</div>
+                      <div class="serif" style="margin-top:10px;font-size:24px;line-height:1.2;">辅助指标保留在右侧小卡片里，不抢主阅读线。</div>
+                      <div class="metric-stack">
+                        <div class="metric-row"><span>任务状态</span><strong>运行中 3 / 已完成 15</strong></div>
+                        <div class="metric-row"><span>结果落地</span><strong>ZIP + manifest + assets</strong></div>
+                        <div class="metric-row"><span>后续动作</span><strong>核验 12 / 下发 4 / 导样本 9</strong></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="preview-pane" data-preview-pane="face">
+                  <div class="summary-grid">
+                    <div class="summary-card"><div class="eyebrow">待识别资产</div><div class="value serif">12</div></div>
+                    <div class="summary-card"><div class="eyebrow">成功命中</div><div class="value serif">7</div></div>
+                    <div class="summary-card"><div class="eyebrow">低质图片</div><div class="value serif">3</div></div>
+                    <div class="summary-card"><div class="eyebrow">需人工复核</div><div class="value serif">2</div></div>
+                  </div>
+                  <div class="content-grid">
+                    <div class="card">
+                      <div class="eyebrow">Identity review</div>
+                      <div class="serif" style="margin-top:10px;font-size:28px;">核验页应更像判读卡，而不是算法调试界面。</div>
+                      <div class="record-list">
+                        <article class="record-item">
+                          <div class="record-thumb" style="background:radial-gradient(circle at 50% 30%, rgba(109,119,99,0.38), transparent 50%), linear-gradient(180deg, #e8e1d3 0%, #d8cfbd 100%);"></div>
+                          <div class="record-meta">
+                            <strong>命中: 张某 / 相似度 0.91</strong>
+                            <small>右脸清晰、可用作正式入队，下发上下文可以继续自动补齐。</small>
+                          </div>
+                          <span class="badge badge-brand">建议入队</span>
+                        </article>
+                      </div>
+                    </div>
+                    <div class="card">
+                      <div class="eyebrow">Library status</div>
+                      <div class="serif" style="margin-top:10px;font-size:24px;">人脸库状态放在安静位置，但要一眼可见。</div>
+                      <div class="metric-stack">
+                        <div class="metric-row"><span>底库状态</span><strong>已准备就绪</strong></div>
+                        <div class="metric-row"><span>特征检索</span><strong>hnswlib / numpy 降级兼容</strong></div>
+                        <div class="metric-row"><span>同步方式</span><strong>staged swap 原子切换</strong></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="preview-pane" data-preview-pane="dispatch">
+                  <div class="summary-grid">
+                    <div class="summary-card"><div class="eyebrow">待下发</div><div class="value serif">4</div></div>
+                    <div class="summary-card"><div class="eyebrow">待短信</div><div class="value serif">2</div></div>
+                    <div class="summary-card"><div class="eyebrow">已发送</div><div class="value serif">9</div></div>
+                    <div class="summary-card"><div class="eyebrow">需补信息</div><div class="value serif">1</div></div>
+                  </div>
+                  <div class="content-grid">
+                    <div class="card">
+                      <div class="eyebrow">Disposition queue</div>
+                      <div class="serif" style="margin-top:10px;font-size:28px;">下发页重点应该是“处置语义”，而不是接口字段堆叠。</div>
+                      <div class="record-list">
+                        <article class="record-item">
+                          <div class="record-thumb"></div>
+                          <div class="record-meta">
+                            <strong>张某 / 夜间摩托聚集</strong>
+                            <small>辖区、派出所、联系电话已补齐，当前处置标题和短信模板可二次编辑。</small>
+                          </div>
+                          <span class="badge badge-brand">待发送</span>
+                        </article>
+                        <article class="record-item">
+                          <div class="record-thumb"></div>
+                          <div class="record-meta">
+                            <strong>李某 / 现场素材命中</strong>
+                            <small>已成功生成 draft payload，缺手机号，短信入口应以提醒式而不是报错式呈现。</small>
+                          </div>
+                          <span class="badge badge-soft">需补手机号</span>
+                        </article>
+                      </div>
+                    </div>
+                    <div class="card">
+                      <div class="eyebrow">Dispatch posture</div>
+                      <div class="serif" style="margin-top:10px;font-size:24px;">右侧保留“本次发送会做什么”的解释性卡片。</div>
+                      <div class="metric-stack">
+                        <div class="metric-row"><span>认证状态</span><strong>已登录 / mock 可切换</strong></div>
+                        <div class="metric-row"><span>发送动作</span><strong>预览 -> 正式下发 -> 记录落库</strong></div>
+                        <div class="metric-row"><span>短信动作</span><strong>模板预览 -> 队列写入 Oracle</strong></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="preview-pane" data-preview-pane="train">
+                  <div class="summary-grid">
+                    <div class="summary-card"><div class="eyebrow">数据集</div><div class="value serif">6</div></div>
+                    <div class="summary-card"><div class="eyebrow">已标注</div><div class="value serif">482</div></div>
+                    <div class="summary-card"><div class="eyebrow">待复核</div><div class="value serif">37</div></div>
+                    <div class="summary-card"><div class="eyebrow">训练中</div><div class="value serif">1</div></div>
+                  </div>
+                  <div class="content-grid">
+                    <div class="card">
+                      <div class="eyebrow">Dataset and training</div>
+                      <div class="serif" style="margin-top:10px;font-size:28px;">训练页应强调“样本成长路径”，而不是命令行痕迹。</div>
+                      <div class="record-list">
+                        <article class="record-item">
+                          <div class="record-thumb"></div>
+                          <div class="record-meta">
+                            <strong>夜间摩托车聚集样本集</strong>
+                            <small>支持结果导入、人工框标注、复核状态流转，以及只用 confirmed 样本启动训练。</small>
+                          </div>
+                          <span class="badge badge-success">可训练</span>
+                        </article>
+                        <article class="record-item">
+                          <div class="record-thumb"></div>
+                          <div class="record-meta">
+                            <strong>模型发布记录</strong>
+                            <small>best.pt 发布后进入 model/，并通过 slot 机制进行切换和回滚。</small>
+                          </div>
+                          <span class="badge badge-brand">可发布</span>
+                        </article>
+                      </div>
+                    </div>
+                    <div class="card">
+                      <div class="eyebrow">Training report</div>
+                      <div class="serif" style="margin-top:10px;font-size:24px;">指标以“能否讲清楚”为主，不需要满屏曲线。</div>
+                      <div class="metric-stack">
+                        <div class="metric-row"><span>mAP50-95</span><strong>0.46</strong></div>
+                        <div class="metric-row"><span>建议动作</span><strong>可演示，继续补夜间样本</strong></div>
+                        <div class="metric-row"><span>发布出口</span><strong>best.pt + 元数据 + slot</strong></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <aside class="panel rail-panel">
+              <div class="eyebrow" style="color:#b0aea5;">Right rail</div>
+              <div class="serif" style="margin-top:12px;font-size:30px;line-height:1.18;">右侧不再是杂项区，而是“本批结果下一步怎么处理”的摘要栏。</div>
+              <p style="margin-top:14px;">
+                这里承接实时任务、处置摘要、下一动作建议。整体偏深色，和中央工作台形成章节切换，符合 DESIGN.md 的 light / dark rhythm。
+              </p>
+
+              <div class="rail-divider"></div>
+
+              <small class="eyebrow" style="color:#b0aea5;">Current batch</small>
+              <div style="margin-top:12px;display:grid;gap:10px;">
+                <div class="dark-card">
+                  <div style="font-size:12px;color:#b0aea5;">检测保留</div>
+                  <div class="serif" style="margin-top:8px;font-size:32px;">64</div>
+                </div>
+                <div class="dark-card">
+                  <div style="font-size:12px;color:#b0aea5;">进入身份核验</div>
+                  <div class="serif" style="margin-top:8px;font-size:32px;">12</div>
+                </div>
+              </div>
+
+              <div class="timeline">
+                <div class="timeline-item">
+                  <div class="timeline-dot"></div>
+                  <div>
+                    <strong style="display:block;font-size:16px;">先看人，再看图</strong>
+                    <small>命中资产不是终点，下一步应直接进入身份核验和处置判断。</small>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot" style="background:#6d7763;box-shadow:0 0 0 4px rgba(109,119,99,0.12);"></div>
+                  <div>
+                    <strong style="display:block;font-size:16px;">把结果当样本资产</strong>
+                    <small>同一批结果可继续导入数据集，不再重复拷贝和解压。</small>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot" style="background:#d97757;box-shadow:0 0 0 4px rgba(217,119,87,0.12);"></div>
+                  <div>
+                    <strong style="display:block;font-size:16px;">模型更新可回到壳层</strong>
+                    <small>发布、slot 切换、回滚，都应该在同一种语言里呈现。</small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rail-divider"></div>
+              <button class="btn btn-brand" type="button" style="width:100%;margin-bottom:10px;">这版适合作为统一模板</button>
+              <button class="btn btn-sand" type="button" style="width:100%;">下一步拆检测页正文</button>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="dark-band" id="notes">
+        <div class="container">
+          <div>
+            <div class="eyebrow" style="color:#b0aea5;">Why this direction</div>
+            <h2 class="serif" style="margin:14px 0 0;font-size:44px;line-height:1.14;">这不是把 Claude 生搬过来，而是把它的“温暖、可信、慢一点的阅读感”翻译成公安工作台语境。</h2>
+          </div>
+          <div class="dark-card">
+            <div class="eyebrow" style="color:#b0aea5;">Applied rules</div>
+            <ul>
+              <li>主背景使用暖纸色 `#f5f4ed`，卡片用 `#faf9f5`，避免冷蓝后台感。</li>
+              <li>标题统一走 serif，按钮和交互走 sans，建立阅读与操作的分工。</li>
+              <li>主按钮用陶土色 `#c96442`，弱化“科技平台”的攻击性，更偏业务工具。</li>
+              <li>深度主要靠 `0 0 0 1px` 的 ring shadow 和章节切换，而不是厚重阴影。</li>
+              <li>先统一壳层和内容语法，再把四个模块逐页替换，避免拼接式改版。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="container footer-note">
+      预览地址建议使用 <code>/design-preview</code>。这张页面是方向稿，不影响当前业务首页。
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var switches = Array.prototype.slice.call(document.querySelectorAll("[data-preview-switch]"));
+      var panes = Array.prototype.slice.call(document.querySelectorAll("[data-preview-pane]"));
+
+      function activate(name) {
+        switches.forEach(function (button) {
+          button.classList.toggle("active", button.getAttribute("data-preview-switch") === name);
+        });
+        panes.forEach(function (pane) {
+          pane.classList.toggle("active", pane.getAttribute("data-preview-pane") === name);
+        });
+      }
+
+      switches.forEach(function (button) {
+        button.addEventListener("click", function () {
+          activate(button.getAttribute("data-preview-switch"));
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

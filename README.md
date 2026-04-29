@@ -24,36 +24,75 @@
 
 ```
 multi-rider/
-├── app.py                   # Flask 入口，注册 Blueprint
-├── config.py                # 全局配置（环境变量覆盖）
+├── app.py                   # Flask 入口，注册各业务模块 Blueprint
 ├── requirements.txt         # 直接依赖
 ├── requirements.lock        # uv 生成的完整锁文件
-├── Dockerfile               # Linux Docker 镜像定义
-├── db/
-│   ├── oracle.py            # Oracle 连接与 SQL 构建
-│   └── sqlite.py            # SQLite 任务历史持久化
-├── routes/
-│   ├── job_routes.py        # /  /start  /progress  /cancel  /jobs  /history
-│   ├── file_routes.py       # /download/<job_id>
-│   └── upload_routes.py     # /upload/start  /upload/progress  /upload/download
-├── service/
-│   ├── infer_service.py     # YOLO 模型加载与批量推理
-│   ├── job_service.py       # Oracle 任务生命周期（内存 + SQLite）
-│   └── upload_job_service.py# 上传任务生命周期（ZIP 解析、视频帧提取）
-├── utils/
-│   └── helpers.py           # 时间/文件名工具函数
+├── wheels/                  # 内网离线安装使用的本地 wheel 包目录
+├── modules/
+│   ├── detection/           # 检测模块：数据库检测、本地上传、结果下载
+│   ├── face/                # 人脸模块：人脸库、识别、身份核验
+│   ├── dispatch/            # 下发模块：认证、队列、短信、任务下发
+│   └── training/            # 训练模块：数据集、预标注、训练、模型注册
+├── shared/
+│   ├── config/              # 全局配置与环境变量加载
+│   ├── db/                  # SQLite / Oracle 等共享存储与数据库接入
+│   ├── inference/           # YOLO 模型加载与批量推理
+│   ├── ownership/           # 会话归属 / 访问隔离
+│   └── utils/               # 通用工具函数
 ├── templates/
-│   ├── index.html           # 主页（双 Tab）
-│   └── history.html         # 历史记录页
+│   ├── index.html           # 工作台壳层
+│   └── modules/             # 按模块拆分的页面片段与页面模板
 ├── static/
-│   └── tailwind.min.js      # Tailwind CSS 本地文件（内网无需 CDN）
+│   ├── modules/             # 按模块拆分的前端脚本
+│   ├── shared/              # 共享前端脚本
+│   ├── src/tailwind.css     # Tailwind 输入文件，汇总自定义组件样式
+│   └── dist/tailwind.css    # npm 构建后的生产 CSS，页面离线引用
+├── package.json             # Tailwind/PostCSS 构建脚本
+├── tailwind.config.js       # Tailwind v3 配置，目标 Chrome 88+
+├── docs/                    # 方案文档、交接记录、设计稿、辅助脚本
+├── ops/
+│   ├── Dockerfile           # Linux Docker 镜像定义
+│   └── app.env.example      # 环境变量模板
 ├── model/                   # 模型文件（不入库）
 ├── output/                  # 推理结果 ZIP 输出目录
 ├── upload_tmp/              # 视频上传临时目录（推理后自动清理）
-├── instantclient_11_2/      # Oracle Instant Client（不入库，Windows/Linux 版本不同）
-└── deploy/
-    └── app.env.example      # 环境变量模板
+└── instantclient_11_2/      # Oracle Instant Client（不入库，Windows/Linux 版本不同）
 ```
+
+## 代码导航
+
+- 检测相关后端：`modules/detection/`
+- 人脸识别与身份核验：`modules/face/`
+- 任务下发与短信：`modules/dispatch/`
+- 训练、预标注、模型注册：`modules/training/`
+- 全局配置与环境变量：`shared/config/config.py`
+- 共享数据库接入：`shared/db/`
+- 共享推理能力：`shared/inference/infer_service.py`
+- 工作台页面壳层：`templates/index.html`
+- 模块页面模板：`templates/modules/`
+- 模块前端脚本：`static/modules/`
+- 运维与部署材料：`ops/`
+- 方案、交接、设计稿：`docs/`
+
+## 前端样式构建
+
+项目使用 `tailwindcss@3.4.17`，原因是 Tailwind v4 官方要求 Chrome 111+，而本项目要求 Chrome 88+。Tailwind 不在浏览器里运行，开发或构建机通过 npm 预编译出 `static/dist/tailwind.css`，Flask 页面只引用这个静态 CSS 文件。
+
+```powershell
+npm install
+npm run build:css
+```
+
+日常改模板或 class 后需要重新执行 `npm run build:css`。Docker 离线部署只需要打包已经生成的 `static/dist/tailwind.css`，运行容器时不需要 Node.js 或 npm。
+
+## 运行目录维护
+
+- `output/`：检测结果 ZIP 和 `_results/` 清单目录。需要保留历史结果时不要直接清空；如仅做演示，可定期删除旧任务目录与旧 ZIP。
+- `upload_tmp/`：上传过程中的临时目录。正常结束后会自动清理；若异常中断后残留，可手动清空。
+- `logs/`：启动器和运行日志。当前仓库里常见的是 `app.stdout.log`、`app.stderr.log`；可按时间轮转或定期删除旧日志。
+- `train_runs/`：训练运行输出目录。仅在实际训练后产生内容，通常体积较大，建议按任务完成情况归档或清理。
+- `datasets/`：训练数据集目录。这里是业务数据，不应像缓存目录那样随意清空。
+- `jobs.sqlite3`：SQLite 历史与任务状态库。删除会丢失历史记录、训练任务记录和数据集元信息，清理前应先备份。
 
 ## 环境变量
 
@@ -83,11 +122,11 @@ multi-rider/
 
 ### 前提条件
 
-- Python 3.10 或以上（推荐通过官网离线安装包安装）
-- Oracle Instant Client **Windows 版**（`.dll` 文件），解压到 `instantclient_11_2\`
+- Python 3.12（推荐通过官网离线安装包安装，或使用已存在的 `.venv`）
+- Oracle Instant Client **Windows 版**（`.dll` 文件），解压到 `instantclient_11_2`
   - 需包含 `oci.dll`、`oraocci11.dll`、`oraociei11.dll` 等
 - 模型文件已放入 `model\`：`biaochezhajiev2.pt`、`yolov8s-worldv2.pt`
-- `static\tailwind.min.js` 已存在（已包含在仓库）
+- `static\dist\tailwind.css` 已存在；如修改过模板 class，在联网构建机上执行 `npm run build:css` 后再带入内网
 - 建议使用 [uv](https://github.com/astral-sh/uv) 管理虚拟环境（也可用标准 `venv`）
 
 ### 1. 创建虚拟环境并安装依赖
@@ -96,16 +135,28 @@ multi-rider/
 cd multi-rider
 
 # 使用 uv（推荐）
-uv venv .venv
-.venv\Scripts\Activate.ps1
-uv pip install -r requirements.txt
+uv venv .venv --python 3.12
+uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements-dev.txt
 
 # 单独安装 torch CPU 版（从 PyTorch 官方离线包安装）
-uv pip install torch==2.8.0+cpu torchvision==0.23.0+cpu `
+uv pip install --python .\.venv\Scripts\python.exe torch==2.8.0+cpu torchvision==0.23.0+cpu `
     --index-url https://download.pytorch.org/whl/cpu
 ```
 
-> 如果事先已下载 `.whl` 文件，可用 `uv pip install ./torch-*.whl` 离线安装。
+> 如果事先已下载 `.whl` 文件，可用 `uv pip install .\wheels\torch-*.whl` 离线安装。
+
+> 完整的 Windows 10 内网离线安装说明见 `docs/OFFLINE_INSTALL_WINDOWS10.md`。离线 wheel 默认放在项目根目录下的 `wheels/`。
+
+### 1.1 运行测试
+
+```powershell
+$env:FACE_SQL_ENABLED = "false"
+$env:DISPATCH_MOCK_MODE = "true"
+$env:YOLO_TELEMETRY = "false"
+uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest
+```
 
 ### 2. 配置环境变量
 
@@ -116,7 +167,7 @@ $env:YOLO_TELEMETRY   = "false"
 $env:ORACLE_HOST      = "oracledb.example.com"
 $env:ORACLE_PASSWORD  = "你的数据库密码"
 $env:FLASK_SECRET_KEY = "改成随机字符串"
-# 其他变量按需修改，不设置则使用 config.py 中的默认值
+# 其他变量按需修改，不设置则使用 shared/config/config.py 中的默认值
 ```
 
 ### 3. 启动服务
@@ -161,95 +212,41 @@ http://本机IP:5001/
 
 适用于 CentOS / Debian / Ubuntu 等 Linux 内网服务器，推荐生产环境使用。
 
-### 前提条件（构建机，需能访问互联网或清华镜像源）
+推荐使用项目根目录新增的 `compose.yaml` + `.env` 同目录启动，不再要求把配置放到 `/opt`。
 
-1. `model/biaochezhajiev2.pt` 和 `model/yolov8s-worldv2.pt` 已放入 `model/`
-2. Oracle Instant Client **Linux 版**（`.so` 文件），解压到 `instantclient_11_2/`
-   - 需包含 `libclntsh.so.11.1`
-3. `static/tailwind.min.js` 已存在（已包含在仓库）
-4. 构建机已安装 Docker
+### 快速结论
 
-### 1. 构建镜像并导出
+1. 当前仓库内的 `instantclient_11_2/` 已切换为 Linux x86_64 版共享库，可直接打入 Linux Docker 镜像。
+2. Docker 镜像默认启用 `python-oracledb` thick mode；如需切回 thin mode，可在 `.env` 中把 `ORACLE_USE_THICK_MODE=false`。
+3. 离线部署建议直接参考 [docs/OFFLINE_DEPLOY_CENTOS_STREAM10.md](docs/OFFLINE_DEPLOY_CENTOS_STREAM10.md)。
 
-```bash
-cd multi-rider
-
-docker build -t multi-rider:latest .
-
-# 导出为 tar 供离线传输
-docker save -o multi-rider_latest.tar multi-rider:latest
-sha256sum multi-rider_latest.tar > multi-rider_latest.tar.sha256
-```
-
-构建说明：
-- 基础镜像 `python:3.10-slim-bullseye`，APT 使用清华镜像源
-- torch/torchvision 使用 CPU-only wheel（PyTorch 官方 whl 索引）
-- 其余依赖来自 `requirements.lock`（清华 PyPI 源）
-- 构建时自动检查模型文件和 Instant Client，缺失则报错退出
-
-### 2. 传输到内网服务器
-
-将以下文件拷贝到内网服务器（U 盘或内网文件共享）：
-
-```
-multi-rider_latest.tar
-multi-rider_latest.tar.sha256
-deploy/app.env.example
-```
-
-### 3. 在内网服务器上部署
+### 最小部署步骤
 
 ```bash
-# 校验文件完整性
-sha256sum -c multi-rider_latest.tar.sha256
+# 联网构建机
+docker build --platform linux/amd64 -f ops/Dockerfile -t multi-rider:centos-stream10 .
+docker save -o multi-rider-centos-stream10.tar multi-rider:centos-stream10
 
-# 导入镜像
-sudo docker load -i multi-rider_latest.tar
-
-# 准备目录和配置文件
-sudo mkdir -p /opt/multi-rider/output /opt/multi-rider/upload_tmp
-sudo cp app.env.example /opt/multi-rider/app.env
-sudo vi /opt/multi-rider/app.env
-# 至少修改以下两项：
-#   ORACLE_PASSWORD=你的数据库密码
-#   FLASK_SECRET_KEY=改成随机字符串
-
-# 启动容器
-sudo docker run -d \
-  --name multi-rider \
-  --restart unless-stopped \
-  -p 5001:5001 \
-  --env-file /opt/multi-rider/app.env \
-  -v /opt/multi-rider/output:/app/output \
-  multi-rider:latest
+# 内网主机（与 compose.yaml/.env 放在同一目录）
+sudo docker load -i multi-rider-centos-stream10.tar
+cp .env.example .env
+mkdir -p data/output data/upload_tmp data/face_data data/datasets data/train_runs
+[ -f data/jobs.sqlite3 ] || touch data/jobs.sqlite3
+sudo docker compose up -d
 ```
 
-访问地址：
+访问地址：`http://服务器IP:5001/`
 
-```
-http://服务器IP:5001/
-```
-
-### 4. 更新容器
+### 常用运维命令
 
 ```bash
-# 导入新镜像后
-sudo docker stop multi-rider
-sudo docker rm multi-rider
-# 重新执行 docker run 命令
+sudo docker compose ps
+sudo docker compose logs -f
+sudo docker compose restart
+sudo docker compose down
 ```
 
-### 5. 常用运维命令
-
-```bash
-sudo docker ps                    # 查看容器状态
-sudo docker logs -f multi-rider   # 查看实时日志
-sudo docker restart multi-rider   # 重启容器
-sudo docker stop multi-rider      # 停止容器
-sudo docker rm -f multi-rider     # 删除容器
-```
-
-### 6. 防火墙
+### 防火墙
 
 ```bash
 # CentOS / RHEL（firewalld）
@@ -260,13 +257,6 @@ sudo firewall-cmd --reload
 sudo ufw allow 5001/tcp
 ```
 
-### 注意事项
-
-- `instantclient_11_2/` 必须是 **Linux `.so`** 版本（容器内为 Debian 用户态）
-- `output/` 挂载到宿主机，容器重建后历史 ZIP 不丢失
-- 上传任务进度存于容器内存，容器重启后运行中的上传任务状态会丢失
-- `YOLO_TELEMETRY=false` 已在 Dockerfile ENV 中预设，无需手动添加
-
 ---
 
 ## 两种部署方式对比
@@ -274,7 +264,7 @@ sudo ufw allow 5001/tcp
 | 对比项 | Windows 10 直接运行 | Linux Docker |
 |---|---|---|
 | 环境要求 | Python 3.10 + uv | Docker |
-| Instant Client | Windows `.dll` 版 | Linux `.so` 版 |
+| Instant Client | Windows `.dll` 版 | 镜像内已包含 Linux `.so` 版 |
 | 适合场景 | 临时演示、开发调试 | 生产部署、长期运行 |
 | 开机自启 | 任务计划程序 / NSSM | `--restart unless-stopped` |
 | 数据持久化 | 本地目录 | 宿主机目录挂载 |

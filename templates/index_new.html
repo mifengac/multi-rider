@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>猎影哨兵</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='falcon-badge.svg') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='dist/tailwind.css') }}" />
+  <style>
+    /* ── CSS 变量：浅蓝主题 ──────────────────────── */
+    :root {
+      --bg-page:     #eef4fd;
+      --bg-sidebar:  #ffffff;
+      --bg-content:  #f5f8fd;
+      --bg-panel:    #ffffff;
+      --bg-topbar:   #ffffff;
+      --border:      #d6e4f5;
+      --border-soft: #e8f0fb;
+      --accent:      #2563eb;
+      --accent-pale: #eff6ff;
+      --text-head:   #1a3358;
+      --text-body:   #3a5a82;
+      --text-muted:  #8aaac8;
+      --shadow-sm:   0 1px 4px rgba(37,99,235,0.07);
+      --shadow-md:   0 4px 16px rgba(37,99,235,0.10);
+    }
+
+    /* ── AUTH 页样式继续工作 ───────────────────── */
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", "Source Han Sans SC", "Segoe UI", sans-serif;
+      color: #0f172a;
+    }
+    .glass-card {
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(203, 213, 225, 0.78);
+      box-shadow: 0 24px 72px rgba(15, 23, 42, 0.08);
+      backdrop-filter: blur(12px);
+    }
+    .auth-tab.active {
+      background: linear-gradient(135deg, #16355b 0%, #264c7d 100%);
+      color: #fff;
+      box-shadow: 0 14px 28px rgba(22, 53, 91, 0.2);
+    }
+
+    /* ── APP SHELL：固定全屏覆盖 ───────────────── */
+    #appShell {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-page);
+      overflow: hidden;
+    }
+    #appShell.hidden { display: none; }
+
+    /* ── TOP STATUS BAR ──────────────────────────── */
+    .top-bar {
+      height: 36px;
+      background: var(--bg-topbar);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      box-shadow: var(--shadow-sm);
+    }
+    .top-bar .dot { width:6px; height:6px; border-radius:50%; background:#16a34a; flex-shrink:0; }
+    .top-bar .dot.warn { background:#d97706; }
+    .top-bar .sep { flex:1; }
+    .top-bar .hi  { color:#16a34a; font-weight:600; }
+    .top-bar .wi  { color:#d97706; font-weight:600; }
+    .top-bar .tdiv { color:var(--border); }
+
+    /* ── MAIN LAYOUT ─────────────────────────────── */
+    .app-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── SIDEBAR ─────────────────────────────────── */
+    .sidebar {
+      width: 220px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      box-shadow: 2px 0 12px rgba(37,99,235,0.05);
+    }
+    .sidebar-brand {
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .brand-icon {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #1d4ed8 0%, #60a5fa 100%);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.35);
+    }
+    .brand-name { font-size:15px; font-weight:700; color:var(--text-head); letter-spacing:0.04em; }
+    .brand-sub  { font-size:10px; color:var(--text-muted); margin-top:2px; letter-spacing:0.1em; text-transform:uppercase; }
+
+    /* Sidebar stats */
+    .sidebar-stats {
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-soft);
+      background: var(--accent-pale);
+    }
+    .stat-card {
+      background: #fff; border: 1px solid var(--border);
+      border-radius: 12px; padding: 8px 10px;
+      box-shadow: var(--shadow-sm);
+    }
+    .stat-card .stat-label { font-size:9px; text-transform:uppercase; letter-spacing:0.15em; color:var(--text-muted); font-weight:600; }
+    .stat-card .stat-value { font-size:22px; font-weight:700; color:var(--text-head); line-height:1.2; margin-top:3px; }
+    .stat-card .stat-value.hit  { color:#059669; }
+    .stat-card .stat-value.pend { color:#d97706; }
+
+    /* Nav */
+    .sidebar-nav { flex:1; padding:6px 8px; display:flex; flex-direction:column; gap:2px; overflow-y:auto; }
+    .nav-section-label { font-size:9px; text-transform:uppercase; letter-spacing:0.2em; color:var(--text-muted); padding:8px 8px 4px; font-weight:700; }
+    .nav-item {
+      display:flex; align-items:center; gap:10px;
+      padding:8px 10px; border-radius:10px;
+      font-size:13px; font-weight:500; color:var(--text-body);
+      cursor:pointer; transition:all 0.15s; text-decoration:none;
+    }
+    .nav-item:hover { background:var(--accent-pale); color:var(--accent); }
+    .nav-item.active { background:#dbeafe; color:var(--accent); font-weight:600; border:1px solid rgba(37,99,235,0.18); }
+    .nav-item .nav-icon { width:18px; text-align:center; font-size:14px; flex-shrink:0; }
+    .nav-item .nav-badge {
+      margin-left:auto; background:#fef3c7; color:#92400e;
+      border:1px solid #fde68a; font-size:10px; font-weight:700;
+      border-radius:9999px; padding:1px 7px; min-width:18px; text-align:center;
+    }
+    .nav-item .nav-badge.blue { background:#dbeafe; color:var(--accent); border-color:#bfdbfe; }
+
+    /* Sidebar user */
+    .sidebar-user {
+      padding:10px 12px; border-top:1px solid var(--border-soft);
+      display:flex; align-items:center; gap:8px;
+      background:var(--accent-pale);
+    }
+    .user-avatar {
+      width:32px; height:32px; border-radius:50%;
+      background:linear-gradient(135deg,#1d4ed8,#60a5fa);
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; font-weight:700; color:#fff; flex-shrink:0;
+      box-shadow:0 2px 8px rgba(37,99,235,0.3);
+    }
+    .user-info { flex:1; min-width:0; }
+    .user-name { font-size:12px; font-weight:600; color:var(--text-head); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .user-role { font-size:10px; color:var(--text-muted); }
+    .logout-btn {
+      width:28px; height:28px; border-radius:8px;
+      border:1px solid var(--border); background:#fff;
+      color:var(--text-muted); cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; transition:all 0.15s; flex-shrink:0;
+    }
+    .logout-btn:hover { background:#fee2e2; color:#dc2626; border-color:#fca5a5; }
+
+    /* ── CONTENT AREA ────────────────────────────── */
+    .content-area { flex:1; display:flex; flex-direction:column; overflow:hidden; background:var(--bg-content); }
+    .content-header {
+      padding:16px 24px 12px; border-bottom:1px solid var(--border);
+      display:flex; align-items:flex-start; justify-content:space-between;
+      flex-shrink:0; background:#fff;
+    }
+    .content-header h1 { font-size:17px; font-weight:700; color:var(--text-head); }
+    .content-header .subtitle { font-size:11px; color:var(--text-muted); margin-top:3px; }
+    .header-actions { display:flex; align-items:center; gap:8px; }
+    .ch-btn {
+      padding:6px 14px; border-radius:9999px; font-size:12px; font-weight:600;
+      cursor:pointer; border:none; transition:all 0.15s;
+    }
+    .ch-btn.primary { background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(37,99,235,0.25); }
+    .ch-btn.primary:hover { background:#1d4ed8; }
+    .ch-btn.ghost { background:#fff; color:var(--text-body); border:1px solid var(--border); }
+    .ch-btn.ghost:hover { background:var(--accent-pale); color:var(--accent); border-color:#bfdbfe; }
+
+    /* Scrollable tab content */
+    .content-scroll { flex:1; overflow-y:auto; padding:20px 24px 28px; }
+
+    /* ── RIGHT PANEL ──────────────────────────────── */
+    .right-panel {
+      width:280px; background:var(--bg-panel);
+      border-left:1px solid var(--border);
+      display:flex; flex-direction:column; overflow:hidden; flex-shrink:0;
+      box-shadow:-2px 0 12px rgba(37,99,235,0.05);
+    }
+    .panel-section { padding:14px 16px; border-bottom:1px solid var(--border-soft); }
+    .panel-section.scroll-section { flex:1; overflow:hidden; display:flex; flex-direction:column; padding-bottom:0; }
+    .panel-section-title { font-size:10px; text-transform:uppercase; letter-spacing:0.18em; color:var(--text-muted); font-weight:700; margin-bottom:10px; }
+
+    /* Task items */
+    .task-item {
+      display:flex; align-items:center; gap:8px;
+      padding:8px 10px; border-radius:10px; margin-bottom:4px;
+      background:var(--bg-page); border:1px solid var(--border);
+    }
+    .task-indicator { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+    .task-indicator.pulse-anim { animation:blink 1.5s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .task-item-body { flex:1; min-width:0; }
+    .task-item-name { font-size:12px; color:var(--text-head); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .task-item-meta { font-size:10px; color:var(--text-muted); margin-top:2px; }
+
+    /* Action grid */
+    .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    .action-card {
+      padding:12px; border-radius:12px;
+      background:var(--bg-page); border:1px solid var(--border);
+      cursor:pointer; transition:all 0.15s;
+    }
+    .action-card:hover { background:#dbeafe; border-color:#93c5fd; }
+    .action-card .ac-icon { font-size:18px; margin-bottom:5px; }
+    .action-card .ac-name { font-size:11px; font-weight:600; color:var(--text-body); }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width:4px; height:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#bfdbfe; border-radius:9999px; }
+
+    /* ── OVERRIDE: renderRunningJobs 使用的暗色类 ── */
+    #jobsInfo .rounded-2xl { border-radius: 1rem; }
+    #jobsInfo .border-dashed { border-style: dashed !important; }
+  </style>
+  <script>
+    window.INDEX_PAGE_BOOTSTRAP = {
+      uploadModels: {{ upload_models | tojson }},
+      uploadModelDefault: {{ upload_model_default | tojson }},
+      trainBaseModels: {{ train_base_models | tojson }},
+      urls: {
+        cancelJob: {{ url_for("job.cancel_job", job_id="__J__") | tojson }},
+        listJobs: {{ url_for("job.list_jobs") | tojson }},
+        jobProgress: {{ url_for("job.get_progress", job_id="__J__") | tojson }},
+        downloadZip: {{ url_for("file.download_zip", job_id="__J__") | tojson }},
+        downloadSummary: {{ url_for("file.download_summary", job_id="__J__") | tojson }},
+        startJob: {{ url_for("job.start_job") | tojson }}
+      }
+    };
+  </script>
+  <script src="{{ url_for('static', filename='modules/detection/tasks.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/dispatch/dispatch.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/training/dataset.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/training/training.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/training/annotation.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/detection/results.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='modules/face/face-library.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='shared/js/auth.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='shared/js/bootstrap.js') }}" defer></script>
+</head>
+<body class="min-h-screen">
+
+<!-- ═══════════════ AUTH SCREEN ═══════════════ -->
+<div id="authShell" style="min-height:100vh; background: radial-gradient(circle at top right,rgba(59,130,246,0.15),transparent 24%), linear-gradient(180deg,#edf4ff 0%,#f8fbff 55%,#eef2f7 100%);">
+  <div class="mx-auto max-w-[1440px] px-4 py-8 md:px-6">
+    <section class="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
+
+      <!-- Hero -->
+      <div class="glass-card overflow-hidden bg-slate-900 text-white">
+        <div class="grid h-full gap-8 bg-[radial-gradient(circle_at_top_right,_rgba(96,165,250,0.24),_transparent_26%),linear-gradient(135deg,_#0f172a_0%,_#16355b_56%,_#234a7d_100%)] p-8 md:p-10">
+          <div>
+            <div class="flex items-center gap-4">
+              <div class="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/10 ring-1 ring-inset ring-white/10">
+                <!-- 猎影哨兵图标：探照灯照出影子 -->
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 20 L4 7 L20 7 Z" fill="rgba(255,255,255,0.2)"/>
+                  <circle cx="12" cy="10.5" r="2.2" fill="white" opacity="0.9"/>
+                  <path d="M9 14.5 Q12 13 15 14.5" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.9"/>
+                  <rect x="9" y="18.5" width="6" height="2.5" rx="1.25" fill="white"/>
+                  <path d="M4 7 L1.5 4" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-linecap="round"/>
+                  <path d="M20 7 L22.5 4" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-linecap="round"/>
+                  <path d="M12 7 L12 2.5" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="text-sm font-semibold tracking-[0.3em] text-sky-200">SHADOW SENTINEL</div>
+                <h1 class="mt-1 text-4xl font-bold tracking-tight md:text-5xl">猎影哨兵</h1>
+              </div>
+            </div>
+            <div class="mt-3 text-sm text-sky-100/90">云浮市公安局治安管理支队基础管控中心</div>
+          </div>
+          <div>
+            <div class="max-w-2xl text-2xl font-semibold leading-tight md:text-3xl">面向基层公安的智能视觉协同平台</div>
+            <p class="mt-4 max-w-2xl text-sm leading-7 text-slate-200">将违法行为识别、人员核验、模型沉淀和任务下发做成一条闭环，强调实用、好上手、少录入。</p>
+          </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <div class="rounded-3xl border border-white/10 bg-white/10 p-5">
+              <div class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">检测研判</div>
+              <div class="mt-3 text-lg font-semibold">历史巡检 + 现场素材</div>
+            </div>
+            <div class="rounded-3xl border border-white/10 bg-white/10 p-5">
+              <div class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">身份核验</div>
+              <div class="mt-3 text-lg font-semibold">识别后自动流转</div>
+            </div>
+            <div class="rounded-3xl border border-white/10 bg-white/10 p-5">
+              <div class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">能力成长</div>
+              <div class="mt-3 text-lg font-semibold">基层可用自训练</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Login form -->
+      <div class="glass-card p-6 md:p-8">
+        <div class="mx-auto max-w-xl">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Auth</div>
+              <h2 class="mt-2 text-3xl font-bold tracking-tight text-slate-900">系统登录</h2>
+              <p class="mt-3 text-sm leading-7 text-slate-500">支持注册申请、账号登录、演示模式进入。</p>
+            </div>
+            <button type="button" onclick="quickEnterApp()" class="mr-btn mr-btn--ink">演示进入</button>
+          </div>
+
+          <div class="mt-8 inline-flex rounded-full bg-slate-100 p-1.5">
+            <button id="authTabLogin" type="button" class="auth-tab active rounded-full px-5 py-2 text-sm font-semibold text-slate-600" onclick="switchAuthPanel('login')">登录</button>
+            <button id="authTabRegister" type="button" class="auth-tab rounded-full px-5 py-2 text-sm font-semibold text-slate-600" onclick="switchAuthPanel('register')">注册申请</button>
+          </div>
+
+          <form id="authPanelLogin" class="mt-8 space-y-6" onsubmit="return handleLogin(event)">
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">警号 / 用户名</span>
+              <input id="authLoginUsername" type="text" value="44170201" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-sky-100" />
+            </label>
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">登录密码</span>
+              <input id="authLoginPassword" type="password" value="123456" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-sky-100" />
+            </label>
+            <div class="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">默认演示账号：44170201 / 123456，也可以直接注册新账号。</div>
+            <div id="authLoginFeedback" class="text-sm text-rose-600"></div>
+            <div class="flex items-center justify-between gap-3">
+              <button type="button" onclick="switchAuthPanel('register')" class="text-sm font-medium text-slate-500">去注册</button>
+              <button type="submit" class="rounded-full bg-[#16355b] px-6 py-3 text-sm font-semibold text-white">登录并进入系统</button>
+            </div>
+          </form>
+
+          <form id="authPanelRegister" class="mt-8 hidden space-y-6" onsubmit="return handleRegister(event)">
+            <div class="grid gap-5 md:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">姓名</span>
+                <input id="authRegisterName" type="text" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-sky-100" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">警号</span>
+                <input id="authRegisterUsername" type="text" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-sky-100" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">所属单位</span>
+                <input id="authRegisterUnit" type="text" value="云浮市公安局治安管理支队" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-sky-100" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-slate-700">联系电话</span>
+                <input id="authRegisterPhone" type="text" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-sky-100" />
+              </label>
+            </div>
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">设置密码</span>
+              <input id="authRegisterPassword" type="password" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-sky-100" />
+            </label>
+            <div class="rounded-3xl bg-amber-50 p-4 text-sm leading-7 text-amber-800 ring-1 ring-inset ring-amber-200">注册后可直接使用该账号登录，当前用于演示和内部试用。</div>
+            <div id="authRegisterFeedback" class="text-sm text-emerald-700"></div>
+            <div class="flex items-center justify-between gap-3">
+              <button type="button" onclick="switchAuthPanel('login')" class="text-sm font-medium text-slate-500">返回登录</button>
+              <button type="submit" class="rounded-full bg-[#16355b] px-6 py-3 text-sm font-semibold text-white">提交申请</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </section>
+  </div>
+</div><!-- /#authShell -->
+
+
+<!-- ═══════════════ APP SHELL ═══════════════════ -->
+<section id="appShell" class="hidden">
+
+  <!-- TOP STATUS BAR -->
+  <div class="top-bar">
+    <div class="dot"></div>
+    <span>系统运行正常</span>
+    <span class="tdiv">·</span>
+    <span>Oracle 连接池 <span class="hi" id="topBarPool">—</span></span>
+    <span class="tdiv">·</span>
+    <span>模型 <span class="hi">已就绪</span></span>
+    <span class="tdiv">·</span>
+    <span>今日命中 <span class="hi" id="topBarHit">—</span> &nbsp; 待下发 <span class="wi" id="topBarPending">—</span></span>
+    <div class="sep"></div>
+    <span id="topClock" style="font-variant-numeric:tabular-nums;"></span>
+    <span class="tdiv">|</span>
+    <span>云浮市公安局治安管理支队</span>
+  </div>
+
+  <!-- 3-COLUMN LAYOUT -->
+  <div class="app-layout">
+
+    <!-- ── SIDEBAR ─────────────────────────────── -->
+    <nav class="sidebar">
+
+      <!-- Brand -->
+      <div class="sidebar-brand">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 19 L5 7 L19 7 Z" fill="rgba(255,255,255,0.25)"/>
+              <circle cx="12" cy="10" r="2" fill="white" opacity="0.9"/>
+              <path d="M9.5 14.5 Q12 13 14.5 14.5" stroke="white" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.9"/>
+              <rect x="9" y="18" width="6" height="3" rx="1.5" fill="white"/>
+              <path d="M5 7 L2 4" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-linecap="round"/>
+              <path d="M19 7 L22 4" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-linecap="round"/>
+              <path d="M12 7 L12 3" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="brand-name">猎影哨兵</div>
+            <div class="brand-sub">SHADOW SENTINEL</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Stats -->
+      <div class="sidebar-stats">
+        <div class="stat-card">
+          <div class="stat-label">今日命中</div>
+          <div class="stat-value hit" id="statTodayMatched">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">待下发</div>
+          <div class="stat-value pend" id="statPendingDispatch">--</div>
+        </div>
+      </div>
+
+      <!-- Nav Items -->
+      <div class="sidebar-nav">
+        <div class="nav-section-label">检测研判</div>
+        <a id="tabBtnOracle" class="nav-item active" href="#" onclick="switchTab('Oracle');return false;">
+          <span class="nav-icon">🗄️</span>
+          <span>数据检测与研判</span>
+          <span class="nav-badge blue">Oracle</span>
+        </a>
+        <a id="tabBtnUpload" class="nav-item" href="#" onclick="switchTab('Upload');return false;">
+          <span class="nav-icon">📤</span>
+          <span>现场素材研判</span>
+        </a>
+
+        <div class="nav-section-label">人员核验</div>
+        <a id="tabBtnFace" class="nav-item" href="#" onclick="switchTab('Face');return false;">
+          <span class="nav-icon">🧠</span>
+          <span>人脸识别与核验</span>
+        </a>
+
+        <div class="nav-section-label">任务管理</div>
+        <a id="tabBtnDispatch" class="nav-item" href="#" onclick="switchTab('Dispatch');return false;">
+          <span class="nav-icon">📋</span>
+          <span>任务下发</span>
+          <span class="nav-badge" id="navBadgePending">0</span>
+        </a>
+
+        <div class="nav-section-label">系统训练</div>
+        <a id="tabBtnTrain" class="nav-item" href="#" onclick="switchTab('Train');return false;">
+          <span class="nav-icon">🔧</span>
+          <span>模型自训练</span>
+        </a>
+      </div>
+
+      <!-- User Info -->
+      <div class="sidebar-user">
+        <div class="user-avatar">管</div>
+        <div class="user-info">
+          <div class="user-name" id="currentUserName">值班员</div>
+          <div class="user-role" id="currentUserUnit">基层民警</div>
+        </div>
+        <button class="logout-btn" onclick="logoutApp()" title="退出登录">↩</button>
+      </div>
+    </nav>
+
+    <!-- ── CONTENT AREA ────────────────────────── -->
+    <div class="content-area">
+
+      <!-- Dynamic content header -->
+      <div class="content-header">
+        <div>
+          <h1 id="contentTitle">数据检测与研判</h1>
+          <div class="subtitle" id="contentSubtitle">查询 Oracle 内网数据库，对已采集的目标图像执行 AI 检测与结果研判</div>
+        </div>
+        <div class="header-actions">
+          <button class="ch-btn ghost" onclick="refreshJobs()">刷新任务</button>
+          <button class="ch-btn primary" id="headerPrimaryBtn" onclick="document.getElementById('jobForm')?.dispatchEvent(new Event('submit',{cancelable:true}))">▶ 新建检测任务</button>
+        </div>
+      </div>
+
+      <!-- Flashed messages -->
+      {% with messages = get_flashed_messages() %}
+      {% if messages %}
+      <div style="padding:8px 24px; flex-shrink:0;">
+        {% for msg in messages %}
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm mb-2">{{ msg }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <!-- Tab Panels -->
+      <div class="content-scroll">
+        {% include 'modules/detection/_oracle_tab.html' %}
+        {% include 'modules/detection/_upload_tab.html' %}
+        {% include 'modules/training/_train_tab.html' %}
+        {% include 'modules/dispatch/_dispatch_tab.html' %}
+        {% include 'modules/face/_face_tab.html' %}
+      </div>
+    </div>
+
+    <!-- ── RIGHT PANEL ─────────────────────────── -->
+    <div class="right-panel">
+
+      <!-- Running Tasks -->
+      <div class="panel-section">
+        <div class="panel-section-title">⚡ 运行中任务</div>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+          <div style="font-size:28px; font-weight:700; color:var(--text-head);" id="runningCount">0</div>
+          <div style="font-size:11px; color:var(--text-muted);">个任务<br>进行中</div>
+        </div>
+        <div id="jobsInfo">
+          <div style="border-radius:12px; border:1px dashed var(--border); background:var(--accent-pale); padding:12px 14px; font-size:12px; color:var(--text-muted);">当前没有运行中的任务。</div>
+        </div>
+      </div>
+
+      <!-- Dashboard Stats -->
+      <div class="panel-section">
+        <div class="panel-section-title">📊 今日统计</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div style="background:var(--accent-pale); border:1px solid #bfdbfe; border-radius:12px; padding:12px;">
+            <div style="font-size:9px; text-transform:uppercase; letter-spacing:0.15em; color:var(--text-muted); font-weight:600;">命中数</div>
+            <div style="font-size:24px; font-weight:700; color:#059669;" id="panelStatHit">--</div>
+          </div>
+          <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:12px; padding:12px;">
+            <div style="font-size:9px; text-transform:uppercase; letter-spacing:0.15em; color:#92400e; font-weight:600;">待下发</div>
+            <div style="font-size:24px; font-weight:700; color:#d97706;" id="panelStatPending">--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="panel-section">
+        <div class="panel-section-title">快捷操作</div>
+        <div class="action-grid">
+          <div class="action-card" onclick="switchTab('Upload')">
+            <div class="ac-icon">📤</div>
+            <div class="ac-name">上传素材</div>
+          </div>
+          <div class="action-card" onclick="switchTab('Face')">
+            <div class="ac-icon">🧠</div>
+            <div class="ac-name">同步人脸库</div>
+          </div>
+          <div class="action-card" onclick="switchTab('Dispatch')">
+            <div class="ac-icon">📋</div>
+            <div class="ac-name">任务下发</div>
+          </div>
+          <div class="action-card" onclick="window.open('{{ url_for('job.history_page') }}')">
+            <div class="ac-icon">📊</div>
+            <div class="ac-name">历史记录</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom: Cancel / Refresh -->
+      <div class="panel-section" style="margin-top:auto; border-top:1px solid var(--border-soft);">
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <button type="button" onclick="cancelCurrent()" class="ch-btn ghost" style="width:100%; font-size:11px;">停止当前巡检任务</button>
+          <button type="button" onclick="refreshJobs()" class="ch-btn ghost" style="width:100%; font-size:11px;">刷新任务中心</button>
+        </div>
+      </div>
+
+    </div><!-- /.right-panel -->
+  </div><!-- /.app-layout -->
+
+  <!-- Top bar clock -->
+  <script>
+    (function() {
+      function tick() {
+        var el = document.getElementById('topClock');
+        if (el) {
+          var d = new Date();
+          el.textContent = d.toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+        }
+        setTimeout(tick, 1000);
+      }
+      tick();
+    })();
+  </script>
+
+</section><!-- /#appShell -->
+
+<!-- Drawers -->
+{% include 'modules/training/_dataset_workspace_drawer.html' %}
+{% include 'modules/detection/_result_detail_drawer.html' %}
+{% include 'modules/training/_result_import_drawer.html' %}
+{% include 'modules/face/_person_detail_drawer.html' %}
+
+</body>
+</html>

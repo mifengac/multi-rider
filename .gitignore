@@ -1,10 +1,16 @@
 .venv/
+.pytest_cache/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.env
+.mcp/
+node_modules/
 
 dist/
+!static/dist/
+!static/dist/tailwind.css
 .remote_check_*/
 
 output/
@@ -17,6 +23,10 @@ app.env
 face_data/
 test/
 jobs.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+jobs.sqlite3-wal
+jobs.sqlite3-shm
 _edit_html.py
 vendor/wheels.7z
 offline_bundle/
@@ -31,3 +41,4 @@ instantclient_11_2/*
 
 model/*
 !model/README.md
+CLIP/

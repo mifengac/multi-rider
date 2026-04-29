@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>猎影哨兵 — 智慧公安视频研判平台</title>
+  <style>
+    /* ═══════════════════════════════════════
+       CSS Variables
+    ═══════════════════════════════════════ */
+    :root {
+      /* Colors */
+      --parchment:    #f5f4ed;
+      --ivory:        #faf9f5;
+      --near-black:   #141413;
+      --olive-gray:   #5e5d59;
+      --stone-gray:   #87867f;
+      --terracotta:   #c96442;
+      --border-cream: #f0eee6;
+      --border-warm:  #e8e6dc;
+      --warm-silver:  #b0aea5;
+
+      /* Typography */
+      --font-serif: Georgia, 'Times New Roman', serif;
+      --font-sans:  system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono:  'Courier New', Courier, monospace;
+
+      /* Shadows */
+      --shadow-ring: 0 0 0 1px var(--border-warm);
+      --shadow-card: rgba(0,0,0,0.05) 0px 4px 24px;
+
+      /* Radii */
+      --r-btn:       8px;
+      --r-input:     10px;
+      --r-card:      12px;
+      --r-container: 16px;
+    }
+
+    /* ═══════════════════════════════════════
+       Reset
+    ═══════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--parchment);
+      color: var(--near-black);
+      font-size: 14px;
+      line-height: 1.6;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════
+       Top Bar  (40px, full-width)
+    ═══════════════════════════════════════ */
+    .top-bar {
+      height: 40px;
+      background: var(--near-black);
+      color: var(--warm-silver);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 14px;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+    .top-bar-brand {
+      font-family: var(--font-serif);
+      font-size: 13px;
+      color: var(--ivory);
+      font-weight: 500;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+    .top-bar-divider {
+      width: 1px;
+      height: 14px;
+      background: #2a2a28;
+    }
+    .top-bar-status {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--warm-silver);
+      white-space: nowrap;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.online  { background: #5a9a6a; animation: pulse-dot 2.4s ease-in-out infinite; }
+    .status-dot.syncing { background: #9a8a4a; }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.45; }
+    }
+    .top-bar-spacer { flex: 1; }
+    .top-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 11px;
+      color: var(--warm-silver);
+    }
+    .top-bar-classify {
+      font-size: 10px;
+      color: #4a4a48;
+      letter-spacing: 0.5px;
+    }
+    .top-bar-time {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--warm-silver);
+      min-width: 56px;
+    }
+    .top-bar-user {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--terracotta);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--ivory);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════════════════════════
+       Workspace  (three-column)
+    ═══════════════════════════════════════ */
+    .workspace {
+      display: flex;
+      height: calc(100vh - 40px);
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════
+       Left Sidebar  (220px)
+    ═══════════════════════════════════════ */
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--ivory);
+      border-right: 1px solid var(--border-cream);
+      height: calc(100vh - 40px);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar::-webkit-scrollbar { width: 3px; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border-warm); border-radius: 2px; }
+
+    /* Logo */
+    .logo-area {
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid var(--border-cream);
+      flex-shrink: 0;
+    }
+    .logo-title {
+      font-family: var(--font-serif);
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--near-black);
+      letter-spacing: 0.2px;
+    }
+    .logo-subtitle {
+      font-size: 10px;
+      color: var(--stone-gray);
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      margin-top: 3px;
+    }
+
+    /* Live Metrics — compact inline row */
+    .live-metrics {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border-cream);
+      flex-shrink: 0;
+    }
+    .metrics-label {
+      font-size: 9px;
+      color: var(--stone-gray);
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .metrics-row {
+      display: flex;
+      gap: 8px;
+    }
+    .metric-item {
+      flex: 1;
+      background: var(--parchment);
+      border: 1px solid var(--border-cream);
+      border-radius: var(--r-card);
+      padding: 8px 10px;
+    }
+    .metric-value {
+      font-family: var(--font-serif);
+      font-size: 19px;
+      font-weight: 500;
+      line-height: 1.2;
+      color: var(--near-black);
+    }
+    .metric-value.hit { color: var(--terracotta); }
+    .metric-desc {
+      font-size: 10px;
+      color: var(--stone-gray);
+      margin-top: 1px;
+    }
+
+    /* Nav Groups */
+    .nav-section {
+      flex: 1;
+      padding: 10px 0 14px;
+    }
+    .nav-group { margin-bottom: 2px; }
+    .nav-group-label {
+      font-size: 9px;
+      color: var(--stone-gray);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 7px 16px 3px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 16px;
+      cursor: pointer;
+      color: var(--olive-gray);
+      font-size: 13px;
+      transition: background 0.13s, color 0.13s;
+      position: relative;
+      user-select: none;
+    }
+    .nav-item:hover {
+      background: var(--parchment);
+      color: var(--near-black);
+    }
+    .nav-item.active {
+      background: var(--parchment);
+      color: var(--near-black);
+      font-weight: 500;
+    }
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 5px; bottom: 5px;
+      width: 3px;
+      background: var(--terracotta);
+      border-radius: 0 2px 2px 0;
+    }
+    .nav-num {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--stone-gray);
+      flex-shrink: 0;
+    }
+    .nav-item.active .nav-num { color: var(--terracotta); }
+
+    /* ═══════════════════════════════════════
+       Main Content
+    ═══════════════════════════════════════ */
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      min-width: 0;
+    }
+    .main-content::-webkit-scrollbar { width: 5px; }
+    .main-content::-webkit-scrollbar-thumb { background: var(--border-warm); border-radius: 3px; }
+
+    /* Module panels: hidden by default, flex-col when active */
+    .module-panel { display: none; flex-direction: column; gap: 20px; }
+    .module-panel.active { display: flex; }
+
+    /* ── Module Header ── */
+    .module-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .module-title {
+      font-family: var(--font-serif);
+      font-size: 21px;
+      font-weight: 500;
+      color: var(--near-black);
+      line-height: 1.3;
+    }
+    .module-subtitle {
+      font-size: 13px;
+      color: var(--stone-gray);
+      margin-top: 3px;
+    }
+    .module-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      padding-top: 3px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 7px 14px;
+      border-radius: var(--r-btn);
+      font-size: 13px;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      border: none;
+      transition: all 0.13s;
+      white-space: nowrap;
+    }
+    .btn-secondary {
+      background: var(--ivory);
+      color: var(--olive-gray);
+      box-shadow: var(--shadow-ring);
+    }
+    .btn-secondary:hover {
+      color: var(--near-black);
+      box-shadow: 0 0 0 1px var(--border-warm), var(--shadow-card);
+    }
+    .btn-primary {
+      background: var(--terracotta);
+      color: var(--ivory);
+    }
+    .btn-primary:hover { background: #b85539; }
+
+    /* ── Stats Bar ── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--ivory);
+      border: 1px solid var(--border-cream);
+      border-radius: var(--r-card);
+      padding: 16px;
+      box-shadow: var(--shadow-ring);
+    }
+    .stat-overline {
+      font-size: 10px;
+      color: var(--stone-gray);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .stat-number {
+      font-family: var(--font-serif);
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.2;
+      color: var(--near-black);
+    }
+    .stat-number.s-completed { color: #4a7a58; }
+    .stat-number.s-running   { color: var(--terracotta); }
+    .stat-number.s-pending   { color: #8a7a40; }
+    .stat-number.s-kept      { color: #6a6a50; }
+    .stat-number.s-failed    { color: #8a4a42; }
+    .stat-desc {
+      font-size: 12px;
+      color: var(--stone-gray);
+      margin-top: 4px;
+    }
+
+    /* ── Module Body ── */
+    .module-body {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+    .module-main  { flex: 1; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+    .module-aside { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--ivory);
+      border: 1px solid var(--border-cream);
+      border-radius: var(--r-card);
+      padding: 20px;
+      box-shadow: var(--shadow-ring);
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--near-black);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-label {
+      font-size: 9px;
+      color: var(--stone-gray);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 400;
+    }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 14px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      color: var(--olive-gray);
+      margin-bottom: 5px;
+    }
+    .form-input,
+    .form-select,
+    .form-textarea {
+      width: 100%;
+      padding: 8px 11px;
+      background: var(--parchment);
+      border: 1px solid var(--border-warm);
+      border-radius: var(--r-input);
+      font-size: 13px;
+      color: var(--near-black);
+      font-family: var(--font-sans);
+      outline: none;
+      transition: border-color 0.13s, box-shadow 0.13s;
+      appearance: none;
+    }
+    .form-select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2387867f' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+      cursor: pointer;
+    }
+    .form-input:focus,
+    .form-select:focus,
+    .form-textarea:focus {
+      border-color: var(--terracotta);
+      box-shadow: 0 0 0 3px rgba(201,100,66,0.1);
+    }
+    .form-textarea { resize: vertical; min-height: 80px; }
+
+    /* ── Upload Area ── */
+    .upload-area {
+      border: 2px dashed var(--border-warm);
+      border-radius: var(--r-container);
+      padding: 36px 24px;
+      text-align: center;
+      background: var(--parchment);
+      cursor: pointer;
+      transition: border-color 0.13s, background 0.13s;
+    }
+    .upload-area:hover {
+      border-color: var(--terracotta);
+      background: #fdf8f4;
+    }
+    .upload-icon  { font-size: 26px; margin-bottom: 10px; color: var(--stone-gray); }
+    .upload-title { font-size: 14px; color: var(--olive-gray); font-weight: 500; }
+    .upload-hint  { font-size: 12px; color: var(--stone-gray); margin-top: 4px; }
+
+    /* ── Data Table ── */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th {
+      font-size: 10px;
+      color: var(--stone-gray);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-cream);
+      font-weight: 500;
+    }
+    .data-table td {
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--olive-gray);
+      border-bottom: 1px solid var(--border-cream);
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: var(--parchment); }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .badge-completed { background: #eef4ee; color: #4a7a58; }
+    .badge-running   { background: #fdf0ec; color: var(--terracotta); }
+    .badge-pending   { background: #f5f2e8; color: #8a7a40; }
+    .badge-failed    { background: #f5eded; color: #8a4a42; }
+    .badge-hit       { background: #fdf0ec; color: var(--terracotta); }
+
+    /* ── Progress Bar ── */
+    .progress-bar {
+      height: 4px;
+      background: var(--border-cream);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--terracotta);
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+
+    /* ── Info List ── */
+    .info-list { list-style: none; }
+    .info-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-cream);
+      font-size: 12px;
+    }
+    .info-list li:last-child { border-bottom: none; }
+    .info-key { color: var(--stone-gray); }
+    .info-val { color: var(--near-black); font-weight: 500; }
+
+    /* ── Alerts ── */
+    .alert {
+      padding: 11px 14px;
+      border-radius: var(--r-card);
+      font-size: 13px;
+      line-height: 1.55;
+      border: 1px solid;
+    }
+    .alert-note { background: #faf5ef; border-color: var(--border-warm); color: var(--olive-gray); }
+    .alert-warn { background: #fdf7e8; border-color: #e8d8b0; color: #8a7040; }
+
+    /* ── Face Compare ── */
+    .face-compare {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .face-box {
+      flex: 1;
+      max-width: 120px;
+      aspect-ratio: 1;
+      background: var(--parchment);
+      border: 1px solid var(--border-cream);
+      border-radius: var(--r-card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+    }
+    .face-score {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .face-score-val {
+      font-family: var(--font-serif);
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--terracotta);
+    }
+    .face-score-label { font-size: 10px; color: var(--stone-gray); }
+
+    /* ── Mini Bar Chart ── */
+    .mini-chart {
+      display: flex;
+      gap: 5px;
+      align-items: flex-end;
+      height: 56px;
+    }
+    .mini-bar {
+      flex: 1;
+      border-radius: 3px 3px 0 0;
+      background: var(--border-warm);
+      transition: background 0.13s;
+    }
+    .mini-bar.today { background: rgba(201,100,66,0.55); }
+    .mini-chart-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      font-size: 10px;
+      color: var(--stone-gray);
+    }
+
+    /* ── Log viewer ── */
+    .log-viewer {
+      background: var(--near-black);
+      border-radius: var(--r-card);
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #6a6a68;
+      line-height: 1.8;
+    }
+    .log-time-green  { color: #5a9a6a; }
+    .log-time-amber  { color: #9a8a4a; }
+
+    /* ═══════════════════════════════════════
+       Right Panel  (240px)
+    ═══════════════════════════════════════ */
+    .right-panel {
+      width: 240px;
+      flex-shrink: 0;
+      height: calc(100vh - 40px);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--border-cream);
+    }
+    .right-panel::-webkit-scrollbar { width: 3px; }
+    .right-panel::-webkit-scrollbar-thumb { background: #2a2a28; border-radius: 2px; }
+
+    /* Dark: Batch Summary */
+    .panel-dark {
+      background: var(--near-black);
+      padding: 18px 16px;
+      flex-shrink: 0;
+    }
+    .panel-dark-label {
+      font-size: 9px;
+      color: #3a3a38;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .batch-id {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--warm-silver);
+      background: #1c1c1a;
+      padding: 6px 10px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      letter-spacing: 0.3px;
+    }
+    .batch-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 6px 0;
+      border-bottom: 1px solid #1e1e1c;
+    }
+    .batch-row:last-child { border-bottom: none; }
+    .batch-key { font-size: 11px; color: #3e3e3c; }
+    .batch-val { font-size: 13px; color: var(--warm-silver); font-weight: 500; }
+    .batch-val.accent { color: var(--terracotta); }
+
+    /* Light sections */
+    .panel-section {
+      background: var(--ivory);
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-warm);
+      flex-shrink: 0;
+    }
+    .panel-section.flex-grow { flex: 1; border-bottom: none; }
+    .panel-section-label {
+      font-size: 9px;
+      color: var(--stone-gray);
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    /* Task items */
+    .task-item {
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border-cream);
+    }
+    .task-item:last-child { border-bottom: none; }
+    .task-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3px;
+      gap: 6px;
+    }
+    .task-name { font-size: 12px; color: var(--near-black); font-weight: 500; }
+    .task-meta { font-size: 10px; color: var(--stone-gray); }
+
+    /* Hit stream */
+    .hit-item {
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border-cream);
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+    }
+    .hit-item:last-child { border-bottom: none; }
+    .hit-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: var(--parchment);
+      border: 1px solid var(--border-cream);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .hit-info   { flex: 1; min-width: 0; }
+    .hit-name   { font-size: 12px; color: var(--near-black); font-weight: 500; }
+    .hit-meta   { font-size: 10px; color: var(--stone-gray); margin-top: 1px; }
+    .hit-conf   { font-size: 11px; color: var(--terracotta); font-weight: 600; flex-shrink: 0; }
+
+    /* ═══════════════════════════════════════
+       Utility
+    ═══════════════════════════════════════ */
+    .text-accent  { color: var(--terracotta); font-weight: 500; }
+    .text-stone   { color: var(--stone-gray); }
+    .text-mono    { font-family: var(--font-mono); font-size: 11px; }
+    .mt-4  { margin-top: 4px; }
+    .mt-8  { margin-top: 8px; }
+    .mt-12 { margin-top: 12px; }
+    .mt-16 { margin-top: 16px; }
+    .mb-12 { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════
+     TOP BAR
+═══════════════════════════════ -->
+<div class="top-bar">
+  <span class="top-bar-brand">猎影哨兵</span>
+  <div class="top-bar-divider"></div>
+  <div class="top-bar-status">
+    <div class="status-dot online"></div>
+    推理引擎在线
+  </div>
+  <div class="top-bar-status" style="margin-left:6px">
+    <div class="status-dot syncing"></div>
+    数据库同步中
+  </div>
+  <div class="top-bar-spacer"></div>
+  <div class="top-bar-right">
+    <span class="top-bar-classify">内网专用 · 严禁外传</span>
+    <div class="top-bar-divider"></div>
+    <span class="top-bar-time" id="clock">--:--:--</span>
+    <div class="top-bar-divider"></div>
+    <div class="top-bar-user">
+      <div class="avatar">王</div>
+      <span>王建国 · 技侦大队</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════
+     WORKSPACE
+═══════════════════════════════ -->
+<div class="workspace">
+
+  <!-- ═══ LEFT SIDEBAR ═══ -->
+  <nav class="sidebar">
+
+    <!-- Logo -->
+    <div class="logo-area">
+      <div class="logo-title">猎影哨兵</div>
+      <div class="logo-subtitle">Shadow Sentinel v2.4</div>
+    </div>
+
+    <!-- Live Metrics — compact inline -->
+    <div class="live-metrics">
+      <div class="metrics-label">Live Metrics</div>
+      <div class="metrics-row">
+        <div class="metric-item">
+          <div class="metric-value hit">247</div>
+          <div class="metric-desc">今日命中</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value">18</div>
+          <div class="metric-desc">待下发</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-section">
+
+      <div class="nav-group">
+        <div class="nav-group-label">Detection</div>
+        <div class="nav-item active" onclick="switchModule('m01', this)">
+          <span class="nav-num">01</span>数据监测与研判
+        </div>
+        <div class="nav-item" onclick="switchModule('m02', this)">
+          <span class="nav-num">02</span>现场素材研判
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Identity</div>
+        <div class="nav-item" onclick="switchModule('m03', this)">
+          <span class="nav-num">03</span>人脸识别与核验
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Disposition</div>
+        <div class="nav-item" onclick="switchModule('m04', this)">
+          <span class="nav-num">04</span>任务下发
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Training</div>
+        <div class="nav-item" onclick="switchModule('m05', this)">
+          <span class="nav-num">05</span>模型自训练
+        </div>
+      </div>
+
+    </div>
+  </nav>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <main class="main-content">
+
+    <!-- ──────────────────────────────────
+         MODULE 01：数据监测与研判（默认）
+    ────────────────────────────────── -->
+    <div class="module-panel active" id="m01">
+
+      <div class="module-header">
+        <div>
+          <div class="module-title">数据监测与研判</div>
+          <div class="module-subtitle">批量视频流分析 · 自动标注可疑目标 · 生成研判报告</div>
+        </div>
+        <div class="module-actions">
+          <button class="btn btn-secondary">↺ 刷新</button>
+          <button class="btn btn-primary">＋ 新建批次</button>
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-overline">Completed</div>
+          <div class="stat-number s-completed">1,284</div>
+          <div class="stat-desc">已完成</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Running</div>
+          <div class="stat-number s-running">6</div>
+          <div class="stat-desc">分析中</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Pending</div>
+          <div class="stat-number s-pending">23</div>
+          <div class="stat-desc">队列等待</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Kept</div>
+          <div class="stat-number s-kept">89</div>
+          <div class="stat-desc">已存档</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Failed</div>
+          <div class="stat-number s-failed">3</div>
+          <div class="stat-desc">处理失败</div>
+        </div>
+      </div>
+
+      <div class="module-body">
+        <div class="module-main">
+          <div class="card">
+            <div class="card-title">
+              <span>当前批次 — 城北卡口 · 2026-04-23</span>
+              <span class="badge badge-running">● 运行中</span>
+            </div>
+            <!-- Progress -->
+            <div class="mb-12">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+                <span class="text-stone">进度</span>
+                <span style="color:var(--olive-gray)">437 / 682 个片段 · 64%</span>
+              </div>
+              <div class="progress-bar" style="height:5px">
+                <div class="progress-fill" style="width:64%"></div>
+              </div>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>批次名称</th><th>来源</th><th>片段数</th>
+                  <th>命中</th><th>状态</th><th>更新</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>城北卡口_0423</td>
+                  <td>卡口摄像 CH-04</td>
+                  <td>682</td>
+                  <td class="text-accent">14</td>
+                  <td><span class="badge badge-running">运行中</span></td>
+                  <td class="text-mono">14:32</td>
+                </tr>
+                <tr>
+                  <td>南环路段_0422</td>
+                  <td>移动单兵 B-07</td>
+                  <td>1,204</td>
+                  <td class="text-accent">31</td>
+                  <td><span class="badge badge-completed">已完成</span></td>
+                  <td class="text-mono">09:17</td>
+                </tr>
+                <tr>
+                  <td>火车站广场_0422</td>
+                  <td>固定球机 FX-12</td>
+                  <td>956</td>
+                  <td class="text-accent">7</td>
+                  <td><span class="badge badge-completed">已完成</span></td>
+                  <td class="text-mono">07:45</td>
+                </tr>
+                <tr>
+                  <td>老城区步行街_0421</td>
+                  <td>卡口摄像 CH-09</td>
+                  <td>312</td>
+                  <td style="color:var(--stone-gray)">—</td>
+                  <td><span class="badge badge-failed">失败</span></td>
+                  <td class="text-mono">昨天</td>
+                </tr>
+                <tr>
+                  <td>高铁站出口_0423</td>
+                  <td>固定球机 FX-03</td>
+                  <td>445</td>
+                  <td style="color:var(--stone-gray)">—</td>
+                  <td><span class="badge badge-pending">等待中</span></td>
+                  <td class="text-mono">—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="module-aside">
+          <div class="card">
+            <div class="card-title">
+              <span>使用说明</span>
+              <span class="card-label">Guide</span>
+            </div>
+            <div class="alert alert-note mb-12">
+              新建批次前需完成摄像头注册，确保来源信息完整准确。
+            </div>
+            <ul class="info-list">
+              <li><span class="info-key">支持格式</span><span class="info-val">MP4 · AVI · MOV</span></li>
+              <li><span class="info-key">最大单文件</span><span class="info-val">4 GB</span></li>
+              <li><span class="info-key">推理引擎</span><span class="info-val">YOLOv8 + CLIP</span></li>
+              <li><span class="info-key">最大并发</span><span class="info-val">8 路</span></li>
+              <li><span class="info-key">存储周期</span><span class="info-val">90 天</span></li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-title">今日命中趋势</div>
+            <div class="mini-chart">
+              <div class="mini-bar" style="height:38%"></div>
+              <div class="mini-bar" style="height:55%"></div>
+              <div class="mini-bar" style="height:45%"></div>
+              <div class="mini-bar" style="height:72%"></div>
+              <div class="mini-bar" style="height:60%"></div>
+              <div class="mini-bar" style="height:85%"></div>
+              <div class="mini-bar today" style="height:100%"></div>
+            </div>
+            <div class="mini-chart-labels">
+              <span>08:00</span><span>11:00</span><span>14:30</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ──────────────────────────────────
+         MODULE 02：现场素材研判
+    ────────────────────────────────── -->
+    <div class="module-panel" id="m02">
+
+      <div class="module-header">
+        <div>
+          <div class="module-title">现场素材研判</div>
+          <div class="module-subtitle">上传图片或视频 · 即时推理分析 · 逐帧目标标注</div>
+        </div>
+        <div class="module-actions">
+          <button class="btn btn-secondary">清空队列</button>
+          <button class="btn btn-primary">↑ 上传文件</button>
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-overline">Completed</div>
+          <div class="stat-number s-completed">342</div>
+          <div class="stat-desc">已分析</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Running</div>
+          <div class="stat-number s-running">2</div>
+          <div class="stat-desc">分析中</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Pending</div>
+          <div class="stat-number s-pending">5</div>
+          <div class="stat-desc">等待中</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Kept</div>
+          <div class="stat-number s-kept">47</div>
+          <div class="stat-desc">已存档</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Failed</div>
+          <div class="stat-number s-failed">1</div>
+          <div class="stat-desc">失败</div>
+        </div>
+      </div>
+
+      <div class="module-body">
+        <div class="module-main">
+          <div class="card">
+            <div class="card-title">上传素材</div>
+            <div class="upload-area">
+              <div class="upload-icon">⊕</div>
+              <div class="upload-title">将文件拖放至此处，或点击选择</div>
+              <div class="upload-hint">支持 MP4 · AVI · MOV · JPG · PNG · 单文件不超过 4 GB</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">
+              <span>最近上传</span>
+              <span class="badge badge-running">2 处理中</span>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr><th>文件名</th><th>类型</th><th>大小</th><th>状态</th><th>命中</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>现场录像_20260423_0914.mp4</td>
+                  <td>视频</td>
+                  <td>1.2 GB</td>
+                  <td><span class="badge badge-running">分析中</span></td>
+                  <td style="color:var(--stone-gray)">—</td>
+                </tr>
+                <tr>
+                  <td>抓拍截图_20260423_0832.jpg</td>
+                  <td>图片</td>
+                  <td>2.4 MB</td>
+                  <td><span class="badge badge-completed">完成</span></td>
+                  <td class="text-accent">1</td>
+                </tr>
+                <tr>
+                  <td>卡口截帧_20260422_1756.jpg</td>
+                  <td>图片</td>
+                  <td>1.8 MB</td>
+                  <td><span class="badge badge-completed">完成</span></td>
+                  <td>0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="module-aside">
+          <div class="card">
+            <div class="card-title">分析参数</div>
+            <div class="form-group">
+              <label class="form-label">推理模型</label>
+              <select class="form-select">
+                <option>YOLOv8s-WorldV2（推荐）</option>
+                <option>YOLOv8n（快速）</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">置信度阈值</label>
+              <input type="range" min="0.3" max="1" step="0.05" value="0.65"
+                     style="width:100%;accent-color:var(--terracotta)">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--stone-gray);margin-top:4px">
+                <span>0.30</span>
+                <span style="color:var(--terracotta);font-weight:600">0.65</span>
+                <span>1.00</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">人脸比对</label>
+              <select class="form-select">
+                <option>启用（对比人脸库）</option>
+                <option>禁用</option>
+              </select>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">注意事项</div>
+            <div class="alert alert-warn">
+              上传素材仅限任务期间使用，处理完成后系统将自动删除原始文件，请提前备份。
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ──────────────────────────────────
+         MODULE 03：人脸识别与核验
+    ────────────────────────────────── -->
+    <div class="module-panel" id="m03">
+
+      <div class="module-header">
+        <div>
+          <div class="module-title">人脸识别与核验</div>
+          <div class="module-subtitle">人脸特征提取 · 在库比对 · 身份核验</div>
+        </div>
+        <div class="module-actions">
+          <button class="btn btn-secondary">↑ 导入人脸</button>
+          <button class="btn btn-primary">开始比对</button>
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-overline">Completed</div>
+          <div class="stat-number s-completed">567</div>
+          <div class="stat-desc">已核验</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Running</div>
+          <div class="stat-number s-running">0</div>
+          <div class="stat-desc">比对中</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Pending</div>
+          <div class="stat-number s-pending">12</div>
+          <div class="stat-desc">待核验</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Kept</div>
+          <div class="stat-number s-kept">34</div>
+          <div class="stat-desc">已存档</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Failed</div>
+          <div class="stat-number s-failed">0</div>
+          <div class="stat-desc">失败</div>
+        </div>
+      </div>
+
+      <div class="module-body">
+        <div class="module-main">
+          <div class="card">
+            <div class="card-title">
+              <span>快速比对</span>
+              <span class="card-label">Single Query</span>
+            </div>
+            <div class="face-compare mb-12">
+              <div class="face-box">👤</div>
+              <div class="face-score">
+                <div class="face-score-val">92.4%</div>
+                <div class="face-score-label">相似度</div>
+                <div class="mt-8"><span class="badge badge-hit">命中</span></div>
+              </div>
+              <div class="face-box">👤</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <div style="flex:1;background:var(--parchment);border:1px solid var(--border-cream);border-radius:var(--r-card);padding:12px">
+                <div style="font-size:10px;color:var(--stone-gray);margin-bottom:3px">查询图像</div>
+                <div style="font-size:12px;color:var(--olive-gray)">从摄像抓拍提取</div>
+                <div style="font-size:10px;color:var(--stone-gray);margin-top:3px">2026-04-23 14:18</div>
+              </div>
+              <div style="flex:1;background:var(--parchment);border:1px solid var(--border-cream);border-radius:var(--r-card);padding:12px">
+                <div style="font-size:10px;color:var(--stone-gray);margin-bottom:3px">库中结果</div>
+                <div style="font-size:12px;color:var(--near-black);font-weight:500">张 × × （已脱敏）</div>
+                <div style="font-size:10px;color:var(--stone-gray);margin-top:3px">管控人员 · 二级预警</div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">
+              <span>批量比对记录</span>
+              <span class="badge badge-completed">全部完成</span>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr><th>任务ID</th><th>查询量</th><th>命中数</th><th>最高相似度</th><th>状态</th><th>时间</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-mono">FR-20260423-009</td>
+                  <td>48</td>
+                  <td class="text-accent">3</td>
+                  <td>94.7%</td>
+                  <td><span class="badge badge-completed">完成</span></td>
+                  <td class="text-mono">14:05</td>
+                </tr>
+                <tr>
+                  <td class="text-mono">FR-20260423-008</td>
+                  <td>120</td>
+                  <td class="text-accent">7</td>
+                  <td>91.2%</td>
+                  <td><span class="badge badge-completed">完成</span></td>
+                  <td class="text-mono">11:30</td>
+                </tr>
+                <tr>
+                  <td class="text-mono">FR-20260422-021</td>
+                  <td>85</td>
+                  <td class="text-accent">2</td>
+                  <td>89.4%</td>
+                  <td><span class="badge badge-completed">完成</span></td>
+                  <td class="text-mono">昨天</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="module-aside">
+          <div class="card">
+            <div class="card-title">比对配置</div>
+            <div class="form-group">
+              <label class="form-label">比对模型</label>
+              <select class="form-select">
+                <option>ArcFace w600k_r50（推荐）</option>
+                <option>轻量化模型</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">命中阈值</label>
+              <input type="range" min="0.5" max="1" step="0.01" value="0.85"
+                     style="width:100%;accent-color:var(--terracotta)">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--stone-gray);margin-top:4px">
+                <span>0.50</span>
+                <span style="color:var(--terracotta);font-weight:600">0.85</span>
+                <span>1.00</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">目标比对库</label>
+              <select class="form-select">
+                <option>全库（12,840 人）</option>
+                <option>重点关注（384 人）</option>
+                <option>管控人员（1,200 人）</option>
+              </select>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">库容量</div>
+            <ul class="info-list">
+              <li><span class="info-key">总人数</span><span class="info-val">12,840</span></li>
+              <li><span class="info-key">特征向量</span><span class="info-val">12,840 条</span></li>
+              <li><span class="info-key">最近更新</span><span class="info-val">今日 08:00</span></li>
+              <li><span class="info-key">存储占用</span><span class="info-val">2.1 GB</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ──────────────────────────────────
+         MODULE 04：任务下发
+    ────────────────────────────────── -->
+    <div class="module-panel" id="m04">
+
+      <div class="module-header">
+        <div>
+          <div class="module-title">任务下发</div>
+          <div class="module-subtitle">向执行单位分派研判任务 · 跟踪回执状态</div>
+        </div>
+        <div class="module-actions">
+          <button class="btn btn-secondary">导出列表</button>
+          <button class="btn btn-primary">＋ 创建任务</button>
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-overline">Completed</div>
+          <div class="stat-number s-completed">89</div>
+          <div class="stat-desc">已回执</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Running</div>
+          <div class="stat-number s-running">18</div>
+          <div class="stat-desc">执行中</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Pending</div>
+          <div class="stat-number s-pending">7</div>
+          <div class="stat-desc">待下发</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Kept</div>
+          <div class="stat-number s-kept">214</div>
+          <div class="stat-desc">历史存档</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Failed</div>
+          <div class="stat-number s-failed">2</div>
+          <div class="stat-desc">下发失败</div>
+        </div>
+      </div>
+
+      <div class="module-body">
+        <div class="module-main">
+          <div class="card">
+            <div class="card-title">
+              <span>待下发任务</span>
+              <span class="badge badge-pending">7 条</span>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr><th>任务编号</th><th>目标信息</th><th>研判依据</th><th>接收单位</th><th>优先级</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-mono">DSP-2604-0047</td>
+                  <td>张 × × · 男 · 34岁</td>
+                  <td>人脸命中 94.7%</td>
+                  <td>城北大队</td>
+                  <td><span class="badge badge-running">紧急</span></td>
+                  <td>
+                    <button class="btn btn-primary" style="padding:4px 10px;font-size:11px">下发</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-mono">DSP-2604-0046</td>
+                  <td>车牌 × ×A · 黑色轿车</td>
+                  <td>布控车辆过卡</td>
+                  <td>交警支队</td>
+                  <td><span class="badge badge-pending">普通</span></td>
+                  <td>
+                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px">下发</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-mono">DSP-2604-0045</td>
+                  <td>未知人员 · 滞留 6h+</td>
+                  <td>行为分析异常</td>
+                  <td>南环派出所</td>
+                  <td><span class="badge badge-pending">普通</span></td>
+                  <td>
+                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px">下发</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-mono">DSP-2604-0044</td>
+                  <td>李 × × · 女 · 28岁</td>
+                  <td>人脸命中 88.3%</td>
+                  <td>技侦大队</td>
+                  <td><span class="badge badge-pending">普通</span></td>
+                  <td>
+                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px">下发</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="module-aside">
+          <div class="card">
+            <div class="card-title">新建任务</div>
+            <div class="form-group">
+              <label class="form-label">目标描述</label>
+              <textarea class="form-textarea" placeholder="输入目标特征、研判依据等信息…"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">接收单位</label>
+              <select class="form-select">
+                <option value="">请选择单位…</option>
+                <option>城北大队</option>
+                <option>交警支队</option>
+                <option>南环派出所</option>
+                <option>技侦大队</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">优先级</label>
+              <select class="form-select">
+                <option>普通</option>
+                <option>紧急</option>
+                <option>特级</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" style="width:100%">提交下发</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ──────────────────────────────────
+         MODULE 05：模型自训练
+    ────────────────────────────────── -->
+    <div class="module-panel" id="m05">
+
+      <div class="module-header">
+        <div>
+          <div class="module-title">模型自训练</div>
+          <div class="module-subtitle">使用本地标注数据微调目标检测模型 · 提升业务场景精度</div>
+        </div>
+        <div class="module-actions">
+          <button class="btn btn-secondary">查看日志</button>
+          <button class="btn btn-primary">启动训练</button>
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-overline">Completed</div>
+          <div class="stat-number s-completed">12</div>
+          <div class="stat-desc">完成轮次</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Running</div>
+          <div class="stat-number s-running">1</div>
+          <div class="stat-desc">训练中</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Pending</div>
+          <div class="stat-number s-pending">0</div>
+          <div class="stat-desc">排队中</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Kept</div>
+          <div class="stat-number s-kept">5</div>
+          <div class="stat-desc">已部署模型</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-overline">Failed</div>
+          <div class="stat-number s-failed">1</div>
+          <div class="stat-desc">训练失败</div>
+        </div>
+      </div>
+
+      <div class="module-body">
+        <div class="module-main">
+          <div class="card">
+            <div class="card-title">
+              <span>当前训练任务</span>
+              <span class="badge badge-running">● 进行中</span>
+            </div>
+            <div class="mb-12">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+                <span class="text-stone">第 18 / 100 轮</span>
+                <span style="color:var(--olive-gray)">当前损失值 0.0342 · mAP50: 0.847</span>
+              </div>
+              <div class="progress-bar" style="height:5px">
+                <div class="progress-fill" style="width:18%"></div>
+              </div>
+            </div>
+            <div class="log-viewer">
+              <span class="log-time-green">[14:31:05]</span> Epoch 18/100 — loss: 0.0342, mAP50: 0.847<br>
+              <span class="log-time-green">[14:30:52]</span> Epoch 17/100 — loss: 0.0358, mAP50: 0.841<br>
+              <span class="log-time-green">[14:30:39]</span> Epoch 16/100 — loss: 0.0371, mAP50: 0.836<br>
+              <span class="log-time-amber">[14:29:12]</span> 加载数据集：本地标注_v3（2,840 帧）<br>
+              <span class="log-time-amber">[14:29:08]</span> 基底模型：yolo26s.pt · 设备：CUDA:0
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">历史训练记录</div>
+            <table class="data-table">
+              <thead>
+                <tr><th>版本</th><th>基底模型</th><th>数据集</th><th>mAP50</th><th>状态</th><th>部署</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>v2.4-beta</td>
+                  <td>yolo26s</td>
+                  <td>本地标注_v3</td>
+                  <td class="text-stone">—</td>
+                  <td><span class="badge badge-running">训练中</span></td>
+                  <td class="text-stone">—</td>
+                </tr>
+                <tr>
+                  <td>v2.3</td>
+                  <td>yolo26s</td>
+                  <td>本地标注_v2</td>
+                  <td style="font-weight:500">0.862</td>
+                  <td><span class="badge badge-completed">完成</span></td>
+                  <td><span class="badge badge-completed">已部署</span></td>
+                </tr>
+                <tr>
+                  <td>v2.2</td>
+                  <td>yolov8s</td>
+                  <td>本地标注_v2</td>
+                  <td style="font-weight:500">0.831</td>
+                  <td><span class="badge badge-completed">完成</span></td>
+                  <td class="text-stone">已弃用</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="module-aside">
+          <div class="card">
+            <div class="card-title">训练参数</div>
+            <div class="form-group">
+              <label class="form-label">基底模型</label>
+              <select class="form-select">
+                <option>yolo26s.pt（推荐）</option>
+                <option>yolo26n.pt（快速）</option>
+                <option>yolov8s-worldv2.pt</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">训练轮次</label>
+              <input type="number" class="form-input" value="100" min="10" max="500">
+            </div>
+            <div class="form-group">
+              <label class="form-label">批次大小</label>
+              <input type="number" class="form-input" value="16" min="4" max="64">
+            </div>
+            <div class="form-group">
+              <label class="form-label">学习率</label>
+              <input type="text" class="form-input" value="0.001">
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">硬件状态</div>
+            <ul class="info-list">
+              <li><span class="info-key">GPU</span><span class="info-val">RTX 3090</span></li>
+              <li>
+                <span class="info-key">显存占用</span>
+                <span class="info-val text-accent">18.4 / 24 GB</span>
+              </li>
+              <li><span class="info-key">CPU 占用</span><span class="info-val">34%</span></li>
+              <li><span class="info-key">预计完成</span><span class="info-val">约 82 分钟</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main><!-- end .main-content -->
+
+  <!-- ═══ RIGHT PANEL ═══ -->
+  <aside class="right-panel">
+
+    <!-- Dark: Batch Summary -->
+    <div class="panel-dark">
+      <div class="panel-dark-label">Batch Summary</div>
+      <div class="batch-id">BATCH · 城北卡口_0423</div>
+      <div class="batch-row">
+        <span class="batch-key">状态</span>
+        <span class="batch-val accent">运行中</span>
+      </div>
+      <div class="batch-row">
+        <span class="batch-key">已处理</span>
+        <span class="batch-val">437 片段</span>
+      </div>
+      <div class="batch-row">
+        <span class="batch-key">当前命中</span>
+        <span class="batch-val accent">14</span>
+      </div>
+      <div class="batch-row">
+        <span class="batch-key">命中率</span>
+        <span class="batch-val">3.2%</span>
+      </div>
+      <div class="batch-row">
+        <span class="batch-key">推理引擎</span>
+        <span class="batch-val">YOLOv8 + CLIP</span>
+      </div>
+      <div class="batch-row">
+        <span class="batch-key">预计完成</span>
+        <span class="batch-val">约 18 分钟</span>
+      </div>
+    </div>
+
+    <!-- Light: Realtime Tasks -->
+    <div class="panel-section">
+      <div class="panel-section-label">实时任务</div>
+
+      <div class="task-item">
+        <div class="task-item-top">
+          <span class="task-name">城北卡口_0423</span>
+          <span class="badge badge-running" style="font-size:10px">64%</span>
+        </div>
+        <div class="task-meta">卡口摄像 CH-04 · 682 片段</div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:64%"></div>
+        </div>
+      </div>
+
+      <div class="task-item">
+        <div class="task-item-top">
+          <span class="task-name">高铁站出口_0423</span>
+          <span class="badge badge-pending" style="font-size:10px">等待</span>
+        </div>
+        <div class="task-meta">固定球机 FX-03 · 445 片段</div>
+      </div>
+
+      <div class="task-item">
+        <div class="task-item-top">
+          <span class="task-name">人脸比对 FR-009</span>
+          <span class="badge badge-completed" style="font-size:10px">完成</span>
+        </div>
+        <div class="task-meta">48 张 · 命中 3</div>
+      </div>
+
+    </div>
+
+    <!-- Light: Hit Stream -->
+    <div class="panel-section flex-grow">
+      <div class="panel-section-label">命中流水</div>
+
+      <div class="hit-item">
+        <div class="hit-avatar">👤</div>
+        <div class="hit-info">
+          <div class="hit-name">已脱敏人员 A</div>
+          <div class="hit-meta">城北卡口 · 14:31</div>
+        </div>
+        <div class="hit-conf">94.7%</div>
+      </div>
+
+      <div class="hit-item">
+        <div class="hit-avatar">👤</div>
+        <div class="hit-info">
+          <div class="hit-name">已脱敏人员 B</div>
+          <div class="hit-meta">南环路段 · 12:08</div>
+        </div>
+        <div class="hit-conf">91.2%</div>
+      </div>
+
+      <div class="hit-item">
+        <div class="hit-avatar">🚗</div>
+        <div class="hit-info">
+          <div class="hit-name">布控车辆</div>
+          <div class="hit-meta">城北卡口 · 11:55</div>
+        </div>
+        <div class="hit-conf">卡口</div>
+      </div>
+
+      <div class="hit-item">
+        <div class="hit-avatar">👤</div>
+        <div class="hit-info">
+          <div class="hit-name">已脱敏人员 C</div>
+          <div class="hit-meta">火车站广场 · 09:44</div>
+        </div>
+        <div class="hit-conf">88.9%</div>
+      </div>
+
+      <div class="hit-item">
+        <div class="hit-avatar">👤</div>
+        <div class="hit-info">
+          <div class="hit-name">已脱敏人员 D</div>
+          <div class="hit-meta">南环路段 · 08:21</div>
+        </div>
+        <div class="hit-conf">86.1%</div>
+      </div>
+
+    </div>
+  </aside>
+
+</div><!-- end .workspace -->
+
+<script>
+  /* ── Clock ── */
+  function updateClock() {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    document.getElementById('clock').textContent =
+      pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  /* ── Module switching ── */
+  function switchModule(moduleId, navEl) {
+    document.querySelectorAll('.module-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById(moduleId).classList.add('active');
+    navEl.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
