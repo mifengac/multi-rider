@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>刑智·护苗 - 知识图谱</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dist/tailwind.css') }}" />
+  <script>
+    window.GRAPH_PAGE_BOOTSTRAP = {
+      urls: {
+        status: {{ url_for('graph.graph_status') | tojson }},
+        sync: {{ url_for('graph.graph_sync_submit') | tojson }},
+        syncStatus: {{ url_for('graph.graph_sync_status') | tojson }},
+        detect: {{ url_for('graph.graph_detect_submit') | tojson }},
+        gangs: {{ url_for('graph.graph_gangs') | tojson }},
+        gangDetail: {{ url_for('graph.graph_gang_detail', gang_id='__G__') | tojson }},
+        person: {{ url_for('graph.graph_person', sfzh='__P__') | tojson }},
+        trajectory: {{ url_for('graph.graph_person_trajectory', sfzh='__P__') | tojson }},
+      }
+    };
+  </script>
+  <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+  <script src="{{ url_for('static', filename='modules/graph/graph.js') }}" defer></script>
+</head>
+<body class="min-h-screen bg-stone-950 text-stone-100">
+  <div class="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-6 px-4 py-6 lg:px-8">
+    <header class="rounded-[28px] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.15),_transparent_40%),linear-gradient(145deg,_rgba(12,18,28,0.96),_rgba(23,32,42,0.92))] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-cyan-300/70">Neo4j Gang Mining</p>
+          <h1 class="mt-2 text-3xl font-black tracking-tight text-stone-50 lg:text-5xl">未成年人盗窃团伙知识图谱</h1>
+          <p class="mt-3 max-w-3xl text-sm leading-7 text-stone-300">
+            从金仓案件表构建 Person / Case 图谱，按同案共犯关系运行 Louvain 社区发现，并按需联动视频云轨迹查询。
+          </p>
+        </div>
+        <div class="flex gap-3">
+          <a href="{{ url_for('job.index') }}" class="rounded-full border border-stone-700 px-4 py-2 text-sm text-stone-300 transition hover:border-cyan-300 hover:text-white">返回主控台</a>
+          <button id="refreshStatusBtn" type="button" class="rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-stone-950 transition hover:bg-cyan-300">刷新状态</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+      <div class="grid gap-4 md:grid-cols-3">
+        <article class="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+          <div class="text-xs uppercase tracking-[0.25em] text-stone-400">Neo4j</div>
+          <div id="neo4jStatus" class="mt-3 text-2xl font-bold text-stone-50">待检测</div>
+          <p id="neo4jStatusText" class="mt-2 text-sm text-stone-400">尚未查询</p>
+        </article>
+        <article class="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+          <div class="text-xs uppercase tracking-[0.25em] text-stone-400">KingBase</div>
+          <div id="kingbaseStatus" class="mt-3 text-2xl font-bold text-stone-50">待检测</div>
+          <p id="kingbaseStatusText" class="mt-2 text-sm text-stone-400">尚未查询</p>
+        </article>
+        <article class="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+          <div class="text-xs uppercase tracking-[0.25em] text-stone-400">最近同步</div>
+          <div id="syncSummary" class="mt-3 text-2xl font-bold text-stone-50">无</div>
+          <p id="syncSummaryText" class="mt-2 text-sm text-stone-400">等待首次同步</p>
+        </article>
+      </div>
+      <article class="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="text-xs uppercase tracking-[0.25em] text-stone-400">任务控制</div>
+            <div class="mt-2 text-lg font-semibold text-stone-50">同步与团伙挖掘</div>
+          </div>
+          <div id="taskFeedback" class="text-xs text-cyan-300"></div>
+        </div>
+        <div class="mt-4 flex flex-wrap items-end gap-3">
+          <label class="flex min-w-[140px] flex-col gap-2 text-xs uppercase tracking-[0.18em] text-stone-400">
+            抽样上限
+            <input id="syncLimitInput" type="number" min="1" placeholder="空=全量" class="rounded-2xl border border-white/10 bg-stone-900 px-4 py-3 text-sm normal-case tracking-normal text-stone-100 outline-none transition focus:border-cyan-300" />
+          </label>
+          <label class="flex items-center gap-2 rounded-2xl border border-white/10 bg-stone-900 px-4 py-3 text-sm text-stone-200">
+            <input id="theftOnlyInput" type="checkbox" checked class="accent-cyan-400" />
+            仅同步盗窃案件
+          </label>
+          <button id="syncBtn" type="button" class="rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-stone-950 transition hover:bg-emerald-300">提交同步任务</button>
+          <button id="detectBtn" type="button" class="rounded-full bg-fuchsia-400 px-5 py-3 text-sm font-semibold text-stone-950 transition hover:bg-fuchsia-300">提交团伙识别</button>
+        </div>
+        <div class="mt-4 rounded-2xl border border-dashed border-white/10 bg-stone-950/60 p-4">
+          <div class="text-xs uppercase tracking-[0.25em] text-stone-500">最近任务</div>
+          <pre id="taskStatusPanel" class="mt-3 whitespace-pre-wrap break-all text-sm leading-6 text-stone-300">暂无任务</pre>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
+      <aside class="rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="text-xs uppercase tracking-[0.25em] text-stone-400">团伙列表</div>
+            <h2 class="mt-2 text-xl font-semibold text-stone-50">最新 Louvain 结果</h2>
+          </div>
+          <button id="reloadGangBtn" type="button" class="rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-stone-200 transition hover:border-cyan-300 hover:text-cyan-200">刷新</button>
+        </div>
+        <div id="gangList" class="mt-5 space-y-3"></div>
+      </aside>
+
+      <section class="grid gap-6">
+        <article class="rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div class="text-xs uppercase tracking-[0.25em] text-stone-400">人物关系查询</div>
+              <h2 class="mt-2 text-xl font-semibold text-stone-50">按身份证查看关系图</h2>
+            </div>
+            <form id="personSearchForm" class="flex w-full max-w-xl gap-3">
+              <input id="personSfzhInput" type="text" placeholder="输入身份证号，例如 440*************" class="flex-1 rounded-full border border-white/10 bg-stone-950 px-5 py-3 text-sm text-stone-100 outline-none transition focus:border-cyan-300" />
+              <button type="submit" class="rounded-full bg-cyan-400 px-5 py-3 text-sm font-semibold text-stone-950 transition hover:bg-cyan-300">查询</button>
+            </form>
+          </div>
+          <div id="graphCanvas" class="mt-5 h-[460px] overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,_rgba(9,14,20,0.9),_rgba(16,25,33,0.98))]"></div>
+        </article>
+
+        <article class="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+          <div class="rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+            <div class="text-xs uppercase tracking-[0.25em] text-stone-400">人物详情</div>
+            <pre id="personDetailPanel" class="mt-4 whitespace-pre-wrap break-all text-sm leading-6 text-stone-300">点击图中人物节点或先搜索身份证号。</pre>
+          </div>
+          <div class="rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+            <div class="text-xs uppercase tracking-[0.25em] text-stone-400">视频云轨迹</div>
+            <div id="trajectoryPanel" class="mt-4 space-y-3 text-sm text-stone-300">暂无轨迹数据</div>
+          </div>
+        </article>
+      </section>
+    </section>
+  </div>
+</body>
+</html>

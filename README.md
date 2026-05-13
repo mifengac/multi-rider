@@ -226,16 +226,37 @@ http://本机IP:5001/
 # 联网构建机
 docker build --platform linux/amd64 -f ops/Dockerfile -t multi-rider:centos-stream10 .
 docker save -o multi-rider-centos-stream10.tar multi-rider:centos-stream10
+docker pull neo4j:5.20-community
+docker save -o neo4j-5.20-community.tar neo4j:5.20-community
 
 # 内网主机（与 compose.yaml/.env 放在同一目录）
 sudo docker load -i multi-rider-centos-stream10.tar
+sudo docker load -i neo4j-5.20-community.tar
 cp .env.example .env
 mkdir -p data/output data/upload_tmp data/face_data data/datasets data/train_runs
+mkdir -p neo4j/data neo4j/logs neo4j/plugins
 [ -f data/jobs.sqlite3 ] || touch data/jobs.sqlite3
 sudo docker compose up -d
 ```
 
-访问地址：`http://服务器IP:5001/`
+其中 `.env` 里需要补 Neo4j 变量，至少包括：`NEO4J_PASSWORD`、`NEO4J_AUTH`、`NEO4J_URI=bolt://neo4j:7687`。
+
+如果目标主机无法访问互联网，建议在联网机器上先把 APOC/GDS 插件缓存到 `neo4j/plugins/` 再一起传输，官方也推荐生产环境直接挂载 `/plugins` 而不是依赖 `NEO4J_PLUGINS` 运行时下载：
+
+```bash
+mkdir -p neo4j/plugins
+docker run -d --name neo4j-plugin-preload \
+  -e NEO4J_AUTH=neo4j/temp12345 \
+  -e NEO4J_PLUGINS='["apoc", "graph-data-science"]' \
+  -v $(pwd)/neo4j/plugins:/plugins \
+  neo4j:5.20-community
+docker logs -f neo4j-plugin-preload
+docker stop neo4j-plugin-preload
+docker rm neo4j-plugin-preload
+ls neo4j/plugins
+```
+
+访问地址：应用 `http://服务器IP:5001/`，可选的 Neo4j Browser 管理入口 `http://服务器IP:7474/`。
 
 ### 常用运维命令
 
@@ -251,10 +272,14 @@ sudo docker compose down
 ```bash
 # CentOS / RHEL（firewalld）
 sudo firewall-cmd --permanent --add-port=5001/tcp
+sudo firewall-cmd --permanent --add-port=7474/tcp
+sudo firewall-cmd --permanent --add-port=7687/tcp
 sudo firewall-cmd --reload
 
 # Ubuntu / Debian（ufw）
 sudo ufw allow 5001/tcp
+sudo ufw allow 7474/tcp
+sudo ufw allow 7687/tcp
 ```
 
 ---

@@ -195,12 +195,33 @@ def _handle_face_library(payload: dict) -> dict:
     return {"job_id": job.get("id"), "status": job.get("status")}
 
 
+def _handle_graph_sync(payload: dict) -> dict:
+    """Run KingBase -> Neo4j graph synchronization."""
+    from modules.graph.services.etl_service import run_graph_sync
+
+    limit = payload.get("limit")
+    theft_only = payload.get("theft_only", True)
+    incremental = payload.get("incremental", False)
+    safe_limit = int(limit) if str(limit or "").strip() else None
+    return run_graph_sync(limit=safe_limit, theft_only=bool(theft_only), incremental=bool(incremental))
+
+
+def _handle_graph_detect(payload: dict) -> dict:
+    """Run Louvain-based gang detection."""
+    from modules.graph.services.algo_service import detect_gangs
+
+    min_size = int(payload.get("min_size") or 2)
+    return detect_gangs(min_size=min_size)
+
+
 HANDLERS: dict[str, Callable] = {
     "detection": _handle_detection,
     "upload": _handle_upload,
     "train": _handle_train,
     "auto_annotate": _handle_auto_annotate,
     "face_library": _handle_face_library,
+    "graph_sync": _handle_graph_sync,
+    "graph_detect": _handle_graph_detect,
 }
 
 

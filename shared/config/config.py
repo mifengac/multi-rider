@@ -55,6 +55,19 @@ SMS_ORACLE_SERVICE = os.getenv("SMS_ORACLE_SERVICE", ORACLE_SERVICE)
 SMS_ORACLE_USER = os.getenv("SMS_ORACLE_USER", ORACLE_USER)
 SMS_ORACLE_PASSWORD = os.getenv("SMS_ORACLE_PASSWORD", ORACLE_PASSWORD)
 
+KINGBASE_HOST = os.getenv("KINGBASE_HOST", "127.0.0.1")
+KINGBASE_PORT = int(os.getenv("KINGBASE_PORT", "54321"))
+KINGBASE_DBNAME = os.getenv("KINGBASE_DBNAME", "yfywk")
+KINGBASE_USER = os.getenv("KINGBASE_USER", "ywkuser")
+KINGBASE_PASSWORD = os.getenv("KINGBASE_PASSWORD", "123")
+KINGBASE_SOURCE_SCHEMA = os.getenv("KINGBASE_SOURCE_SCHEMA", "ywdata")
+KINGBASE_APP_SCHEMA = os.getenv("KINGBASE_APP_SCHEMA", "jcgkzx_monitor")
+
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://127.0.0.1:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "hm123456")
+NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "neo4j")
+
 
 def _resolve_model_path(default_filename: str, *env_names: str) -> str:
     project_model_path = os.path.join(MODEL_DIR, default_filename)

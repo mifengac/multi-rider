@@ -1,16 +1,18 @@
 ARG BASE_IMAGE=python:3.10-slim-bullseye
 FROM ${BASE_IMAGE}
 
+ARG INSTALL_ML_STACK=true
+
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin \
     PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_DEFAULT_TIMEOUT=600 \
     PIP_RETRIES=10 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     ORACLE_IC_DIR=/app/instantclient_11_2 \
     LD_LIBRARY_PATH=/app/instantclient_11_2 \
-    ORACLE_USE_THICK_MODE=true \
+    ORACLE_USE_THICK_MODE=false \
     OUTPUT_DIR=/data/output \
     RESULTS_DIR=/data/output/_results \
     SQLITE_DB_PATH=/data/jobs.sqlite3 \
@@ -40,6 +42,8 @@ RUN set -eux; \
     fi; \
     if ! apt-get install -y --no-install-recommends \
         ca-certificates \
+        curl \
+        git \
         libaio1 \
         libglib2.0-0 \
         libgl1 \
@@ -54,6 +58,8 @@ RUN set -eux; \
         apt-get update; \
         apt-get install -y --no-install-recommends \
             ca-certificates \
+            curl \
+            git \
             libaio1 \
             libglib2.0-0 \
             libgl1 \
@@ -66,13 +72,24 @@ RUN set -eux; \
 WORKDIR /app
 
 COPY requirements.txt requirements.lock ./
-COPY wheels/clip-1.0-py3-none-any.whl ./wheels/
+COPY wheels ./wheels
 
-RUN grep -Ev '^(torch|torchvision|triton|nvidia-[^=]+)==' requirements.lock > requirements.docker.lock \
-    && /usr/local/bin/python -m pip install --no-cache-dir --no-deps \
-        --index-url https://download.pytorch.org/whl/cpu \
-        torch==2.8.0+cpu \
-        torchvision==0.23.0 \
+RUN if [ "$INSTALL_ML_STACK" = "true" ]; then \
+        grep -Ev '^(torch|torchvision|triton|nvidia-[^=]+)==' requirements.lock | grep -Fv './wheels/clip-1.0-py3-none-any.whl' > requirements.docker.lock; \
+        CLIP_INSTALL_REF='git+https://github.com/openai/CLIP.git'; \
+        if [ -f ./wheels/clip-1.0-py3-none-any.whl ]; then CLIP_INSTALL_REF='./wheels/clip-1.0-py3-none-any.whl'; fi; \
+        mkdir -p /tmp/pytorch-whls; \
+        curl -fL --retry 10 --retry-delay 5 -C - -o /tmp/pytorch-whls/torch-2.8.0+cpu-cp310-cp310-manylinux_2_28_x86_64.whl \
+            'https://download.pytorch.org/whl/cpu/torch-2.8.0%2Bcpu-cp310-cp310-manylinux_2_28_x86_64.whl'; \
+        curl -fL --retry 10 --retry-delay 5 -C - -o /tmp/pytorch-whls/torchvision-0.23.0+cpu-cp310-cp310-manylinux_2_28_x86_64.whl \
+            'https://download.pytorch.org/whl/cpu/torchvision-0.23.0%2Bcpu-cp310-cp310-manylinux_2_28_x86_64.whl'; \
+        /usr/local/bin/python -m pip install --no-cache-dir --no-deps \
+            /tmp/pytorch-whls/torch-2.8.0+cpu-cp310-cp310-manylinux_2_28_x86_64.whl \
+            /tmp/pytorch-whls/torchvision-0.23.0+cpu-cp310-cp310-manylinux_2_28_x86_64.whl; \
+        /usr/local/bin/python -m pip install --no-cache-dir "$CLIP_INSTALL_REF"; \
+    else \
+        grep -Ev '^(torch|torchvision|triton|nvidia-[^=]+)==|^ultralytics==|^ultralytics-thop==' requirements.lock | grep -Fv './wheels/clip-1.0-py3-none-any.whl' > requirements.docker.lock; \
+    fi \
     && (/usr/local/bin/python -m pip install --no-cache-dir \
         --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
         -r requirements.docker.lock \
@@ -97,7 +114,7 @@ RUN test -f /app/model/biaochezhajiev2.pt || (echo "Missing model/biaochezhajiev
     && test -f /app/model/det_10g.onnx || (echo "Missing model/det_10g.onnx" >&2; exit 1) \
     && test -f /app/model/w600k_r50.onnx || (echo "Missing model/w600k_r50.onnx" >&2; exit 1) \
     && test -f /app/static/dist/tailwind.css || (echo "Missing built Tailwind CSS at static/dist/tailwind.css; run npm run build:css before docker build" >&2; exit 1) \
-    && test -f /app/instantclient_11_2/libclntsh.so.11.1 || (echo "Missing Linux Oracle Instant Client under instantclient_11_2/" >&2; exit 1) \
+    && if [ ! -f /app/instantclient_11_2/libclntsh.so.11.1 ]; then echo "Linux Oracle Instant Client not bundled; container will use thin mode unless ORACLE_USE_THICK_MODE=true" >&2; fi \
     && mkdir -p /data/output /data/upload_tmp /data/face_data /data/datasets /data/train_runs
 
 VOLUME ["/data"]
