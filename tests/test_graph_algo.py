@@ -216,6 +216,43 @@ class TestDetectGangs:
         assert row[7] in (2.0, 0.0)  # centrality_score
         assert row[8] == "louvain"  # algo_type
 
+    def test_falls_back_to_networkx_when_gds_unavailable(self, monkeypatch):
+        import modules.graph.services.algo_service as algo
+
+        def fake_run_query(cypher, params=None):
+            if "count(r)" in cypher:
+                return [{"edge_count": 2}]
+            if "gds.graph.exists" in cypher:
+                raise RuntimeError("Neo4j GDS procedure not found")
+            if "MATCH (a:Person)-[r:CO_SUSPECT]-(b:Person)" in cypher:
+                return [
+                    {
+                        "source": {"sfzh": "110", "name": "A", "age": 25, "is_wcnr": False, "area_code": "320100"},
+                        "target": {"sfzh": "220", "name": "B", "age": 30, "is_wcnr": True, "area_code": "320100"},
+                        "weight": 2,
+                    }
+                ]
+            return []
+
+        inserted_rows = []
+
+        def fake_execute_many(sql, params):
+            inserted_rows.extend(params)
+
+        monkeypatch.setattr(algo, "table_exists", lambda s, t: True)
+        monkeypatch.setattr(algo, "run_query", fake_run_query)
+        monkeypatch.setattr(algo, "execute_many", fake_execute_many)
+
+        result = algo.detect_gangs(min_size=2)
+
+        assert result["ok"] is True
+        assert result["algo_type"] == "networkx_louvain"
+        assert result["graph_name"] == "hm-co-suspect-networkx"
+        assert result["gang_count"] == 1
+        assert result["member_count"] == 2
+        assert len(inserted_rows) == 2
+        assert {row[8] for row in inserted_rows} == {"networkx_louvain"}
+
 
 # ---------------------------------------------------------------------------
 # predict_links
@@ -300,6 +337,23 @@ class TestListGangs:
         assert result["ok"] is True
         assert result["table_ready"] is True
         assert result["items"] == []
+
+    def test_latest_run_id_uses_newest_computed_at(self, monkeypatch):
+        import modules.graph.services.algo_service as algo
+
+        captured = {}
+
+        def fake_fetch_value(sql, params=None):
+            captured["sql"] = sql
+            return "latest-run"
+
+        monkeypatch.setattr(algo, "table_exists", lambda s, t: True)
+        monkeypatch.setattr(algo, "fetch_value", fake_fetch_value)
+
+        assert algo._latest_run_id() == "latest-run"
+        normalized_sql = " ".join(captured["sql"].split()).lower()
+        assert "order by computed_at desc, id desc" in normalized_sql
+        assert "max(run_id)" not in normalized_sql
 
 
 # ---------------------------------------------------------------------------

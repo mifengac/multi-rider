@@ -19,7 +19,7 @@
       }
     };
   </script>
-  <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+  <script src="{{ url_for('static', filename='vendor/cytoscape/cytoscape.min.js') }}"></script>
   <script src="{{ url_for('static', filename='modules/graph/graph.js') }}" defer></script>
 </head>
 <body class="min-h-screen bg-stone-950 text-stone-100">

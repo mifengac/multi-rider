@@ -18,7 +18,12 @@ def _latest_run_id() -> str:
         return ""
     return str(
         fetch_value(
-            f"SELECT COALESCE(MAX(run_id), '') FROM {KINGBASE_APP_SCHEMA}.hm_gang_result"
+            f"""
+            SELECT COALESCE(run_id, '')
+            FROM {KINGBASE_APP_SCHEMA}.hm_gang_result
+            ORDER BY computed_at DESC, id DESC
+            LIMIT 1
+            """
         )
         or ""
     )
@@ -36,21 +41,10 @@ def _drop_projection(graph_name: str) -> None:
         )
 
 
-def detect_gangs(min_size: int = 2) -> dict[str, Any]:
-    if not _gang_result_table_ready():
-        raise RuntimeError(
-            f"KingBase table {KINGBASE_APP_SCHEMA}.hm_gang_result not found; execute sql/01_create_hm_tables.sql first"
-        )
-
-    edge_count_rows = run_query(
-        "MATCH ()-[r:CO_SUSPECT]-() RETURN count(r) AS edge_count"
-    )
-    edge_count = int(edge_count_rows[0].get("edge_count") or 0) if edge_count_rows else 0
-    if edge_count <= 0:
-        return {"ok": True, "run_id": "", "gang_count": 0, "member_count": 0, "message": "no CO_SUSPECT relationships found"}
-
-    graph_name = "hm-co-suspect"
-    projection = None
+def _run_gds_community_detection(
+    graph_name: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], str]:
+    projection: list[dict[str, Any]] | None = None
     try:
         _drop_projection(graph_name)
         projection = run_query(
@@ -95,11 +89,115 @@ def detect_gangs(min_size: int = 2) -> dict[str, Any]:
             """,
             {"graph_name": graph_name},
         )
+        return projection[0] if projection else {}, louvain_rows, betweenness_rows, "louvain"
     finally:
         try:
             _drop_projection(graph_name)
         except Exception as exc:
             logger.warning("failed to drop GDS projection %s: %s", graph_name, exc)
+
+
+def _run_networkx_community_detection() -> tuple[
+    dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], str
+]:
+    import networkx as nx
+
+    rows = run_query(
+        """
+        MATCH (a:Person)-[r:CO_SUSPECT]-(b:Person)
+        WHERE a.sfzh < b.sfzh
+        RETURN a {.sfzh, .name, .age, .is_wcnr, .area_code} AS source,
+               b {.sfzh, .name, .age, .is_wcnr, .area_code} AS target,
+               coalesce(r.weight, 1) AS weight
+        """
+    )
+    graph = nx.Graph()
+    for row in rows:
+        source = row.get("source") or {}
+        target = row.get("target") or {}
+        source_sfzh = str(source.get("sfzh") or "").strip()
+        target_sfzh = str(target.get("sfzh") or "").strip()
+        if not source_sfzh or not target_sfzh:
+            continue
+        graph.add_node(source_sfzh, **source)
+        graph.add_node(target_sfzh, **target)
+        graph.add_edge(source_sfzh, target_sfzh, weight=float(row.get("weight") or 1.0))
+
+    if graph.number_of_edges() <= 0:
+        return (
+            {
+                "graphName": "hm-co-suspect-networkx",
+                "nodeCount": graph.number_of_nodes(),
+                "relationshipCount": 0,
+            },
+            [],
+            [],
+            "networkx_louvain",
+        )
+
+    algo_type = "networkx_louvain"
+    try:
+        communities = nx.community.louvain_communities(graph, weight="weight", seed=42)
+    except Exception as exc:
+        logger.warning("NetworkX Louvain failed; using connected components: %s", exc)
+        communities = [set(component) for component in nx.connected_components(graph)]
+        algo_type = "networkx_components"
+
+    centrality = nx.betweenness_centrality(graph, normalized=True)
+    louvain_rows: list[dict[str, Any]] = []
+    for community_id, members in enumerate(communities):
+        for sfzh in sorted(str(member) for member in members):
+            attrs = graph.nodes[sfzh]
+            louvain_rows.append(
+                {
+                    "member_sfzh": sfzh,
+                    "member_name": attrs.get("name"),
+                    "member_age": attrs.get("age"),
+                    "is_wcnr": bool(attrs.get("is_wcnr")),
+                    "area_code": attrs.get("area_code") or "",
+                    "communityId": community_id,
+                }
+            )
+
+    betweenness_rows = [
+        {"member_sfzh": str(sfzh), "score": score}
+        for sfzh, score in centrality.items()
+    ]
+    return (
+        {
+            "graphName": "hm-co-suspect-networkx",
+            "nodeCount": graph.number_of_nodes(),
+            "relationshipCount": graph.number_of_edges(),
+        },
+        louvain_rows,
+        betweenness_rows,
+        algo_type,
+    )
+
+
+def detect_gangs(min_size: int = 2) -> dict[str, Any]:
+    if not _gang_result_table_ready():
+        raise RuntimeError(
+            f"KingBase table {KINGBASE_APP_SCHEMA}.hm_gang_result not found; execute sql/01_create_hm_tables.sql first"
+        )
+
+    edge_count_rows = run_query(
+        "MATCH ()-[r:CO_SUSPECT]-() RETURN count(r) AS edge_count"
+    )
+    edge_count = int(edge_count_rows[0].get("edge_count") or 0) if edge_count_rows else 0
+    if edge_count <= 0:
+        return {"ok": True, "run_id": "", "gang_count": 0, "member_count": 0, "message": "no CO_SUSPECT relationships found"}
+
+    graph_name = "hm-co-suspect"
+    try:
+        projection_info, louvain_rows, betweenness_rows, algo_type = (
+            _run_gds_community_detection(graph_name)
+        )
+    except Exception as exc:
+        logger.warning("Neo4j GDS gang detection failed; falling back to NetworkX: %s", exc)
+        projection_info, louvain_rows, betweenness_rows, algo_type = (
+            _run_networkx_community_detection()
+        )
 
     centrality_by_person = {
         str(row.get("member_sfzh") or ""): float(row.get("score") or 0.0)
@@ -133,7 +231,7 @@ def detect_gangs(min_size: int = 2) -> dict[str, Any]:
                     bool(member.get("is_wcnr")),
                     gang_size,
                     centrality_by_person.get(sfzh, 0.0),
-                    "louvain",
+                    algo_type,
                     None,
                     area_code,
                 )
@@ -171,13 +269,13 @@ def detect_gangs(min_size: int = 2) -> dict[str, Any]:
             inserts,
         )
 
-    projection_info = projection[0] if projection else {}
     return {
         "ok": True,
         "run_id": run_id,
         "graph_name": projection_info.get("graphName", graph_name),
         "node_count": int(projection_info.get("nodeCount") or 0),
         "relationship_count": int(projection_info.get("relationshipCount") or 0),
+        "algo_type": algo_type,
         "gang_count": gang_count,
         "member_count": len(inserts),
     }
