@@ -4,12 +4,14 @@ import os
 import re
 import shutil
 import time
+import urllib.request
 import zipfile
 from uuid import uuid4
 
 from PIL import Image
 
 from shared.config.config import DATASETS_DIR
+from modules.detection.repositories import ai_result_repository as structured_repo
 from shared.db.sqlite import count_dataset_assets
 from shared.db.sqlite import get_dataset_asset as get_saved_dataset_asset
 from shared.db.sqlite import get_dataset as get_saved_dataset
@@ -323,6 +325,154 @@ def import_result_assets_to_dataset(
         "skipped": skipped,
         "recent_assets": list_saved_dataset_assets(dataset_id, limit=8),
     }
+
+
+def _load_image_bytes_from_media_uri(media_uri: str) -> bytes:
+    uri = str(media_uri or "").strip()
+    if not uri:
+        raise ValueError("empty media uri")
+
+    if os.path.isfile(uri):
+        with open(uri, "rb") as fh:
+            return fh.read()
+
+    if uri.startswith(("http://", "https://")):
+        with urllib.request.urlopen(uri, timeout=15) as response:
+            return response.read()
+
+    raise ValueError(f"unsupported media uri: {uri}")
+
+
+def _map_structured_label_to_class_index(dataset: dict, label_name: str, label_code: str) -> int | None:
+    class_names = dataset.get("class_names") or []
+    normalized_targets = {
+        str(label_name or "").strip().lower(),
+        str(label_code or "").strip().lower(),
+    }
+    normalized_targets.discard("")
+    for index, class_name in enumerate(class_names):
+        normalized_name = str(class_name or "").strip().lower()
+        if normalized_name and normalized_name in normalized_targets:
+            return index
+    return None
+
+
+def import_structured_detections_to_dataset(dataset_id: str, detections: list[dict]) -> dict:
+    dataset = _require_dataset(dataset_id)
+    if not isinstance(detections, list) or not detections:
+        raise ValueError("至少选择一条结构化检测记录")
+
+    grouped: dict[str, list[dict]] = {}
+    for item in detections:
+        asset_id = str(item.get("asset_id") or "").strip()
+        media_uri = str(item.get("media_uri") or "").strip()
+        if not asset_id or not media_uri:
+            continue
+        grouped.setdefault(asset_id, []).append(item)
+
+    if not grouped:
+        raise ValueError("所选结构化检测记录缺少可导入媒体")
+
+    images_dir = os.path.join(dataset["root_dir"], "images")
+    os.makedirs(images_dir, exist_ok=True)
+    used_names = {entry.lower() for entry in os.listdir(images_dir)}
+
+    imported = 0
+    skipped = 0
+    annotated = 0
+    now = int(time.time())
+
+    for asset_id, items in grouped.items():
+        first = items[0]
+        media_uri = str(first.get("media_uri") or "").strip()
+
+        try:
+            payload = _load_image_bytes_from_media_uri(media_uri)
+            with Image.open(io.BytesIO(payload)) as image:
+                image.load()
+                width, height = image.size
+        except Exception:
+            skipped += 1
+            continue
+
+        origin_name = os.path.basename(media_uri) or f"structured_{asset_id[:8]}.jpg"
+        stored_name = _unique_asset_filename(images_dir, origin_name, used_names)
+        full_path = os.path.join(images_dir, stored_name)
+        with open(full_path, "wb") as fh:
+            fh.write(payload)
+
+        dataset_asset = {
+            "id": uuid4().hex,
+            "dataset_id": dataset_id,
+            "filename": stored_name,
+            "origin_name": origin_name,
+            "source_type": "structured_detection",
+            "source_job_id": str(first.get("run_id") or ""),
+            "source_asset_id": asset_id,
+            "file_path": os.path.abspath(full_path),
+            "width": width,
+            "height": height,
+            "size_bytes": len(payload),
+            "created_ts": now + imported,
+        }
+        save_dataset_asset(dataset_asset)
+        imported += 1
+
+        boxes: list[dict] = []
+        for item in items:
+            class_index = _map_structured_label_to_class_index(
+                dataset,
+                str(item.get("label_name") or ""),
+                str(item.get("label_code") or ""),
+            )
+            if class_index is None:
+                continue
+
+            x1 = float(item.get("bbox_x") or 0.0)
+            y1 = float(item.get("bbox_y") or 0.0)
+            box_w = float(item.get("bbox_w") or 0.0)
+            box_h = float(item.get("bbox_h") or 0.0)
+            boxes.append(
+                {
+                    "class_index": class_index,
+                    "x1": x1,
+                    "y1": y1,
+                    "x2": x1 + box_w,
+                    "y2": y1 + box_h,
+                    "confidence": item.get("confidence"),
+                }
+            )
+
+        if boxes:
+            save_asset_annotation(dataset_id, dataset_asset["id"], boxes)
+            annotated += 1
+
+    if imported == 0:
+        raise ValueError("所选结构化检测记录未能导入到数据集")
+
+    dataset = _refresh_dataset_counters(dataset)
+
+    return {
+        "dataset": dataset,
+        "imported": imported,
+        "skipped": skipped,
+        "annotated": annotated,
+        "recent_assets": list_saved_dataset_assets(dataset_id, limit=8),
+    }
+
+
+def get_structured_detections_by_ids(detection_ids: list[str]) -> list[dict]:
+    items: list[dict] = []
+    seen: set[str] = set()
+    for detection_id in detection_ids:
+        normalized_id = str(detection_id or "").strip()
+        if not normalized_id or normalized_id in seen:
+            continue
+        seen.add(normalized_id)
+        item = structured_repo.get_yolo_detection(normalized_id)
+        if item is not None:
+            items.append(item)
+    return items
 
 
 def _label_path(dataset: dict, asset: dict) -> str:

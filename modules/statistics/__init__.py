@@ -1,0 +1,2 @@
+"""Situation statistics module."""
+

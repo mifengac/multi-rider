@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>锐智 AI - 猎影哨兵</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dist/tailwind.css') }}" />
+  <script src="{{ url_for('static', filename='modules/ruizhi/ruizhi.js') }}" defer></script>
+</head>
+<body class="min-h-screen bg-[#faf9f5] text-slate-900">
+  <header class="border-b border-[#e8e6dc] bg-[#f5f4ed] px-8 py-5">
+    <div class="mx-auto flex max-w-7xl items-center justify-between gap-6">
+      <div>
+        <div class="text-xs font-bold uppercase tracking-[0.24em] text-[#c96442]">Ruizhi AI</div>
+        <h1 class="mt-2 text-3xl font-bold tracking-tight">锐智 AI 研判助手</h1>
+        <p class="mt-2 text-sm text-slate-500">大模型会话、知识库问答、OCR、智能报告和调用审计。</p>
+      </div>
+      <a href="{{ url_for('job.index') }}" class="rounded-lg border border-[#e8e6dc] bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">返回工作台</a>
+    </div>
+  </header>
+
+  <main class="mx-auto grid max-w-7xl gap-6 px-8 py-8 xl:grid-cols-[360px_1fr]">
+    <aside class="space-y-6">
+      <section class="rounded-2xl border border-[#e8e6dc] bg-white p-5 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-bold">平台状态</h2>
+            <p class="mt-1 text-sm text-slate-500">默认未启用，不影响主系统运行。</p>
+          </div>
+          <button type="button" onclick="refreshRuizhiStatus()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">刷新</button>
+        </div>
+        <div class="mt-4 grid gap-3 text-sm">
+          <div class="flex justify-between gap-3"><span class="text-slate-500">状态</span><span id="rzStatusText" class="font-semibold">--</span></div>
+          <div class="flex justify-between gap-3"><span class="text-slate-500">BASE_URL</span><span id="rzBaseUrl" class="max-w-[220px] truncate font-mono text-xs">--</span></div>
+          <div class="flex justify-between gap-3"><span class="text-slate-500">project</span><span id="rzProject" class="font-mono text-xs">--</span></div>
+          <div class="flex justify-between gap-3"><span class="text-slate-500">verify_ssl</span><span id="rzVerifySsl" class="font-mono text-xs">--</span></div>
+          <div class="flex justify-between gap-3"><span class="text-slate-500">默认模型</span><span id="rzChatModel" class="font-mono text-xs">--</span></div>
+        </div>
+        <div id="rzStatusAlert"></div>
+      </section>
+
+      <section class="rounded-2xl border border-[#e8e6dc] bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-4">
+          <h2 class="text-lg font-bold">会话</h2>
+          <button type="button" onclick="RUIZHI_STATE.sessionId='';document.getElementById('rzChatMessages').innerHTML='';rzSetText('rzCurrentSession','新会话')" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">新建</button>
+        </div>
+        <div class="mt-3 text-xs text-slate-500">当前：<span id="rzCurrentSession">新会话</span></div>
+        <div id="rzSessionList" class="mt-4 space-y-3"></div>
+      </section>
+    </aside>
+
+    <section class="space-y-6">
+      <section class="rounded-2xl border border-[#e8e6dc] bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 class="text-lg font-bold">模型发现</h2>
+            <p class="mt-1 text-sm text-slate-500">通过平台接口确认现场可用模型。</p>
+          </div>
+          <button type="button" onclick="refreshRuizhiModels(this)" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">刷新模型列表</button>
+        </div>
+        <div id="rzModelsAlert"></div>
+        <pre id="rzModelsJson" class="mt-4 max-h-64 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">{}</pre>
+      </section>
+
+      <section class="rounded-2xl border border-[#e8e6dc] bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 class="text-lg font-bold">AI 研判助手</h2>
+            <p class="mt-1 text-sm text-slate-500">输出仅作为辅助建议，派单和处置前必须人工确认。</p>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <label class="text-xs font-semibold text-slate-600">
+              场景
+              <select id="rzScenario" class="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                <option value="general">通用问答</option>
+                <option value="profile">画像摘要</option>
+                <option value="risk">风险解释</option>
+                <option value="dispatch">派单草稿</option>
+                <option value="report">报告生成</option>
+              </select>
+            </label>
+            <label class="text-xs font-semibold text-slate-600">
+              知识库
+              <input id="rzChatKbNames" class="mt-1 w-64 rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="多个用英文逗号分隔" />
+            </label>
+          </div>
+        </div>
+        <div id="rzChatMessages" class="mt-5 h-[420px] space-y-4 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4"></div>
+        <div class="mt-4 flex gap-3">
+          <textarea id="rzChatInput" rows="3" class="min-h-[78px] flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm" placeholder="输入研判问题，例如：请解释这个人员近期风险点，并列出待核查问题。"></textarea>
+          <button type="button" onclick="sendRuizhiChat(this)" class="w-28 rounded-xl bg-[#c96442] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ad5638]">发送</button>
+        </div>
+      </section>
+
+      <section class="grid gap-6 lg:grid-cols-2">
+        <div class="rounded-2xl border border-[#e8e6dc] bg-white p-5 shadow-sm">
+          <h2 class="text-lg font-bold">知识库管理</h2>
+          <div class="mt-4 grid gap-3">
+            <input id="rzKbName" class="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="知识库名称，如 未成年人处置规范" />
+            <input id="rzKbDesc" class="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="描述" />
+            <button type="button" onclick="createRuizhiKb(this)" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">创建知识库</button>
+          </div>
+          <div class="mt-5 grid gap-3">
+            <input id="rzUploadKbName" class="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="关联到知识库名称" />
+            <input id="rzKbFile" type="file" class="text-sm" />
+            <button type="button" onclick="uploadRuizhiKbFile(this)" class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">上传并关联</button>
+          </div>
+          <div id="rzKbAlert"></div>
+          <div id="rzKbList" class="mt-5 grid gap-3"></div>
+          <pre id="rzKbRemoteJson" class="mt-4 max-h-52 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">{}</pre>
+        </div>
+
+        <div class="rounded-2xl border border-[#e8e6dc] bg-white p-5 shadow-sm">
+          <h2 class="text-lg font-bold">OCR / 文件图片解析</h2>
+          <div class="mt-4 flex flex-wrap items-end gap-3">
+            <label class="text-xs font-semibold text-slate-600">
+              引擎
+              <select id="rzOcrEngine" class="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                <option value="paddle">Paddle OCR</option>
+                <option value="deepseek">DeepSeek OCR</option>
+              </select>
+            </label>
+            <input id="rzOcrFile" type="file" accept="image/*" class="text-sm" />
+            <button type="button" onclick="runRuizhiOcr(this)" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">开始 OCR</button>
+          </div>
+          <div id="rzOcrAlert"></div>
+          <pre id="rzOcrResult" class="mt-4 max-h-80 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">{}</pre>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-[#e8e6dc] bg-white p-5 shadow-sm">
+        <h2 class="text-lg font-bold">智能报告草稿</h2>
+        <p class="mt-1 text-sm text-slate-500">输入 JSON 上下文，生成线索研判报告草稿。报告必须人工确认。</p>
+        <textarea id="rzReportSource" rows="7" class="mt-4 w-full rounded-xl border border-slate-200 px-4 py-3 font-mono text-xs">{"线索类型":"示例","风险等级":"待评分","事实":["请替换为真实上下文"]}</textarea>
+        <div class="mt-3 flex justify-end">
+          <button type="button" onclick="generateRuizhiReport(this)" class="rounded-lg bg-[#c96442] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ad5638]">生成报告草稿</button>
+        </div>
+        <div id="rzReportAlert"></div>
+        <pre id="rzReportResult" class="mt-4 max-h-80 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">{}</pre>
+      </section>
+
+      <section class="rounded-2xl border border-[#e8e6dc] bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-bold">调用日志</h2>
+            <p class="mt-1 text-sm text-slate-500">记录模块、操作、模型、耗时、结果和错误，不保存完整敏感原文。</p>
+          </div>
+          <button type="button" onclick="refreshRuizhiLogs()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">刷新</button>
+        </div>
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="border-b border-slate-200 text-xs text-slate-500">
+              <tr>
+                <th class="px-4 py-3">时间</th>
+                <th class="px-4 py-3">模块</th>
+                <th class="px-4 py-3">操作</th>
+                <th class="px-4 py-3">模型</th>
+                <th class="px-4 py-3">结果</th>
+                <th class="px-4 py-3">耗时</th>
+                <th class="px-4 py-3">错误</th>
+              </tr>
+            </thead>
+            <tbody id="rzCallLogRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
+

@@ -2,7 +2,17 @@
       oracle: { jobId: '', items: [], selected: new Set(), identifyResults: {}, identitySummary: {}, library: null, loading: false },
       upload: { jobId: '', items: [], selected: new Set(), identifyResults: {}, identitySummary: {}, library: null, loading: false }
     };
-    const RESULT_DETAIL_STATE = { prefix: '', assetId: '' };
+    const RESULT_DETAIL_STATE = {
+      prefix: '',
+      assetId: '',
+      lineageRequestKey: '',
+      lineageAssetId: '',
+      lineageLoading: false,
+      lineageError: '',
+      lineageAsset: null,
+      lineageParent: null,
+      lineageChildren: []
+    };
 
     function escapeHtml(value) {
       return String(value == null ? '' : value)
@@ -53,6 +63,123 @@
       return null;
     }
 
+    function resetResultDetailLineage() {
+      RESULT_DETAIL_STATE.lineageRequestKey = '';
+      RESULT_DETAIL_STATE.lineageAssetId = '';
+      RESULT_DETAIL_STATE.lineageLoading = false;
+      RESULT_DETAIL_STATE.lineageError = '';
+      RESULT_DETAIL_STATE.lineageAsset = null;
+      RESULT_DETAIL_STATE.lineageParent = null;
+      RESULT_DETAIL_STATE.lineageChildren = [];
+    }
+
+    function summarizeStructuredMediaAsset(asset, roleLabel) {
+      if (!asset) {
+        return '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-500">暂无' + roleLabel + '。</div>';
+      }
+
+      var sourceRowKey = '';
+      if (asset.source_row_key) {
+        sourceRowKey = typeof asset.source_row_key === 'string'
+          ? asset.source_row_key
+          : JSON.stringify(asset.source_row_key);
+      }
+
+      return (
+        '<div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">' +
+          '<div class="flex items-start justify-between gap-3">' +
+            '<div>' +
+              '<div class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">' + roleLabel + '</div>' +
+              '<div class="mt-2 break-all text-sm font-semibold text-slate-900">' + escapeHtml(asset.asset_id || '') + '</div>' +
+            '</div>' +
+            '<span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-200">' + escapeHtml(asset.media_type || '--') + '</span>' +
+          '</div>' +
+          '<div class="mt-3 text-xs leading-6 text-slate-600">状态：' + escapeHtml(asset.detect_status || '--') + ' · 检测框 ' + escapeHtml(asset.detection_count || 0) + ' · 子资源 ' + escapeHtml(asset.child_count || 0) + '</div>' +
+          '<div class="mt-2 break-all text-xs leading-6 text-slate-500">媒体地址：' + escapeHtml(asset.media_uri || '--') + '</div>' +
+          (sourceRowKey ? '<div class="mt-2 break-all text-xs leading-6 text-slate-500">来源键：' + escapeHtml(sourceRowKey) + '</div>' : '') +
+        '</div>'
+      );
+    }
+
+    function renderResultLineage(item) {
+      var box = document.getElementById('resultDetailLineage');
+      if (!box) return;
+      if (!item || !item.structured_asset_id) {
+        box.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-500">当前结果暂未关联结构化媒体链路。</div>';
+        return;
+      }
+
+      if (RESULT_DETAIL_STATE.lineageLoading) {
+        box.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-500">正在加载媒体链路...</div>';
+        return;
+      }
+
+      if (RESULT_DETAIL_STATE.lineageError) {
+        box.innerHTML = '<div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">' + escapeHtml(RESULT_DETAIL_STATE.lineageError) + '</div>';
+        return;
+      }
+
+      var children = RESULT_DETAIL_STATE.lineageChildren || [];
+      var childrenHtml = children.length
+        ? children.map(function (child, index) { return summarizeStructuredMediaAsset(child, '子资源 ' + (index + 1)); }).join('')
+        : '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-500">当前资源没有子资产。</div>';
+
+      box.innerHTML = [
+        '<div class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Media Lineage</div>',
+        summarizeStructuredMediaAsset(RESULT_DETAIL_STATE.lineageParent, '父资源'),
+        summarizeStructuredMediaAsset(RESULT_DETAIL_STATE.lineageAsset, '当前资源'),
+        '<div class="space-y-3"><div class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">子资源</div>' + childrenHtml + '</div>'
+      ].join('');
+    }
+
+    function loadResultLineage(prefix, item) {
+      if (!item || !item.structured_asset_id) {
+        resetResultDetailLineage();
+        renderResultLineage(item);
+        return;
+      }
+
+      if (RESULT_DETAIL_STATE.lineageAssetId === item.structured_asset_id) {
+        renderResultLineage(item);
+        return;
+      }
+
+      var requestKey = prefix + ':' + item.id;
+      RESULT_DETAIL_STATE.lineageRequestKey = requestKey;
+      RESULT_DETAIL_STATE.lineageAssetId = item.structured_asset_id;
+      RESULT_DETAIL_STATE.lineageLoading = true;
+      RESULT_DETAIL_STATE.lineageError = '';
+      RESULT_DETAIL_STATE.lineageAsset = null;
+      RESULT_DETAIL_STATE.lineageParent = null;
+      RESULT_DETAIL_STATE.lineageChildren = [];
+      renderResultLineage(item);
+
+      fetch(item.structured_lineage_url || ('/detection/api/structured/assets/' + encodeURIComponent(item.structured_asset_id) + '/lineage'))
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+          if (RESULT_DETAIL_STATE.lineageRequestKey !== requestKey) {
+            return;
+          }
+          if (!data.ok) {
+            throw new Error(data.error || '加载媒体链路失败');
+          }
+          RESULT_DETAIL_STATE.lineageLoading = false;
+          RESULT_DETAIL_STATE.lineageError = '';
+          RESULT_DETAIL_STATE.lineageAsset = data.asset || null;
+          RESULT_DETAIL_STATE.lineageParent = data.parent || null;
+          RESULT_DETAIL_STATE.lineageChildren = data.children || [];
+          renderResultLineage(getResultItem(prefix, item.id));
+        })
+        .catch(function (err) {
+          if (RESULT_DETAIL_STATE.lineageRequestKey !== requestKey) {
+            return;
+          }
+          RESULT_DETAIL_STATE.lineageLoading = false;
+          RESULT_DETAIL_STATE.lineageError = err.message || '加载媒体链路失败';
+          renderResultLineage(getResultItem(prefix, item.id));
+        });
+    }
+
     function resetResultState(prefix) {
       FACE_RESULT_STATE[prefix] = { jobId: '', items: [], selected: new Set(), identifyResults: {}, identitySummary: {}, library: null, loading: false };
       var dom = getResultDom(prefix);
@@ -69,6 +196,7 @@
     function closeResultDetail() {
       RESULT_DETAIL_STATE.prefix = '';
       RESULT_DETAIL_STATE.assetId = '';
+      resetResultDetailLineage();
       var overlay = document.getElementById('resultDetailOverlay');
       var drawer = document.getElementById('resultDetailDrawer');
       if (overlay) overlay.classList.add('hidden');
@@ -101,6 +229,8 @@
       document.getElementById('resultDetailPreview').src = item.asset_url;
       document.getElementById('resultDetailPreview').alt = item.name;
       document.getElementById('resultDetailMeta').textContent = '文件：' + item.name + ' · 大小：' + formatBytes(item.size_bytes);
+      renderResultLineage(item);
+      loadResultLineage(prefix, item);
 
       var selectBtn = document.getElementById('resultDetailSelectBtn');
       selectBtn.textContent = selected ? '移出批量识别' : '加入批量识别';

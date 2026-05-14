@@ -4,7 +4,7 @@ import shutil
 import threading
 import time
 import zipfile
-from typing import Optional, Set
+from typing import Any, Optional, Set
 from uuid import uuid4
 
 import cv2
@@ -15,6 +15,7 @@ from shared.config.config import (
     CONF_THRESH,
     IMGSZ,
     OUTPUT_DIR,
+    resolve_model_path,
     get_upload_model_default,
     logger,
     model_supports_text_prompt,
@@ -27,7 +28,15 @@ from modules.detection.services.result_store_service import (
     create_result_store,
     finalize_result_store,
 )
-from shared.inference.infer_service import _predict_batch, get_model
+from shared.inference.infer_service import get_model, predict_image_boxes_batch
+from modules.detection.services.structured_result_service import (
+    build_structured_yolo_context,
+    filter_prediction_boxes,
+    finalize_structured_yolo_run,
+    preview_structured_asset_id,
+    safe_persist_structured_yolo_batch,
+    seed_parent_video_asset,
+)
 from shared.ownership.ownership import job_matches_owner
 
 
@@ -36,6 +45,18 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
 UPLOAD_JOBS: dict[str, dict] = {}
 UPLOAD_JOBS_LOCK = threading.Lock()
 TERMINAL_STATUSES = {"done", "error", "canceled", "interrupted"}
+
+
+def _model_label_candidates(model, model_key: str, classes_raw: str, prompt_classes: list[str] | None) -> list[str]:
+    if model_supports_text_prompt(model_key):
+        return prompt_classes or [token.strip() for token in classes_raw.split(",") if token.strip()]
+
+    names = getattr(model, "names", None)
+    if isinstance(names, dict):
+        return [str(value).strip() for value in names.values() if str(value).strip()]
+    if isinstance(names, (list, tuple)):
+        return [str(value).strip() for value in names if str(value).strip()]
+    return [token.strip() for token in classes_raw.split(",") if token.strip()]
 
 
 def _upload_snapshot(job: dict) -> dict:
@@ -160,10 +181,12 @@ def _new_upload_job(total: int, source_name: str, source_type: str, status: str 
     }
 
 
-def _close_batch_images(batch: list[tuple[str, Image.Image]]) -> None:
-    for _name, img in batch:
+def _close_batch_images(batch) -> None:
+    for item in batch:
+        img = item[1] if isinstance(item, tuple) else item.get("image")
         try:
-            img.close()
+            if img is not None:
+                img.close()
         except Exception:
             pass
 
@@ -213,7 +236,7 @@ def _mark_upload_failed_item(job_id: str) -> None:
 
 def _process_batch(
     job_id: str,
-    batch: list[tuple[str, Image.Image]],
+    batch: list[dict[str, Any]],
     model,
     conf_thresh: float,
     allowed_classes: Optional[Set[int]],
@@ -222,13 +245,15 @@ def _process_batch(
     prompt_classes: list[str] | None,
     result_zip: zipfile.ZipFile,
     result_store: dict,
+    structured_context,
     kept_sequence: int,
 ) -> int:
-    batch_names = [name for name, _ in batch]
-    batch_imgs = [img for _, img in batch]
+    batch_names = [str(item.get("name") or "") for item in batch]
+    batch_imgs = [item.get("image") for item in batch]
 
     try:
-        hits = _predict_batch(batch_imgs, model, conf_thresh, allowed_classes, imgsz, model_key, prompt_classes)
+        hits = predict_image_boxes_batch(batch_imgs, model_key, conf_thresh, imgsz, prompt_classes)
+        filtered_boxes = [filter_prediction_boxes(boxes, conf_thresh, allowed_classes) for boxes in hits]
     except Exception as exc:
         with UPLOAD_JOBS_LOCK:
             job = UPLOAD_JOBS.get(job_id)
@@ -242,20 +267,56 @@ def _process_batch(
         raise RuntimeError(f"inference failed: {exc}") from exc
 
     kept_delta = 0
-    try:
-        for name, img, hit in zip(batch_names, batch_imgs, hits):
-            if not hit:
-                continue
-            kept_sequence += 1
-            buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=90)
-            payload = buf.getvalue()
-            output_name = f"{kept_sequence:07d}_{os.path.splitext(name)[0]}.jpg"
-            result_zip.writestr(output_name, payload)
-            add_result_bytes(result_store, output_name, payload, extra={"origin_name": name})
-            kept_delta += 1
-    finally:
-        _close_batch_images(batch)
+    for item, name, img, boxes in zip(batch, batch_names, batch_imgs, filtered_boxes):
+        if not boxes:
+            continue
+        kept_sequence += 1
+        buf = io.BytesIO()
+        if not isinstance(img, Image.Image):
+            raise RuntimeError("invalid upload batch image")
+        img.save(buf, format="JPEG", quality=90)
+        payload = buf.getvalue()
+        output_name = f"{kept_sequence:07d}_{os.path.splitext(name)[0]}.jpg"
+        result_zip.writestr(output_name, payload)
+        add_result_bytes(
+            result_store,
+            output_name,
+            payload,
+            extra={
+                "origin_name": name,
+                "structured_asset_id": preview_structured_asset_id(structured_context, item),
+            },
+        )
+        kept_delta += 1
+
+    structured_batch_items = []
+    for item in batch:
+        structured_batch_items.append({
+            "name": item.get("name"),
+            "image": item.get("image"),
+            "payload_bytes": item.get("payload_bytes"),
+            "source_pk": item.get("source_pk"),
+            "source_row_key": item.get("source_row_key"),
+            "media_uri": item.get("media_uri"),
+            "media_type": item.get("media_type"),
+            "uri_type": item.get("uri_type"),
+            "mime_type": item.get("mime_type"),
+            "file_size_bytes": item.get("file_size_bytes"),
+            "shot_time": item.get("shot_time"),
+            "download_status": item.get("download_status"),
+            "device_id": item.get("device_id"),
+            "device_name": item.get("device_name"),
+            "place_name": item.get("place_name"),
+        })
+
+    safe_persist_structured_yolo_batch(
+        structured_context,
+        structured_batch_items,
+        filtered_boxes,
+        conf_thresh=conf_thresh,
+    )
+
+    _close_batch_images(batch)
 
     with UPLOAD_JOBS_LOCK:
         job = UPLOAD_JOBS.get(job_id)
@@ -280,8 +341,9 @@ def _run_zip_source(
     prompt_classes: list[str] | None,
     result_zip: zipfile.ZipFile,
     result_store: dict,
+    structured_context,
 ) -> int:
-    batch: list[tuple[str, Image.Image]] = []
+    batch: list[dict[str, Any]] = []
     kept_sequence = 0
 
     with zipfile.ZipFile(zip_path) as source_zip:
@@ -303,7 +365,20 @@ def _run_zip_source(
                 _mark_upload_failed_item(job_id)
                 continue
 
-            batch.append((safe_name, img))
+            batch.append(
+                {
+                    "name": safe_name,
+                    "image": img,
+                    "payload_bytes": payload,
+                    "source_pk": f"{zip_path}:{entry.filename}",
+                    "source_row_key": {"zip_path": zip_path, "entry_name": entry.filename},
+                    "media_uri": "",
+                    "media_type": "image",
+                    "uri_type": "file_path",
+                    "download_status": "downloaded",
+                    "mime_type": "image/jpeg",
+                }
+            )
             if len(batch) >= batch_size:
                 kept_sequence = _process_batch(
                     job_id,
@@ -316,6 +391,7 @@ def _run_zip_source(
                     prompt_classes,
                     result_zip,
                     result_store,
+                    structured_context,
                     kept_sequence,
                 )
                 batch = []
@@ -333,6 +409,7 @@ def _run_zip_source(
                 prompt_classes,
                 result_zip,
                 result_store,
+                structured_context,
                 kept_sequence,
             )
             _persist_job_state(job_id)
@@ -355,12 +432,13 @@ def _run_video_source(
     prompt_classes: list[str] | None,
     result_zip: zipfile.ZipFile,
     result_store: dict,
+    structured_context,
 ) -> int:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise RuntimeError("cannot open video file")
 
-    batch: list[tuple[str, Image.Image]] = []
+    batch: list[dict[str, Any]] = []
     kept_sequence = 0
     frame_idx = 0
     sample_idx = 0
@@ -386,7 +464,20 @@ def _run_video_source(
                 frame_idx += 1
                 continue
 
-            batch.append((f"frame_{sample_idx:06d}.jpg", img))
+            batch.append(
+                {
+                    "name": f"frame_{sample_idx:06d}.jpg",
+                    "image": img,
+                    "payload_bytes": None,
+                    "source_pk": f"{video_path}:{sample_idx}",
+                    "source_row_key": {"video_path": video_path, "frame_index": sample_idx},
+                    "parent_asset_id": structured_context.parent_asset_id if structured_context else "",
+                    "media_uri": "",
+                    "media_type": "frame",
+                    "uri_type": "file_path",
+                    "download_status": "downloaded",
+                }
+            )
             sample_idx += 1
             frame_idx += 1
 
@@ -402,6 +493,7 @@ def _run_video_source(
                     prompt_classes,
                     result_zip,
                     result_store,
+                    structured_context,
                     kept_sequence,
                 )
                 batch = []
@@ -419,6 +511,7 @@ def _run_video_source(
                 prompt_classes,
                 result_zip,
                 result_store,
+                structured_context,
                 kept_sequence,
             )
             _persist_job_state(job_id)
@@ -464,6 +557,7 @@ def _run_upload_job(
         UPLOAD_JOBS[job_id] = runtime_job
 
     result_store = None
+    structured_context = None
     zip_path = os.path.join(OUTPUT_DIR, f"upload_{job_id}.zip")
 
     try:
@@ -484,6 +578,35 @@ def _run_upload_job(
         model = get_model(runtime_job["model_key"])
         result_store = create_result_store(job_id, "upload", source_type, runtime_job.get("source_name", ""))
         allowed_classes, prompt_classes = _resolve_model_filters(runtime_job["model_key"], model, classes_raw)
+        structured_context = build_structured_yolo_context(
+            runtime_job,
+            source_system="upload",
+            source_table="local_upload",
+            source_type=source_type,
+            model_key=runtime_job["model_key"],
+            model_name=runtime_job["model_key"],
+            model_path=resolve_model_path(runtime_job["model_key"]),
+            label_candidates=_model_label_candidates(model, runtime_job["model_key"], classes_raw, prompt_classes),
+            result_dir=result_store["result_dir"],
+            materialize_local_inputs=True,
+            source_scope={
+                "source_type": source_type,
+                "source_path": source_path,
+                "source_name": runtime_job.get("source_name", ""),
+                "frame_interval": frame_interval,
+                "conf_thresh": conf_thresh,
+                "batch_size": batch_size,
+                "imgsz": imgsz,
+                "classes_raw": classes_raw,
+                "model_key": runtime_job["model_key"],
+            },
+        )
+        if source_type == "video":
+            seed_parent_video_asset(
+                structured_context,
+                source_path,
+                source_name=runtime_job.get("source_name", ""),
+            )
 
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as result_zip:
             if source_type == "zip":
@@ -499,6 +622,7 @@ def _run_upload_job(
                     prompt_classes,
                     result_zip,
                     result_store,
+                    structured_context,
                 )
             else:
                 _run_video_source(
@@ -514,6 +638,7 @@ def _run_upload_job(
                     prompt_classes,
                     result_zip,
                     result_store,
+                    structured_context,
                 )
 
         if _is_upload_canceled(job_id):
@@ -535,6 +660,7 @@ def _run_upload_job(
                     snapshot = None
             if snapshot is not None:
                 _save_job_state(snapshot)
+            finalize_structured_yolo_run(structured_context, status="canceled")
             return
 
         manifest_path = finalize_result_store(result_store)
@@ -554,6 +680,7 @@ def _run_upload_job(
                 snapshot = None
         if snapshot is not None:
             _save_job_state(snapshot)
+        finalize_structured_yolo_run(structured_context, status="success")
 
     except Exception as exc:
         logger.exception("upload job %s failed: %s", job_id, exc)
@@ -581,6 +708,7 @@ def _run_upload_job(
                 snapshot = None
         if snapshot is not None:
             _save_job_state(snapshot)
+        finalize_structured_yolo_run(structured_context, status="canceled" if snapshot and snapshot.get("status") == "canceled" else "failed", error_msg=str(exc))
     finally:
         with UPLOAD_JOBS_LOCK:
             current = UPLOAD_JOBS.get(job_id)

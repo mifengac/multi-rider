@@ -10,6 +10,7 @@
     const JOB_ID = {{ job_id|tojson }};
     let DETAIL_STATE = { job: null, items: [], identitySummary: {}, library: null, loading: false };
     let IMPORT_STATE = { assetIds: [], datasets: [], loading: false };
+    let LINEAGE_STATE = { assetId: '', title: '', loading: false, error: '', asset: null, parent: null, children: [] };
 
     const STATUS_UI = {
       queued: { label: '排队中', badge: 'bg-slate-100 text-slate-700 ring-slate-200' },
@@ -89,6 +90,111 @@
       } else {
         box.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700');
       }
+    }
+
+    function closeLineageDrawer() {
+      LINEAGE_STATE = { assetId: '', title: '', loading: false, error: '', asset: null, parent: null, children: [] };
+      const overlay = document.getElementById('lineageOverlay');
+      const drawer = document.getElementById('lineageDrawer');
+      if (overlay) overlay.classList.add('hidden');
+      if (drawer) drawer.classList.add('translate-x-full');
+    }
+
+    function summarizeMediaAsset(asset, roleLabel) {
+      if (!asset) {
+        return '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-500">暂无' + roleLabel + '。</div>';
+      }
+
+      const sourceRowKey = asset.source_row_key
+        ? escapeHtml(typeof asset.source_row_key === 'string' ? asset.source_row_key : JSON.stringify(asset.source_row_key))
+        : '';
+      const mediaUri = escapeHtml(asset.media_uri || '--');
+      const mediaType = escapeHtml(asset.media_type || '--');
+      const detectStatus = escapeHtml(asset.detect_status || '--');
+      const detectionCount = escapeHtml(asset.detection_count || 0);
+      const childCount = escapeHtml(asset.child_count || 0);
+
+      return (
+        '<div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">' +
+          '<div class="flex items-start justify-between gap-3">' +
+            '<div>' +
+              '<div class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">' + roleLabel + '</div>' +
+              '<div class="mt-2 break-all text-sm font-semibold text-slate-900">' + escapeHtml(asset.asset_id || '') + '</div>' +
+            '</div>' +
+            '<span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-200">' + mediaType + '</span>' +
+          '</div>' +
+          '<div class="mt-3 text-xs leading-6 text-slate-600">状态：' + detectStatus + ' · 检测框 ' + detectionCount + ' · 子资源 ' + childCount + '</div>' +
+          '<div class="mt-2 break-all text-xs leading-6 text-slate-500">媒体地址：' + mediaUri + '</div>' +
+          (sourceRowKey ? '<div class="mt-2 break-all text-xs leading-6 text-slate-500">来源键：' + sourceRowKey + '</div>' : '') +
+        '</div>'
+      );
+    }
+
+    function renderLineageDrawer() {
+      const title = document.getElementById('lineageTitle');
+      const meta = document.getElementById('lineageMeta');
+      const body = document.getElementById('lineageBody');
+      if (!title || !meta || !body) return;
+
+      title.textContent = LINEAGE_STATE.title || '媒体链路';
+      meta.textContent = LINEAGE_STATE.assetId ? ('结构化资源 ID：' + LINEAGE_STATE.assetId) : '正在准备链路信息...';
+
+      if (LINEAGE_STATE.loading) {
+        body.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-sm text-slate-500">正在加载媒体链路...</div>';
+        return;
+      }
+
+      if (LINEAGE_STATE.error) {
+        body.innerHTML = '<div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">' + escapeHtml(LINEAGE_STATE.error) + '</div>';
+        return;
+      }
+
+      const children = LINEAGE_STATE.children || [];
+      const childrenHtml = children.length
+        ? children.map(function (item, index) { return summarizeMediaAsset(item, '子资源 ' + (index + 1)); }).join('')
+        : '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-500">当前资源没有子资产。</div>';
+
+      body.innerHTML = [
+        summarizeMediaAsset(LINEAGE_STATE.parent, '父资源'),
+        summarizeMediaAsset(LINEAGE_STATE.asset, '当前资源'),
+        '<div class="space-y-3"><div class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">子资源</div>' + childrenHtml + '</div>'
+      ].join('');
+    }
+
+    function openLineageDrawer(encodedAssetId, encodedTitle) {
+      LINEAGE_STATE = {
+        assetId: decodeURIComponent(encodedAssetId || ''),
+        title: decodeURIComponent(encodedTitle || ''),
+        loading: true,
+        error: '',
+        asset: null,
+        parent: null,
+        children: []
+      };
+      const overlay = document.getElementById('lineageOverlay');
+      const drawer = document.getElementById('lineageDrawer');
+      if (overlay) overlay.classList.remove('hidden');
+      if (drawer) drawer.classList.remove('translate-x-full');
+      renderLineageDrawer();
+
+      fetch('/detection/api/structured/assets/' + encodeURIComponent(LINEAGE_STATE.assetId) + '/lineage')
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+          if (!data.ok) {
+            throw new Error(data.error || '加载媒体链路失败');
+          }
+          LINEAGE_STATE.loading = false;
+          LINEAGE_STATE.error = '';
+          LINEAGE_STATE.asset = data.asset || null;
+          LINEAGE_STATE.parent = data.parent || null;
+          LINEAGE_STATE.children = data.children || [];
+          renderLineageDrawer();
+        })
+        .catch(function (err) {
+          LINEAGE_STATE.loading = false;
+          LINEAGE_STATE.error = err.message || '加载媒体链路失败';
+          renderLineageDrawer();
+        });
     }
 
     function renderLibraryPanel() {
@@ -176,6 +282,12 @@
 
       root.innerHTML = items.map(function (item) {
         const identity = item.identity || null;
+        const lineageButton = item.structured_asset_id
+          ? '<button type="button" onclick="openLineageDrawer(' +
+              JSON.stringify(encodeURIComponent(item.structured_asset_id)) + ', ' +
+              JSON.stringify(encodeURIComponent(item.origin_name || item.name)) +
+            ')" class="rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50">查看媒体链路</button>'
+          : '';
         let statusHtml = '<div class="text-xs text-slate-400">尚未执行身份识别</div>';
         let detailHtml = '<div class="mt-2 text-xs text-slate-500">文件大小：' + formatBytes(item.size_bytes) + '</div>';
         let facesHtml = '';
@@ -242,6 +354,7 @@
               '<div class="mt-3 flex flex-wrap gap-2">' +
                 statusHtml +
                 '<button type="button" onclick="openImportDrawer([\'' + encodeURIComponent(item.id) + '\'])" class="rounded-full border border-teal-200 bg-white px-3 py-1.5 text-xs font-semibold text-teal-700 transition hover:bg-teal-50">加入数据集</button>' +
+                lineageButton +
               '</div>' +
               detailHtml +
               facesHtml +
@@ -563,6 +676,19 @@
         <button id="importSubmitBtn" type="button" onclick="submitImport()" class="mr-btn mr-btn--ink">确认导入</button>
       </div>
     </div>
+  </aside>
+
+  <div id="lineageOverlay" class="fixed inset-0 z-40 hidden bg-slate-900/35 backdrop-blur-[1px]" onclick="closeLineageDrawer()"></div>
+  <aside id="lineageDrawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-2xl translate-x-full overflow-y-auto border-l border-white/60 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] transition-transform duration-300">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      <div>
+        <div class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Media Lineage</div>
+        <h3 id="lineageTitle" class="mt-2 text-lg font-semibold text-slate-900">媒体链路</h3>
+        <div id="lineageMeta" class="mt-1 text-xs text-slate-500"></div>
+      </div>
+      <button type="button" onclick="closeLineageDrawer()" class="mr-btn mr-btn--ghost">关闭</button>
+    </div>
+    <div id="lineageBody" class="space-y-5 px-5 py-5"></div>
   </aside>
 </body>
 </html>

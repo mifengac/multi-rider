@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime
 
@@ -16,6 +17,7 @@ from shared.config.config import (
 from shared.db.oracle import fetch_image_urls
 from shared.db.sqlite import get_job as get_saved_job
 from shared.db.sqlite import list_all_jobs as list_all_saved_jobs
+from modules.detection.repositories import ai_result_repository as structured_repo
 from modules.detection.services.job_service import (
     get_job_snapshot,
     list_running_jobs,
@@ -38,6 +40,7 @@ from shared.ownership.ownership import get_request_owner, job_matches_owner
 
 
 job_bp = Blueprint("job", __name__)
+list_saved_jobs = list_all_saved_jobs
 
 
 def _get_face_library_status() -> dict:
@@ -87,6 +90,39 @@ def _history_summary_payload(record: dict) -> dict:
         "detail_url": url_for("job.history_detail_page", job_id=record.get("id")),
         "download_url": url_for("file.download_zip", job_id=record.get("id")),
     }
+
+
+def _parse_limit_arg(value: str, default: int, *, minimum: int = 1, maximum: int = 500) -> int:
+    try:
+        parsed = int(value)
+    except Exception:
+        parsed = default
+    return max(minimum, min(maximum, parsed))
+
+
+def _serialize_structured_value(value):
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("{") or text.startswith("["):
+            try:
+                return json.loads(text)
+            except Exception:
+                return value
+    return value
+
+
+def _serialize_structured_run(record: dict) -> dict:
+    return {key: _serialize_structured_value(value) for key, value in dict(record).items()}
+
+
+def _serialize_structured_detection(record: dict) -> dict:
+    return {key: _serialize_structured_value(value) for key, value in dict(record).items()}
+
+
+def _serialize_structured_media_asset(record: dict) -> dict:
+    return {key: _serialize_structured_value(value) for key, value in dict(record).items()}
 
 
 @job_bp.route("/", methods=["GET", "POST"])
@@ -219,6 +255,174 @@ def list_jobs():
     return jsonify({"ok": True, "running_count": len(running), "running": running})
 
 
+@job_bp.get("/detection/api/structured/runs")
+def structured_run_list():
+    limit = _parse_limit_arg(request.args.get("limit", "50"), 50)
+    status = (request.args.get("status", "") or "").strip().lower() or None
+
+    try:
+        items = structured_repo.list_yolo_runs(limit=limit, status=status)
+    except Exception as exc:
+        logger.exception("failed to query structured yolo runs: %s", exc)
+        return jsonify({"ok": False, "error": "structured run query failed"}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "count": len(items),
+            "items": [_serialize_structured_run(item) for item in items],
+        }
+    )
+
+
+@job_bp.get("/detection/api/structured/runs/<run_id>")
+def structured_run_detail(run_id: str):
+    detection_limit = _parse_limit_arg(request.args.get("detection_limit", "100"), 100)
+
+    try:
+        run_record = structured_repo.get_yolo_run(run_id)
+        if run_record is None:
+            return jsonify({"ok": False, "error": "structured run not found"}), 404
+        detections = structured_repo.list_yolo_detections(limit=detection_limit, run_id=run_id)
+    except Exception as exc:
+        logger.exception("failed to query structured yolo run %s: %s", run_id, exc)
+        return jsonify({"ok": False, "error": "structured run query failed"}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "run": _serialize_structured_run(run_record),
+            "detections": [_serialize_structured_detection(item) for item in detections],
+        }
+    )
+
+
+@job_bp.get("/detection/api/structured/detections")
+def structured_detection_list():
+    limit = _parse_limit_arg(request.args.get("limit", "100"), 100)
+    filters = {
+        "run_id": (request.args.get("run_id", "") or "").strip() or None,
+        "label_code": (request.args.get("label_code", "") or "").strip() or None,
+        "sfzh": (request.args.get("sfzh", "") or "").strip() or None,
+        "start_time": (request.args.get("start_time", "") or "").strip() or None,
+        "end_time": (request.args.get("end_time", "") or "").strip() or None,
+        "source_system": (request.args.get("source_system", "") or "").strip() or None,
+        "source_table": (request.args.get("source_table", "") or "").strip() or None,
+        "review_status": (request.args.get("review_status", "") or "").strip().lower() or None,
+    }
+
+    try:
+        items = structured_repo.list_yolo_detections(limit=limit, **filters)
+    except Exception as exc:
+        logger.exception("failed to query structured yolo detections: %s", exc)
+        return jsonify({"ok": False, "error": "structured detection query failed"}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "count": len(items),
+            "filters": filters,
+            "items": [_serialize_structured_detection(item) for item in items],
+        }
+    )
+
+
+@job_bp.get("/detection/api/structured/assets")
+def structured_media_asset_list():
+    limit = _parse_limit_arg(request.args.get("limit", "100"), 100)
+    filters = {
+        "asset_id": (request.args.get("asset_id", "") or "").strip() or None,
+        "parent_asset_id": (request.args.get("parent_asset_id", "") or "").strip() or None,
+        "source_system": (request.args.get("source_system", "") or "").strip() or None,
+        "source_table": (request.args.get("source_table", "") or "").strip() or None,
+        "media_type": (request.args.get("media_type", "") or "").strip().lower() or None,
+        "detect_status": (request.args.get("detect_status", "") or "").strip().lower() or None,
+    }
+
+    try:
+        items = structured_repo.list_media_assets(limit=limit, **filters)
+    except Exception as exc:
+        logger.exception("failed to query structured media assets: %s", exc)
+        return jsonify({"ok": False, "error": "structured media asset query failed"}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "count": len(items),
+            "filters": filters,
+            "items": [_serialize_structured_media_asset(item) for item in items],
+        }
+    )
+
+
+@job_bp.get("/detection/api/structured/assets/<asset_id>/lineage")
+def structured_media_asset_lineage(asset_id: str):
+    child_limit = _parse_limit_arg(request.args.get("child_limit", "200"), 200)
+
+    try:
+        asset = structured_repo.get_media_asset(asset_id)
+        if asset is None:
+            return jsonify({"ok": False, "error": "structured media asset not found"}), 404
+        parent = None
+        parent_asset_id = str(asset.get("parent_asset_id") or "").strip()
+        if parent_asset_id:
+            parent = structured_repo.get_media_asset(parent_asset_id)
+        children = structured_repo.list_media_assets(limit=child_limit, parent_asset_id=asset_id)
+    except Exception as exc:
+        logger.exception("failed to query structured media asset lineage %s: %s", asset_id, exc)
+        return jsonify({"ok": False, "error": "structured media asset lineage query failed"}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "asset": _serialize_structured_media_asset(asset),
+            "parent": _serialize_structured_media_asset(parent) if parent else None,
+            "children": [_serialize_structured_media_asset(item) for item in children],
+        }
+    )
+
+
+@job_bp.post("/detection/api/structured/detections/<detection_id>/review")
+def structured_detection_review_update(detection_id: str):
+    payload = request.get_json(silent=True) or request.form or {}
+    review_status = (payload.get("review_status", "") or "").strip().lower()
+    review_result = (payload.get("review_result", "") or "").strip().lower() or None
+
+    if review_status not in structured_repo.VALID_REVIEW_STATUSES:
+        allowed = ", ".join(sorted(structured_repo.VALID_REVIEW_STATUSES))
+        return jsonify({"ok": False, "error": f"invalid review_status, allowed: {allowed}"}), 400
+    if review_result and review_result not in structured_repo.VALID_REVIEW_RESULTS:
+        allowed = ", ".join(sorted(structured_repo.VALID_REVIEW_RESULTS))
+        return jsonify({"ok": False, "error": f"invalid review_result, allowed: {allowed}"}), 400
+
+    try:
+        item = structured_repo.update_yolo_detection_review(
+            detection_id,
+            review_status=review_status,
+            review_result=review_result,
+            reviewer_id=(payload.get("reviewer_id", "") or "").strip() or None,
+            reviewer_name=(payload.get("reviewer_name", "") or "").strip() or None,
+            review_comment=(payload.get("review_comment", "") or "").strip() or None,
+        )
+        if item is None:
+            return jsonify({"ok": False, "error": "structured detection not found"}), 404
+        training_sample = None
+        if review_result in {"true_positive", "false_positive", "false_negative"}:
+            training_sample = structured_repo.sync_training_sample_from_detection_review(detection_id)
+    except Exception as exc:
+        logger.exception("failed to update structured yolo detection review %s: %s", detection_id, exc)
+        return jsonify({"ok": False, "error": "structured detection review update failed"}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "message": "复核结果已更新",
+            "item": _serialize_structured_detection(item),
+            "training_sample": training_sample,
+        }
+    )
+
+
 @job_bp.get("/history")
 def history():
     limit_raw = request.args.get("limit", "50")
@@ -227,7 +431,8 @@ def history():
     except Exception:
         limit = 50
 
-    records = list_all_saved_jobs(limit=limit)
+    owner_key, owner_ip = get_request_owner(request)
+    records = list_saved_jobs(owner_key, owner_ip, limit=limit)
     items = [_history_summary_payload(record) for record in records]
     return jsonify({"ok": True, "jobs": items})
 
@@ -267,6 +472,7 @@ def history_detail(job_id: str):
     items = []
     if manifest is not None:
         for item in attach_identity_to_manifest_items(manifest, identity_report):
+            structured_asset_id = str(item.get("structured_asset_id") or "").strip()
             items.append(
                 {
                     "id": item.get("id"),
@@ -274,6 +480,8 @@ def history_detail(job_id: str):
                     "origin_name": item.get("origin_name") or item.get("name"),
                     "size_bytes": item.get("size_bytes", 0),
                     "asset_url": url_for("face.result_asset", job_id=job_id, asset_id=item.get("id")),
+                    "structured_asset_id": structured_asset_id,
+                    "structured_lineage_url": url_for("job.structured_media_asset_lineage", asset_id=structured_asset_id) if structured_asset_id else "",
                     "identity": item.get("identity"),
                 }
             )

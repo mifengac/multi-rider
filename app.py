@@ -23,7 +23,11 @@ from modules.detection.upload_routes import upload_bp
 from modules.dispatch.routes import dispatch_bp
 from modules.face.routes import face_bp
 from modules.graph.routes import graph_bp
-from modules.training.routes import train_bp
+from modules.ruizhi.routes import ruizhi_bp
+from modules.security.hooks import register_security_hooks
+from modules.security.routes import security_bp
+from modules.statistics.routes import statistics_bp
+from modules.training.routes import train_bp, training_api_bp
 from shared.inference.infer_service import get_model
 
 
@@ -62,9 +66,14 @@ def create_app() -> Flask:
     app.register_blueprint(upload_bp)
     app.register_blueprint(face_bp)
     app.register_blueprint(train_bp)
+    app.register_blueprint(training_api_bp)
     app.register_blueprint(dispatch_bp)
     app.register_blueprint(diagnostics_bp)
     app.register_blueprint(graph_bp)
+    app.register_blueprint(ruizhi_bp)
+    app.register_blueprint(statistics_bp)
+    app.register_blueprint(security_bp)
+    register_security_hooks(app)
     return app
 
 

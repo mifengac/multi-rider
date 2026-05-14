@@ -18,6 +18,7 @@ from shared.config.config import (
     MODEL_DEFAULT,
     OUTPUT_DIR,
     logger,
+    resolve_model_path,
 )
 from shared.db.sqlite import (
     get_job as get_saved_job,
@@ -31,9 +32,16 @@ from modules.detection.services.result_store_service import (
     finalize_result_store,
 )
 from shared.inference.infer_service import (
-    _predict_batch,
     download_image_with_status,
     get_model,
+    predict_image_boxes_batch,
+)
+from modules.detection.services.structured_result_service import (
+    build_structured_yolo_context,
+    filter_prediction_boxes,
+    finalize_structured_yolo_run,
+    preview_structured_asset_id,
+    safe_persist_structured_yolo_batch,
 )
 from shared.ownership.ownership import job_matches_owner
 from shared.utils.helpers import (
@@ -186,6 +194,18 @@ def _new_job_record(total: int, status: str = "queued") -> dict:
     }
 
 
+def _model_label_candidates(model, model_key: str, classes_raw: str, prompt_classes: list[str] | None) -> list[str]:
+    if model_key == "general":
+        return prompt_classes or [token.strip() for token in classes_raw.split(",") if token.strip()]
+
+    names = getattr(model, "names", None)
+    if isinstance(names, dict):
+        return [str(value).strip() for value in names.values() if str(value).strip()]
+    if isinstance(names, (list, tuple)):
+        return [str(value).strip() for value in names if str(value).strip()]
+    return [token.strip() for token in classes_raw.split(",") if token.strip()]
+
+
 def _summarize(job: dict) -> str:
     downloaded = (
         job.get("downloaded")
@@ -295,6 +315,7 @@ def _run_job(
     _persist_job_state(job_id)
 
     result_store = None
+    structured_context = None
     try:
         model = get_model(runtime_job["model_key"])
         result_store = create_result_store(job_id, "oracle", "oracle", "oracle")
@@ -321,6 +342,28 @@ def _run_job(
                             indexes.add(int(mapped))
                 if indexes:
                     allowed_classes = indexes
+
+        structured_context = build_structured_yolo_context(
+            runtime_job,
+            source_system="oracle",
+            source_table="yfgadb.T_SPY_ELCZP_XX",
+            source_type="oracle",
+            model_key=runtime_job["model_key"],
+            model_name=runtime_job["model_key"],
+            model_path=resolve_model_path(runtime_job["model_key"]),
+            label_candidates=_model_label_candidates(model, runtime_job["model_key"], classes_raw, prompt_classes),
+            result_dir=result_store["result_dir"],
+            materialize_local_inputs=False,
+            source_scope={
+                "source_type": "oracle",
+                "total_urls": len(url_and_times),
+                "conf_thresh": conf_thresh,
+                "batch_size": batch_size,
+                "imgsz": imgsz,
+                "classes_raw": classes_raw,
+                "model_key": runtime_job["model_key"],
+            },
+        )
 
         with JOBS_LOCK:
             current = JOBS[job_id]
@@ -383,7 +426,7 @@ def _run_job(
                             if not ext:
                                 ext = infer_ext_from_bytes(data)
                                 name = root + ext
-                            yield name, data, ts
+                            yield url, name, data, ts
 
                         item = next(iterator, None)
                         if item is not None:
@@ -403,8 +446,9 @@ def _run_job(
         images: list[Image.Image] = []
         payloads: list[tuple[str, bytes]] = []
         bins: list[str] = []
+        source_items: list[dict] = []
 
-        for name, image_bytes, time_str in gen_downloads():
+        for url, name, image_bytes, time_str in gen_downloads():
             if should_cancel():
                 break
 
@@ -418,23 +462,39 @@ def _run_job(
             images.append(image)
             payloads.append((name, image_bytes))
             bins.append(time_bin_key(time_str))
+            source_items.append(
+                {
+                    "name": name,
+                    "payload_bytes": image_bytes,
+                    "source_pk": url,
+                    "source_row_key": {"url": url, "shot_time": time_str},
+                    "media_uri": url,
+                    "source_uri": url,
+                    "media_type": "image",
+                    "uri_type": "url",
+                    "download_status": "downloaded",
+                    "shot_time": time_str,
+                }
+            )
 
             if len(images) < batch_size:
                 continue
 
-            keeps = _predict_batch(
+            predictions = predict_image_boxes_batch(
                 images,
-                model,
-                conf_thresh,
-                allowed_classes,
-                imgsz,
                 runtime_job["model_key"],
+                conf_thresh,
+                imgsz,
                 prompt_classes,
             )
-            for index, ((filename, payload), keep) in enumerate(zip(payloads, keeps)):
+            structured_boxes = [
+                filter_prediction_boxes(boxes, conf_thresh, allowed_classes)
+                for boxes in predictions
+            ]
+            for index, ((filename, payload), boxes) in enumerate(zip(payloads, structured_boxes)):
                 with JOBS_LOCK:
                     JOBS[job_id]["processed"] += 1
-                if keep:
+                if boxes:
                     sequence += 1
                     output_name = f"{sequence:07d}_{filename}"
                     zip_file = get_zip_for_key(bins[index])
@@ -443,10 +503,21 @@ def _run_job(
                         result_store,
                         output_name,
                         payload,
-                        extra={"origin_name": filename, "group_key": bins[index]},
+                        extra={
+                            "origin_name": filename,
+                            "group_key": bins[index],
+                            "structured_asset_id": preview_structured_asset_id(structured_context, source_items[index]),
+                        },
                     )
                     with JOBS_LOCK:
                         JOBS[job_id]["kept"] += 1
+
+            safe_persist_structured_yolo_batch(
+                structured_context,
+                source_items,
+                structured_boxes,
+                conf_thresh=conf_thresh,
+            )
 
             for image in images:
                 try:
@@ -456,25 +527,28 @@ def _run_job(
             images.clear()
             payloads.clear()
             bins.clear()
+            source_items.clear()
             _persist_job_state(job_id)
 
             if should_cancel():
                 break
 
         if images:
-            keeps = _predict_batch(
+            predictions = predict_image_boxes_batch(
                 images,
-                model,
-                conf_thresh,
-                allowed_classes,
-                imgsz,
                 runtime_job["model_key"],
+                conf_thresh,
+                imgsz,
                 prompt_classes,
             )
-            for index, ((filename, payload), keep) in enumerate(zip(payloads, keeps)):
+            structured_boxes = [
+                filter_prediction_boxes(boxes, conf_thresh, allowed_classes)
+                for boxes in predictions
+            ]
+            for index, ((filename, payload), boxes) in enumerate(zip(payloads, structured_boxes)):
                 with JOBS_LOCK:
                     JOBS[job_id]["processed"] += 1
-                if keep:
+                if boxes:
                     sequence += 1
                     output_name = f"{sequence:07d}_{filename}"
                     zip_file = get_zip_for_key(bins[index])
@@ -483,10 +557,21 @@ def _run_job(
                         result_store,
                         output_name,
                         payload,
-                        extra={"origin_name": filename, "group_key": bins[index]},
+                        extra={
+                            "origin_name": filename,
+                            "group_key": bins[index],
+                            "structured_asset_id": preview_structured_asset_id(structured_context, source_items[index]),
+                        },
                     )
                     with JOBS_LOCK:
                         JOBS[job_id]["kept"] += 1
+
+            safe_persist_structured_yolo_batch(
+                structured_context,
+                source_items,
+                structured_boxes,
+                conf_thresh=conf_thresh,
+            )
 
             for image in images:
                 try:
@@ -496,6 +581,7 @@ def _run_job(
             images.clear()
             payloads.clear()
             bins.clear()
+            source_items.clear()
             _persist_job_state(job_id)
 
         with JOBS_LOCK:
@@ -534,6 +620,12 @@ def _run_job(
             snapshot = _job_snapshot(current)
 
         _save_job_state(snapshot)
+        final_status = str(snapshot.get("status") or "") if snapshot else ""
+        if final_status == "done":
+            final_status = "success"
+        elif final_status not in {"canceled", "failed"}:
+            final_status = "success"
+        finalize_structured_yolo_run(structured_context, status=final_status)
     except Exception as exc:
         logger.exception("job failed: %s", exc)
         with JOBS_LOCK:
@@ -548,6 +640,7 @@ def _run_job(
                 snapshot = None
         if snapshot is not None:
             _save_job_state(snapshot)
+        finalize_structured_yolo_run(structured_context, status="failed", error_msg=str(exc))
     finally:
         with JOBS_LOCK:
             current = JOBS.get(job_id)

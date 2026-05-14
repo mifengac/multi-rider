@@ -59,6 +59,7 @@ def list_job_results(job_id: str):
     _report_path, identity_report = load_identity_report_for_manifest(job.get("result_manifest_path") or "")
     items = []
     for item in attach_identity_to_manifest_items(manifest, identity_report):
+        structured_asset_id = str(item.get("structured_asset_id") or "").strip()
         items.append(
             {
                 "id": item.get("id"),
@@ -66,6 +67,8 @@ def list_job_results(job_id: str):
                 "origin_name": item.get("origin_name") or item.get("name"),
                 "size_bytes": item.get("size_bytes", 0),
                 "asset_url": url_for("face.result_asset", job_id=job_id, asset_id=item.get("id")),
+                "structured_asset_id": structured_asset_id,
+                "structured_lineage_url": url_for("job.structured_media_asset_lineage", asset_id=structured_asset_id) if structured_asset_id else "",
                 "identity": item.get("identity"),
             }
         )

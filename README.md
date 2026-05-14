@@ -8,6 +8,10 @@
 |---|---|---|
 | **数据库检测** | Oracle 数据库按时间范围查询图片 URL，批量下载推理 | 定期筛查、飙车炸街告警图检索 |
 | **本地上传检测** | 民警/用户上传 ZIP 图片包或 MP4/AVI/MOV 视频 | 现场视频快速比对、手头素材核查 |
+| **结构化结果** | KingBase `jcgkzx_monitor.hm_ai_*` 应用表 | YOLO 检测批次、媒体资源、检测框、人工复核、训练样本沉淀 |
+| **态势统计** | SQLite 运行数据 + KingBase 图谱结果 | 检测任务、派单闭环、团伙识别等指标统计和报表缓存 |
+| **安全审计** | 请求上下文、敏感字段访问、操作日志 | 角色权限、访问留痕、敏感人员信息脱敏 |
+| **锐智 AI** | 锐智兼容 OpenAI 风格接口、知识库、文件能力 | 研判助手、报告摘要、知识库问答和调用日志 |
 
 两个 Tab 共享同一套模型和参数配置，检测结果均打包为 ZIP 供下载。
 
@@ -32,10 +36,14 @@ multi-rider/
 │   ├── detection/           # 检测模块：数据库检测、本地上传、结果下载
 │   ├── face/                # 人脸模块：人脸库、识别、身份核验
 │   ├── dispatch/            # 下发模块：认证、队列、短信、任务下发
+│   ├── graph/               # 知识图谱模块：KingBase -> Neo4j 同步、团伙挖掘
+│   ├── statistics/          # 态势统计模块：指标、报表、趋势
+│   ├── security/            # 安全审计模块：权限、脱敏、审计日志
+│   ├── ruizhi/              # 锐智 AI 模块：模型调用、助手会话、知识库映射
 │   └── training/            # 训练模块：数据集、预标注、训练、模型注册
 ├── shared/
 │   ├── config/              # 全局配置与环境变量加载
-│   ├── db/                  # SQLite / Oracle 等共享存储与数据库接入
+│   ├── db/                  # SQLite / Oracle / KingBase 等共享存储与数据库接入
 │   ├── inference/           # YOLO 模型加载与批量推理
 │   ├── ownership/           # 会话归属 / 访问隔离
 │   └── utils/               # 通用工具函数
@@ -64,6 +72,10 @@ multi-rider/
 - 检测相关后端：`modules/detection/`
 - 人脸识别与身份核验：`modules/face/`
 - 任务下发与短信：`modules/dispatch/`
+- 知识图谱与团伙挖掘：`modules/graph/`
+- 态势统计：`modules/statistics/`
+- 安全审计与脱敏：`modules/security/`
+- 锐智 AI 服务平台接入：`modules/ruizhi/`
 - 训练、预标注、模型注册：`modules/training/`
 - 全局配置与环境变量：`shared/config/config.py`
 - 共享数据库接入：`shared/db/`
@@ -103,6 +115,18 @@ npm run build:css
 | `ORACLE_SERVICE` | `yfgxpt` | Oracle 服务名 |
 | `ORACLE_USER` | `yfzagk` | 数据库用户名 |
 | `ORACLE_PASSWORD` | *(必须修改)* | 数据库密码 |
+| `KINGBASE_HOST` | `127.0.0.1` | 人大金仓 KingBase 主机 |
+| `KINGBASE_PORT` | `54321` | KingBase 端口 |
+| `KINGBASE_DBNAME` | `yfywk` | KingBase 数据库名 |
+| `KINGBASE_USER` | `ywkuser` | KingBase 用户 |
+| `KINGBASE_PASSWORD` | `123` | KingBase 密码 |
+| `KINGBASE_SOURCE_SCHEMA` | `ywdata` | 业务源表 schema |
+| `KINGBASE_APP_SCHEMA` | `jcgkzx_monitor` | 项目自建应用表 schema |
+| `RUIZHI_ENABLED` | `false` | 是否启用锐智 AI 服务平台 |
+| `RUIZHI_BASE_URL` | `https://10.2.164.106/v2` | 锐智接口地址 |
+| `RUIZHI_API_KEY` | *(空)* | 锐智 API Key |
+| `RUIZHI_PROJECT` | *(空)* | 锐智 project 标识 |
+| `RUIZHI_VERIFY_SSL` | `false` | 是否校验锐智 HTTPS 证书 |
 | `FLASK_SECRET_KEY` | *(必须修改)* | Flask Session 密钥 |
 | `MODEL_DEFAULT` | `general` | 启动时预热的模型 |
 | `CONF_THRESH` | `0.8` | 默认置信度阈值 |

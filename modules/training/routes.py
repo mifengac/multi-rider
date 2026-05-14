@@ -16,7 +16,9 @@ from modules.training.services.dataset_service import (
     create_dataset,
     get_dataset_asset,
     get_dataset,
+    get_structured_detections_by_ids,
     import_result_assets_to_dataset,
+    import_structured_detections_to_dataset,
     import_zip_to_dataset,
     load_asset_annotation,
     list_dataset_assets,
@@ -45,6 +47,7 @@ from shared.ownership.ownership import get_request_owner, job_matches_owner
 
 
 train_bp = Blueprint("train", __name__, url_prefix="/train")
+training_api_bp = Blueprint("training_api", __name__, url_prefix="/training/api")
 
 
 def _parse_bool(value) -> bool:
@@ -607,6 +610,51 @@ def dataset_import_results(dataset_id: str):
     except Exception as exc:
         logger.exception("failed to import results into dataset %s from job %s: %s", dataset_id, job_id, exc)
         return jsonify({"ok": False, "error": "结果图导入失败"}), 500
+
+
+def _import_structured_detections_response(dataset_id: str, payload: dict):
+    detection_ids = payload.get("detection_ids") or []
+
+    if not dataset_id:
+        return jsonify({"ok": False, "error": "dataset_id is required"}), 400
+    if not isinstance(detection_ids, list) or not detection_ids:
+        return jsonify({"ok": False, "error": "detection_ids is required"}), 400
+
+    detections = get_structured_detections_by_ids(
+        [str(item or "").strip() for item in detection_ids if str(item or "").strip()]
+    )
+    if not detections:
+        return jsonify({"ok": False, "error": "no valid structured detections found"}), 400
+
+    try:
+        result = import_structured_detections_to_dataset(dataset_id, detections)
+        response = _datasets_payload()
+        response.update(
+            {
+                "message": f"已导入 {result['imported']} 张结构化检测图片，跳过 {result['skipped']} 张，生成 {result['annotated']} 张标注。",
+                "imported": result["imported"],
+                "skipped": result["skipped"],
+                "annotated": result["annotated"],
+                "dataset_id": dataset_id,
+                "detection_ids": [item.get("detection_id") for item in detections],
+            }
+        )
+        return jsonify(response)
+    except LookupError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logger.exception("failed to import structured detections into dataset %s: %s", dataset_id, exc)
+        return jsonify({"ok": False, "error": "结构化检测结果导入失败"}), 500
+
+
+@train_bp.post("/api/import-structured-detections")
+@training_api_bp.post("/import-structured-detections")
+def dataset_import_structured_detections():
+    payload = request.get_json(silent=True) or request.form or {}
+    dataset_id = (payload.get("dataset_id", "") or "").strip()
+    return _import_structured_detections_response(dataset_id, payload)
 
 
 @train_bp.get("/datasets/<dataset_id>/assets")

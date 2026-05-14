@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 import zipfile
@@ -19,6 +20,12 @@ def test_app_factory_registers_expected_endpoints(app_module):
     assert "dispatch.dispatch_auth_status" in flask_app.view_functions
     assert "face.face_library_status" in flask_app.view_functions
     assert "train.dataset_list" in flask_app.view_functions
+    assert "job.structured_run_list" in flask_app.view_functions
+    assert "job.structured_detection_review_update" in flask_app.view_functions
+    assert "job.structured_media_asset_list" in flask_app.view_functions
+    assert "job.structured_media_asset_lineage" in flask_app.view_functions
+    assert "train.dataset_import_structured_detections" in flask_app.view_functions
+    assert "training_api.dataset_import_structured_detections" in flask_app.view_functions
 
 
 def test_livez_returns_process_ok(client):
@@ -141,6 +148,23 @@ def test_header_primary_button_has_tab_specific_actions():
     assert "refreshTaskQueueDiagnostics()" in script
 
 
+def test_history_detail_template_wires_structured_media_lineage():
+    template = (REPO_ROOT / "templates" / "modules" / "detection" / "history" / "history_detail.html").read_text(encoding="utf-8")
+
+    assert "lineageDrawer" in template
+    assert "查看媒体链路" in template
+    assert "/detection/api/structured/assets/" in template
+
+
+def test_result_detail_drawer_wires_structured_media_lineage():
+    template = (REPO_ROOT / "templates" / "modules" / "detection" / "_result_detail_drawer.html").read_text(encoding="utf-8")
+    script = (REPO_ROOT / "static" / "modules" / "detection" / "results.js").read_text(encoding="utf-8")
+
+    assert "resultDetailLineage" in template
+    assert "loadResultLineage" in script
+    assert "structured_lineage_url" in script
+
+
 def test_file_routes_use_mocked_job_payload(client, monkeypatch, tmp_path):
     import modules.detection.file_routes as file_routes
 
@@ -224,6 +248,316 @@ def test_job_routes_return_mocked_history(client, monkeypatch):
     history_payload = history_response.get_json()
     assert history_payload["jobs"][0]["detail_url"].endswith("/history-page/job-1")
     assert history_payload["jobs"][0]["download_url"].endswith("/download/job-1")
+
+
+def test_job_routes_history_detail_exposes_structured_lineage_fields(client, monkeypatch):
+    import modules.detection.job_routes as job_routes
+
+    monkeypatch.setattr(
+        job_routes,
+        "get_saved_job",
+        lambda job_id: {
+            "id": job_id,
+            "status": "done",
+            "job_type": "upload",
+            "source_type": "video",
+            "source_name": "sample.mp4",
+            "result_manifest_path": "C:/tmp/manifest.json",
+            "identity_result_path": "C:/tmp/identity.json",
+            "zip_parts": [],
+            "identity_summary": {"recognized_asset_count": 1},
+        },
+    )
+    monkeypatch.setattr(job_routes.os.path, "isfile", lambda path: True)
+    monkeypatch.setattr(job_routes, "load_result_manifest", lambda path: {"items": [{"id": "0001.jpg"}]})
+    monkeypatch.setattr(job_routes, "load_identity_report", lambda path: {"summary": {"recognized_asset_count": 1}, "items": []})
+    monkeypatch.setattr(
+        job_routes,
+        "attach_identity_to_manifest_items",
+        lambda manifest, identity_report: [
+            {
+                "id": "0001.jpg",
+                "name": "0001.jpg",
+                "origin_name": "frame_001.jpg",
+                "size_bytes": 128,
+                "structured_asset_id": "asset-frame-1",
+                "identity": None,
+            }
+        ],
+    )
+    monkeypatch.setattr(job_routes, "_get_face_library_status", lambda: {"ready": True})
+
+    response = client.get("/history/job-1")
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["items"][0]["structured_asset_id"] == "asset-frame-1"
+    assert payload["items"][0]["structured_lineage_url"].endswith("/detection/api/structured/assets/asset-frame-1/lineage")
+
+
+def test_job_routes_return_mocked_structured_results(client, monkeypatch):
+    import modules.detection.job_routes as job_routes
+
+    run_calls = []
+    detection_calls = []
+
+    monkeypatch.setattr(
+        job_routes.structured_repo,
+        "list_yolo_runs",
+        lambda limit=50, status=None: run_calls.append({"limit": limit, "status": status}) or [
+            {
+                "run_id": "run-1",
+                "task_name": "oracle:oracle",
+                "model_code": "general",
+                "source_scope": '{"source_type":"oracle"}',
+                "status": "success",
+                "total_assets": 3,
+                "processed_assets": 3,
+                "detected_assets": 2,
+                "detection_count": 4,
+                "started_at": datetime(2026, 5, 13, 10, 0, 0),
+                "finished_at": datetime(2026, 5, 13, 10, 1, 0),
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        job_routes.structured_repo,
+        "get_yolo_run",
+        lambda run_id: {
+            "run_id": run_id,
+            "task_name": "oracle:oracle",
+            "model_code": "general",
+            "source_scope": '{"source_type":"oracle"}',
+            "status": "success",
+            "total_assets": 3,
+            "processed_assets": 3,
+            "detected_assets": 2,
+            "detection_count": 4,
+            "started_at": datetime(2026, 5, 13, 10, 0, 0),
+            "finished_at": datetime(2026, 5, 13, 10, 1, 0),
+        },
+    )
+    monkeypatch.setattr(
+        job_routes.structured_repo,
+        "list_yolo_detections",
+        lambda limit=100, **filters: detection_calls.append({"limit": limit, **filters}) or [
+            {
+                "detection_id": "det-1",
+                "run_id": filters.get("run_id") or "run-1",
+                "asset_id": "asset-1",
+                "label_code": "person",
+                "label_name": "person",
+                "confidence": 0.91,
+                "bbox_json": '{"x1":1,"y1":2,"x2":9,"y2":10}',
+                "review_status": "pending",
+                "source_system": filters.get("source_system") or "oracle",
+                "media_uri": "https://example.com/a.jpg",
+                "created_at": datetime(2026, 5, 13, 10, 0, 5),
+            }
+        ],
+    )
+
+    runs_response = client.get("/detection/api/structured/runs?limit=5&status=success")
+    runs_payload = runs_response.get_json()
+    assert runs_response.status_code == 200
+    assert runs_payload["count"] == 1
+    assert runs_payload["items"][0]["run_id"] == "run-1"
+    assert runs_payload["items"][0]["source_scope"]["source_type"] == "oracle"
+    assert run_calls == [{"limit": 5, "status": "success"}]
+
+    run_response = client.get("/detection/api/structured/runs/run-1?detection_limit=2")
+    run_payload = run_response.get_json()
+    assert run_response.status_code == 200
+    assert run_payload["run"]["run_id"] == "run-1"
+    assert run_payload["detections"][0]["detection_id"] == "det-1"
+    assert detection_calls[0]["limit"] == 2
+    assert detection_calls[0]["run_id"] == "run-1"
+
+    detections_response = client.get(
+        "/detection/api/structured/detections?run_id=run-1&sfzh=320101199001010011&source_system=oracle&review_status=pending&limit=20"
+    )
+    detections_payload = detections_response.get_json()
+    assert detections_response.status_code == 200
+    assert detections_payload["items"][0]["bbox_json"]["x1"] == 1
+    assert detection_calls[1]["limit"] == 20
+    assert detection_calls[1]["sfzh"] == "320101199001010011"
+    assert detection_calls[1]["source_system"] == "oracle"
+    assert detection_calls[1]["review_status"] == "pending"
+
+
+def test_job_routes_return_mocked_structured_media_assets(client, monkeypatch):
+    import modules.detection.job_routes as job_routes
+
+    asset_calls = []
+    lineage_calls = []
+
+    monkeypatch.setattr(
+        job_routes.structured_repo,
+        "list_media_assets",
+        lambda limit=100, **filters: (asset_calls if filters.get("parent_asset_id") != "asset-parent" else lineage_calls).append({"limit": limit, **filters}) or [
+            {
+                "asset_id": filters.get("asset_id") or (filters.get("parent_asset_id") and "asset-child-1") or "asset-parent",
+                "parent_asset_id": filters.get("parent_asset_id") or None,
+                "media_type": "video" if not filters.get("parent_asset_id") else "frame",
+                "media_uri": "C:/tmp/sample.mp4" if not filters.get("parent_asset_id") else "C:/tmp/frame_001.jpg",
+                "detect_status": "success",
+                "source_row_key": '{"frame_index":1}',
+                "created_at": datetime(2026, 5, 13, 10, 0, 0),
+                "child_count": 1 if not filters.get("parent_asset_id") else 0,
+                "detection_count": 0,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        job_routes.structured_repo,
+        "get_media_asset",
+        lambda asset_id: {
+            "asset_id": asset_id,
+            "parent_asset_id": "asset-root" if asset_id == "asset-parent" else None,
+            "media_type": "video",
+            "media_uri": f"C:/tmp/{asset_id}.mp4",
+            "detect_status": "success",
+            "source_row_key": '{"job_id":"run-1"}',
+            "created_at": datetime(2026, 5, 13, 10, 0, 0),
+            "child_count": 1,
+            "detection_count": 0,
+        },
+    )
+
+    assets_response = client.get(
+        "/detection/api/structured/assets?parent_asset_id=asset-parent&media_type=frame&detect_status=success&limit=50"
+    )
+    assets_payload = assets_response.get_json()
+    assert assets_response.status_code == 200
+    assert assets_payload["count"] == 1
+    assert assets_payload["items"][0]["asset_id"] == "asset-child-1"
+    assert assets_payload["items"][0]["source_row_key"]["frame_index"] == 1
+    assert asset_calls == []
+    assert lineage_calls == [{"limit": 50, "asset_id": None, "parent_asset_id": "asset-parent", "source_system": None, "source_table": None, "media_type": "frame", "detect_status": "success"}]
+
+    lineage_response = client.get("/detection/api/structured/assets/asset-parent/lineage?child_limit=10")
+    lineage_payload = lineage_response.get_json()
+    assert lineage_response.status_code == 200
+    assert lineage_payload["asset"]["asset_id"] == "asset-parent"
+    assert lineage_payload["parent"]["asset_id"] == "asset-root"
+    assert lineage_payload["children"][0]["asset_id"] == "asset-child-1"
+
+
+def test_job_routes_update_structured_detection_review(client, monkeypatch):
+    import modules.detection.job_routes as job_routes
+
+    sample_calls = []
+
+    monkeypatch.setattr(
+        job_routes.structured_repo,
+        "update_yolo_detection_review",
+        lambda detection_id, **payload: {
+            "detection_id": detection_id,
+            "review_status": payload["review_status"],
+            "review_result": payload["review_result"],
+            "reviewer_name": payload["reviewer_name"],
+            "review_comment": payload["review_comment"],
+            "reviewed_at": datetime(2026, 5, 13, 10, 2, 0),
+        },
+    )
+    monkeypatch.setattr(
+        job_routes.structured_repo,
+        "sync_training_sample_from_detection_review",
+        lambda detection_id: sample_calls.append(detection_id) or {
+            "sample_id": "sample-1",
+            "detection_id": detection_id,
+            "sample_type": "positive",
+        },
+    )
+
+    response = client.post(
+        "/detection/api/structured/detections/det-1/review",
+        json={
+            "review_status": "confirmed",
+            "review_result": "true_positive",
+            "reviewer_name": "Alice",
+            "review_comment": "looks good",
+        },
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["item"]["detection_id"] == "det-1"
+    assert payload["item"]["review_status"] == "confirmed"
+    assert payload["item"]["review_result"] == "true_positive"
+    assert payload["training_sample"]["sample_id"] == "sample-1"
+    assert sample_calls == ["det-1"]
+
+
+def test_job_routes_reject_invalid_structured_detection_review_status(client):
+    response = client.post(
+        "/detection/api/structured/detections/det-1/review",
+        json={"review_status": "bad-status"},
+    )
+
+    assert response.status_code == 400
+    assert "invalid review_status" in response.get_json()["error"]
+
+
+def test_training_routes_import_structured_detections(client, monkeypatch):
+    import modules.training.routes as train_routes
+
+    monkeypatch.setattr(train_routes, "list_datasets", lambda limit=100: [])
+    monkeypatch.setattr(train_routes, "attach_recent_assets", lambda items: items)
+    monkeypatch.setattr(train_routes, "summarize_datasets", lambda items: {"dataset_count": len(items)})
+    monkeypatch.setattr(
+        train_routes,
+        "get_structured_detections_by_ids",
+        lambda ids: [
+            {
+                "detection_id": detection_id,
+                "asset_id": f"asset-{index}",
+                "run_id": "run-1",
+                "media_uri": f"C:/tmp/{detection_id}.jpg",
+                "label_name": "person",
+                "label_code": "person",
+                "bbox_x": 1,
+                "bbox_y": 2,
+                "bbox_w": 8,
+                "bbox_h": 8,
+                "confidence": 0.9,
+            }
+            for index, detection_id in enumerate(ids, start=1)
+        ],
+    )
+    monkeypatch.setattr(
+        train_routes,
+        "import_structured_detections_to_dataset",
+        lambda dataset_id, detections: {
+            "dataset": {"id": dataset_id, "recent_assets": []},
+            "imported": len(detections),
+            "skipped": 0,
+            "annotated": len(detections),
+            "recent_assets": [],
+        },
+    )
+
+    response = client.post(
+        "/training/api/import-structured-detections",
+        json={"dataset_id": "ds-1", "detection_ids": ["det-1", "det-2"]},
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["imported"] == 2
+    assert payload["annotated"] == 2
+    assert payload["dataset_id"] == "ds-1"
+    assert payload["detection_ids"] == ["det-1", "det-2"]
+
+
+def test_training_routes_reject_invalid_structured_detection_import_payload(client):
+    response = client.post(
+        "/training/api/import-structured-detections",
+        json={"dataset_id": "", "detection_ids": []},
+    )
+
+    assert response.status_code == 400
+    assert "dataset_id is required" in response.get_json()["error"]
 
 
 def test_dispatch_routes_return_mocked_payloads(client, monkeypatch):

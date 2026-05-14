@@ -40,6 +40,7 @@ def _load_env_file(*paths: str) -> None:
 _load_env_file(
     os.path.join(BASE_DIR, "app.env"),
     os.path.join(BASE_DIR, "ops", "app.env"),
+    os.path.join(BASE_DIR, "runtime", "config", "app.env"),
     os.path.join(BASE_DIR, ".env"),
 )
 
@@ -187,6 +188,20 @@ DISPATCH_SMS_DEFAULT_TEMPLATE = os.getenv(
 DISPATCH_SMS_USERID = os.getenv("DISPATCH_SMS_USERID", "admin")
 DISPATCH_SMS_PASSWORD = os.getenv("DISPATCH_SMS_PASSWORD", "")
 DISPATCH_SMS_USERPORT = os.getenv("DISPATCH_SMS_USERPORT", "0006")
+
+RUIZHI_ENABLED = (os.getenv("RUIZHI_ENABLED", "false") or "false").strip().lower() in {"1", "true", "yes", "on"}
+RUIZHI_BASE_URL = os.getenv("RUIZHI_BASE_URL", "https://10.2.164.106/v2").rstrip("/")
+RUIZHI_API_KEY = os.getenv("RUIZHI_API_KEY", "")
+RUIZHI_PROJECT = os.getenv("RUIZHI_PROJECT", "")
+RUIZHI_PROJECT_HEADER = os.getenv("RUIZHI_PROJECT_HEADER", "project")
+RUIZHI_VERIFY_SSL = (os.getenv("RUIZHI_VERIFY_SSL", "false") or "false").strip().lower() in {"1", "true", "yes", "on"}
+RUIZHI_CHAT_MODEL = os.getenv("RUIZHI_CHAT_MODEL", "ayenaspring-pro-001")
+RUIZHI_VISION_MODEL = os.getenv("RUIZHI_VISION_MODEL", "ayenavisual-004")
+RUIZHI_EMBEDDING_MODEL = os.getenv("RUIZHI_EMBEDDING_MODEL", "ayenaembedding-001")
+RUIZHI_RERANK_MODEL = os.getenv("RUIZHI_RERANK_MODEL", "bge-reranker-base")
+RUIZHI_AUDIO_MODEL = os.getenv("RUIZHI_AUDIO_MODEL", "ayenaaudio-001")
+RUIZHI_TIMEOUT_SECONDS = max(5, int(os.getenv("RUIZHI_TIMEOUT_SECONDS", "60") or 60))
+RUIZHI_MAX_INPUT_CHARS = max(1000, int(os.getenv("RUIZHI_MAX_INPUT_CHARS", "12000") or 12000))
 
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", os.urandom(24).hex())
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")

@@ -6,6 +6,7 @@ from flask import Blueprint, send_file, url_for
 
 from shared.db.sqlite import get_job as get_saved_job
 from modules.detection.services.job_service import _summarize, get_job_snapshot
+from shared.ownership.ownership import get_request_owner
 
 
 file_bp = Blueprint("file", __name__)
