@@ -413,3 +413,10 @@ if os.path.basename(MODEL_REGISTRY["general"]).lower() != "yolov8s-worldv2.pt":
         "Preferred general model yolov8s-worldv2.pt is not active; currently using %s",
         MODEL_REGISTRY["general"],
     )
+
+RUIZHI_API_KEY = os.getenv("RUIZHI_API_KEY", "")
+RUIZHI_BASE_URL = os.getenv("RUIZHI_BASE_URL", "https://10.2.164.106/v2")
+RUIZHI_TEXT_MODEL = os.getenv("RUIZHI_TEXT_MODEL", "ayenaspring-pro-001")
+RUIZHI_EMBEDDING_MODEL = os.getenv("RUIZHI_EMBEDDING_MODEL", "Qwen3-Embedding-0.6B")
+RUIZHI_RERANK_MODEL = os.getenv("RUIZHI_RERANK_MODEL", "bge-reranker-base")
+RUIZHI_KB_NAME = os.getenv("RUIZHI_KB_NAME", "wcnr_test_0518_083959")

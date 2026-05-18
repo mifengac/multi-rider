@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI研判助手 - 未成年人智能管控中枢</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dist/tailwind.css') }}" />
+  <style>
+    body { background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; margin: 0; overflow: hidden; }
+    .nav-link { color: #94a3b8; text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 0.85rem; }
+    .nav-link:hover { background: #334155; color: #e2e8f0; }
+    .nav-link.active { background: #3b82f6; color: white; }
+    .sidebar-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 16px; border: 1px solid #334155; border-radius: 10px; background: #1e293b; color: #e2e8f0; font-size: 0.85rem; cursor: pointer; text-align: left; transition: all 0.15s; }
+    .sidebar-btn:hover { background: #334155; border-color: #475569; }
+    .sidebar-btn.active { border-color: #3b82f6; background: #1e3a5f; }
+    .sidebar-btn-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .chat-area { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+    .msg { max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; line-height: 1.6; }
+    .msg-user { background: #3b82f6; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .msg-ai { background: #1e293b; border: 1px solid #334155; align-self: flex-start; border-bottom-left-radius: 4px; }
+    .msg-ai h1,.msg-ai h2,.msg-ai h3 { font-size: 1em; font-weight: 700; margin: 12px 0 6px; color: #60a5fa; }
+    .msg-ai h1 { font-size: 1.1em; }
+    .msg-ai ul,.msg-ai ol { padding-left: 20px; margin: 6px 0; }
+    .msg-ai li { margin: 3px 0; }
+    .msg-ai strong { color: #f59e0b; }
+    .msg-ai code { background: #334155; padding: 1px 5px; border-radius: 3px; font-size: 0.85em; }
+    .msg-meta { font-size: 0.7rem; color: #64748b; margin-top: 4px; }
+    .typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #60a5fa; animation: blink 1.4s infinite both; margin: 0 2px; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%,80%,100% { opacity: 0.3; } 40% { opacity: 1; } }
+    .input-area { border-top: 1px solid #334155; padding: 16px 24px; background: #0f172a; }
+    .input-wrap { display: flex; gap: 10px; max-width: 100%; }
+    .input-wrap textarea { flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 10px 14px; color: #e2e8f0; font-size: 0.9rem; resize: none; min-height: 44px; max-height: 120px; font-family: inherit; }
+    .input-wrap textarea:focus { outline: none; border-color: #3b82f6; }
+    .send-btn { background: #3b82f6; border: none; color: white; padding: 0 20px; border-radius: 10px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
+    .send-btn:hover { background: #2563eb; }
+    .send-btn:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+    .mode-tag { display: inline-block; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
+    .mode-rag { background: #7c3aed; color: white; }
+    .mode-general { background: #475569; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <header class="flex items-center justify-between px-6 py-3 border-b border-slate-700 shrink-0">
+    <div class="flex items-center gap-4">
+      <h1 class="text-base font-bold text-white">AI研判助手</h1>
+      <span id="modeLabel" class="mode-tag mode-general">通用模式</span>
+    </div>
+    <nav class="flex items-center gap-2">
+      <a href="/dashboard" class="nav-link">态势总览</a>
+      <a href="/graph" class="nav-link">关系图谱</a>
+      <a href="/ai-analyst" class="nav-link active">AI研判</a>
+      <a href="/" class="nav-link">工作台</a>
+    </nav>
+  </header>
+
+  <div class="flex" style="height: calc(100vh - 52px);">
+    <!-- Sidebar -->
+    <aside class="w-64 border-r border-slate-700 p-4 flex flex-col gap-3 shrink-0 overflow-y-auto">
+      <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">快捷功能</div>
+
+      <button class="sidebar-btn" onclick="startPersonAnalysis()">
+        <div class="sidebar-btn-icon bg-blue-900/50 text-blue-400">&#128100;</div>
+        <div>
+          <div class="font-semibold">人员研判</div>
+          <div class="text-xs text-slate-400">输入证件号，AI分析侵财风险</div>
+        </div>
+      </button>
+
+      <button class="sidebar-btn" onclick="startSerialAnalysis()">
+        <div class="sidebar-btn-icon bg-purple-900/50 text-purple-400">&#128279;</div>
+        <div>
+          <div class="font-semibold">串并案分析</div>
+          <div class="text-xs text-slate-400">AI自动发现侵财系列案线索</div>
+        </div>
+      </button>
+
+      <button class="sidebar-btn" id="btnRag" onclick="toggleRagMode()">
+        <div class="sidebar-btn-icon bg-emerald-900/50 text-emerald-400">&#128218;</div>
+        <div>
+          <div class="font-semibold">知识问答</div>
+          <div class="text-xs text-slate-400">基于侵财法律知识库回答</div>
+        </div>
+      </button>
+
+      <div class="border-t border-slate-700 mt-2 pt-3">
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-2">快捷提问</div>
+        <div class="flex flex-col gap-2">
+          <button class="text-left text-xs text-slate-400 hover:text-slate-200 px-2 py-1.5 rounded hover:bg-slate-800" onclick="quickAsk('未成年人盗窃的量刑标准是什么？')">盗窃量刑标准</button>
+          <button class="text-left text-xs text-slate-400 hover:text-slate-200 px-2 py-1.5 rounded hover:bg-slate-800" onclick="quickAsk('未成年人侵财犯罪的预防措施有哪些？')">侵财预防措施</button>
+          <button class="text-left text-xs text-slate-400 hover:text-slate-200 px-2 py-1.5 rounded hover:bg-slate-800" onclick="quickAsk('附条件不起诉的适用条件是什么？')">附条件不起诉</button>
+        </div>
+      </div>
+
+      <div class="mt-auto pt-3 border-t border-slate-700">
+        <button class="text-xs text-slate-500 hover:text-slate-300 px-2 py-1" onclick="clearChat()">清空对话</button>
+      </div>
+    </aside>
+
+    <!-- Chat Main -->
+    <div class="flex-1 flex flex-col min-w-0">
+      <div id="chatArea" class="chat-area">
+        <div class="text-center text-slate-500 py-20">
+          <div class="text-3xl mb-4">&#129302;</div>
+          <div class="text-lg mb-2">未成年人侵财犯罪AI研判助手</div>
+          <div class="text-sm">选择左侧功能或直接输入问题开始对话</div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-wrap">
+          <textarea id="inputBox" placeholder="输入问题... (Enter发送, Shift+Enter换行)" rows="1" onkeydown="handleKey(event)"></textarea>
+          <button id="sendBtn" class="send-btn" onclick="sendMessage()">发送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='modules/ai_analyst/analyst.js') }}"></script>
+</body>
+</html>

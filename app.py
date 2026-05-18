@@ -23,6 +23,15 @@ from modules.detection.upload_routes import upload_bp
 from modules.dispatch.routes import dispatch_bp
 from modules.face.routes import face_bp
 from modules.training.routes import train_bp
+from modules.score import score_bp
+from modules.profile import profile_bp
+from modules.dashboard import dashboard_bp
+from modules.graph import graph_bp
+from modules.dashboard.page_routes import dashboard_page_bp
+from modules.profile.page_routes import profile_page_bp
+from modules.graph.page_routes import graph_page_bp
+from modules.ai_analyst import ai_analyst_bp
+from modules.ai_analyst.page_routes import ai_analyst_page_bp
 from shared.inference.infer_service import get_model
 
 
@@ -63,6 +72,15 @@ def create_app() -> Flask:
     app.register_blueprint(train_bp)
     app.register_blueprint(dispatch_bp)
     app.register_blueprint(diagnostics_bp)
+    app.register_blueprint(score_bp)
+    app.register_blueprint(profile_bp)
+    app.register_blueprint(dashboard_bp)
+    app.register_blueprint(graph_bp)
+    app.register_blueprint(dashboard_page_bp)
+    app.register_blueprint(profile_page_bp)
+    app.register_blueprint(graph_page_bp)
+    app.register_blueprint(ai_analyst_bp)
+    app.register_blueprint(ai_analyst_page_bp)
     return app
 
 

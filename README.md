@@ -116,64 +116,31 @@ npm run build:css
 
 ---
 
-## 部署方式一：Windows 10 直接运行（无 Docker）
+## 部署方式一：Windows 10 Docker（内网服务器）
 
-适用于开发机、临时演示机，或没有 Docker 环境的内网 Windows 主机。
+适用于 Windows 10 内网服务器，统一使用 Docker 部署，不再使用本机 Python 直接运行。
 
 ### 前提条件
 
-- Python 3.12（推荐通过官网离线安装包安装，或使用已存在的 `.venv`）
-- Oracle Instant Client **Windows 版**（`.dll` 文件），解压到 `instantclient_11_2`
-  - 需包含 `oci.dll`、`oraocci11.dll`、`oraociei11.dll` 等
-- 模型文件已放入 `model\`：`biaochezhajiev2.pt`、`yolov8s-worldv2.pt`
-- `static\dist\tailwind.css` 已存在；如修改过模板 class，在联网构建机上执行 `npm run build:css` 后再带入内网
-- 建议使用 [uv](https://github.com/astral-sh/uv) 管理虚拟环境（也可用标准 `venv`）
+- Windows 10 已安装并启用 Docker Desktop 或兼容的 Docker 环境
+- 建议启用 Linux 容器模式，使用项目提供的 `compose.yaml` 启动
+- 模型文件已放入 `model/`：`biaochezhajiev2.pt`、`yolov8s-worldv2.pt`
+- `static/dist/tailwind.css` 已存在；如修改过模板 class，在构建机上执行 `npm run build:css` 后再带入内网
+- 共享数据目录、结果目录和 `jobs.sqlite3` 需按 Docker 挂载方式持久化
 
-### 1. 创建虚拟环境并安装依赖
+### 1. 准备镜像和配置
 
 ```powershell
 cd multi-rider
-
-# 使用 uv（推荐）
-uv venv .venv --python 3.12
-uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
-uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements-dev.txt
-
-# 单独安装 torch CPU 版（从 PyTorch 官方离线包安装）
-uv pip install --python .\.venv\Scripts\python.exe torch==2.8.0+cpu torchvision==0.23.0+cpu `
-    --index-url https://download.pytorch.org/whl/cpu
+cp .env.example .env
 ```
 
-> 如果事先已下载 `.whl` 文件，可用 `uv pip install .\wheels\torch-*.whl` 离线安装。
+根据实际环境修改 `.env` 中的数据库、模型和目录配置；内网环境下保持 `YOLO_TELEMETRY=false`。
 
-> 完整的 Windows 10 内网离线安装说明见 `docs/OFFLINE_INSTALL_WINDOWS10.md`。离线 wheel 默认放在项目根目录下的 `wheels/`。
-
-### 1.1 运行测试
+### 2. 启动服务
 
 ```powershell
-$env:FACE_SQL_ENABLED = "false"
-$env:DISPATCH_MOCK_MODE = "true"
-$env:YOLO_TELEMETRY = "false"
-uv pip install --python .\.venv\Scripts\python.exe -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m pytest
-```
-
-### 2. 配置环境变量
-
-在 PowerShell 中临时设置（每次启动前执行），或写入系统环境变量：
-
-```powershell
-$env:YOLO_TELEMETRY   = "false"
-$env:ORACLE_HOST      = "oracledb.example.com"
-$env:ORACLE_PASSWORD  = "你的数据库密码"
-$env:FLASK_SECRET_KEY = "改成随机字符串"
-# 其他变量按需修改，不设置则使用 shared/config/config.py 中的默认值
-```
-
-### 3. 启动服务
-
-```powershell
-python app.py
+docker compose up -d
 ```
 
 服务默认监听 `0.0.0.0:5001`，浏览器访问：
@@ -188,31 +155,28 @@ http://localhost:5001/
 http://本机IP:5001/
 ```
 
-### 4. 开机自启（可选）
+### 3. 常用运维命令
 
-可使用 Windows 任务计划程序，创建"系统启动时"触发的任务，操作为：
-
+```powershell
+docker compose ps
+docker compose logs -f
+docker compose restart
+docker compose down
 ```
-程序：C:\path\to\multi-rider\.venv\Scripts\python.exe
-参数：C:\path\to\multi-rider\app.py
-起始位置：C:\path\to\multi-rider
-```
-
-或使用 [NSSM](https://nssm.cc/) 将其注册为 Windows 服务。
 
 ### 注意事项
 
-- `instantclient_11_2\` 必须是 **Windows `.dll`** 版本，不能用 Linux `.so` 版本
+- Windows 10 这里是 Docker 宿主机，不是 Python 直跑环境
 - 防火墙需放通 5001 端口（入站规则），局域网其他设备才能访问
-- `output\` 目录下的 ZIP 文件需定期清理，默认无自动清理
+- `output/`、`upload_tmp/`、`train_runs/` 等目录应通过宿主机挂载保留数据
 
 ---
 
-## 部署方式二：Linux + Docker（内网服务器）
+## 部署方式二：CentOS Stream 10 Docker（内网服务器）
 
-适用于 CentOS / Debian / Ubuntu 等 Linux 内网服务器，推荐生产环境使用。
+适用于 CentOS Stream 10 内网服务器，统一使用 Docker 部署，推荐生产环境使用。
 
-推荐使用项目根目录新增的 `compose.yaml` + `.env` 同目录启动，不再要求把配置放到 `/opt`。
+推荐使用项目根目录的 `compose.yaml` + `.env` 同目录启动，不再要求把配置放到 `/opt`。
 
 ### 快速结论
 
@@ -261,11 +225,12 @@ sudo ufw allow 5001/tcp
 
 ## 两种部署方式对比
 
-| 对比项 | Windows 10 直接运行 | Linux Docker |
+| 对比项 | Windows 10 Docker | CentOS Stream 10 Docker |
 |---|---|---|
-| 环境要求 | Python 3.10 + uv | Docker |
-| Instant Client | Windows `.dll` 版 | 镜像内已包含 Linux `.so` 版 |
-| 适合场景 | 临时演示、开发调试 | 生产部署、长期运行 |
-| 开机自启 | 任务计划程序 / NSSM | `--restart unless-stopped` |
-| 数据持久化 | 本地目录 | 宿主机目录挂载 |
-| 升级方式 | 拉取代码重启 | 重建镜像替换容器 |
+| 环境要求 | Docker Desktop 或兼容 Docker 环境 | Docker |
+| 宿主机角色 | Windows 10 内网服务器 | CentOS Stream 10 内网服务器 |
+| Instant Client | 由容器镜像提供 Linux `.so` 版 | 由容器镜像提供 Linux `.so` 版 |
+| 适合场景 | 内网部署、统一容器化管理 | 生产部署、长期运行 |
+| 开机自启 | Docker 自动重启策略 | `--restart unless-stopped` |
+| 数据持久化 | 宿主机目录挂载 | 宿主机目录挂载 |
+| 升级方式 | 替换镜像并重启容器 | 重建镜像替换容器 |

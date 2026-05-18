@@ -4,6 +4,9 @@ Flask==3.0.0
 # HTTP client for intranet image downloads
 requests==2.31.0
 
+# HTTP client for Ruizhi OpenAI-compatible intranet API
+httpx==0.28.1
+
 # YOLO inference engine
 ultralytics==8.4.27
 torch==2.11.0

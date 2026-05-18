@@ -42,3 +42,4 @@ instantclient_11_2/*
 model/*
 !model/README.md
 CLIP/
+.claude/
