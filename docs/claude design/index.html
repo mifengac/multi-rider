@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920">
+  <title>未成年人侵财智能管控中枢</title>
+
+  <!-- ECharts (生产环境替换为本地 echarts.min.js) -->
+  <script src="https://unpkg.com/echarts@5.5.1/dist/echarts.min.js"></script>
+
+  <!-- 设计系统样式 -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- ====== 统一顶部导航壳 ====== -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="header-logo" id="header-logo"></div>
+        <span class="header-title">未成年人侵财智能管控中枢</span>
+        <div class="header-divider"></div>
+        <span class="header-subtitle" id="page-subtitle">态势总览</span>
+      </div>
+
+      <nav class="header-nav">
+        <button class="nav-tab active" data-page="dashboard">
+          <span class="nav-icon" data-icon="grid"></span>
+          态势总览
+        </button>
+        <button class="nav-tab" data-page="profile">
+          <span class="nav-icon" data-icon="user"></span>
+          个人画像
+        </button>
+        <button class="nav-tab" data-page="graph">
+          <span class="nav-icon" data-icon="network"></span>
+          关系图谱
+        </button>
+        <button class="nav-tab" data-page="analyst">
+          <span class="nav-icon" data-icon="sparkles"></span>
+          AI 研判
+        </button>
+        <button class="nav-tab" data-page="workbench">
+          <span class="nav-icon" data-icon="briefcase"></span>
+          工作台
+        </button>
+      </nav>
+
+      <div class="header-right">
+        <span class="header-clock" id="header-clock">00:00:00</span>
+        <span class="status-dot" title="系统在线"></span>
+        <button class="header-refresh-btn" id="refresh-btn" title="刷新数据">
+          <span class="nav-icon" data-icon="refresh"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ====== 页面容器 ====== -->
+    <div class="page-wrap">
+      <div class="page-container" id="page-dashboard"></div>
+      <div class="page-container hidden" id="page-profile"></div>
+      <div class="page-container hidden" id="page-graph"></div>
+      <div class="page-container hidden" id="page-analyst"></div>
+      <div class="page-container hidden" id="page-workbench"></div>
+    </div>
+  </div>
+
+  <!-- ====== JS 模块 ====== -->
+  <script src="js/icons.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/profile.js"></script>
+  <script src="js/graph.js"></script>
+  <script src="js/ai-analyst.js"></script>
+  <script src="js/workbench.js"></script>
+
+  <script>
+    // ====== 应用初始化 ======
+    (function() {
+      // 注入导航图标
+      document.querySelectorAll('.nav-icon').forEach(function(el) {
+        el.innerHTML = icon(el.dataset.icon, 18);
+      });
+
+      // 注入 Logo
+      document.getElementById('header-logo').innerHTML = logoSVG(32);
+
+      // 实时时钟
+      startClock(document.getElementById('header-clock'));
+
+      // 导航切换
+      document.querySelectorAll('.nav-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          PageManager.switchTo(this.dataset.page);
+        });
+      });
+
+      // 刷新按钮
+      document.getElementById('refresh-btn').addEventListener('click', function() {
+        var current = PageManager.current;
+        if (current && PageManager.pages[current]) {
+          var page = PageManager.pages[current];
+          var container = document.getElementById('page-' + current);
+          if (page.destroy) page.destroy();
+          if (container) container.dataset.rendered = '';
+          PageManager.current = null;
+          PageManager.switchTo(current);
+        }
+      });
+
+      // 启动默认页
+      PageManager.switchTo('dashboard');
+    })();
+  </script>
+</body>
+</html>
