@@ -30,7 +30,23 @@ Use this file when a task requires querying or analyzing business data related t
 | Suspect information | `"ywdata"."zq_zfba_xyrxx"` |
 | Case-involved person information | `"ywdata"."zq_zfba_saryxx"` |
 
+## Juvenile (未成年人) Filtering Pattern
+
+To find juvenile-related cases, join `zq_zfba_ajxx` with `zq_zfba_xyrxx` and filter by age using the ID number (positions 7-14 encode birth date):
+
+```sql
+FROM "ywdata"."zq_zfba_ajxx" a
+JOIN "ywdata"."zq_zfba_xyrxx" x
+  ON x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
+WHERE LENGTH(x."xyrxx_sfzh") = 18
+  AND DATE_PART('year',
+        AGE(a."ajxx_fasj"::date,
+            TO_DATE(SUBSTR(x."xyrxx_sfzh", 7, 8), 'YYYYMMDD'))
+      ) < 18
+  AND COALESCE(NULLIF(x."xyrxx_isdel_dm", ''), '0')::integer = 0
+```
+
 ## Important Notes
 
 - `"ywdata"."zq_zfba_saryxx"` may not exist in the current local database clone yet. Use this table name as the expected production table for case-involved person information, and inspect its structure after the local schema is synchronized.
-- Do not use `"ywdata"."zq_zfba_wcnr_ajxx"` as the general case-information table. The general case-information table is `"ywdata"."zq_zfba_ajxx"`.
+- Do not use `"ywdata"."zq_zfba_wcnr_ajxx"` or `"ywdata"."zq_zfba_wcnr_xyr"` in application SQL. Use the general tables `"ywdata"."zq_zfba_ajxx"` and `"ywdata"."zq_zfba_xyrxx"` with the juvenile filtering pattern above.

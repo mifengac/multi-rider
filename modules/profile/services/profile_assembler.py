@@ -81,12 +81,13 @@ def get_education_info(zjhm: str) -> dict:
 
 def get_cases(zjhm: str) -> list[dict]:
     sql = """
-        SELECT a.ajxx_ajbh, a.ajxx_ajmc, a.ajxx_ay, a.ajxx_fasj, a.ajxx_cbdw_mc
-        FROM "ywdata"."zq_zfba_wcnr_ajxx" a
-        JOIN "ywdata"."zq_zfba_wcnr_xyr" x
-          ON x.ajxx_join_ajxx_ajbh = a.ajxx_ajbh
-        WHERE x.xyrxx_sfzh = %(zjhm)s
-        ORDER BY a.ajxx_fasj DESC
+        SELECT a."ajxx_ajbh", a."ajxx_ajmc", a."ajxx_ay",
+               a."ajxx_fasj", a."ajxx_cbdw_mc"
+        FROM "ywdata"."zq_zfba_ajxx" a
+        JOIN "ywdata"."zq_zfba_xyrxx" x
+          ON x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
+        WHERE x."xyrxx_sfzh" = %(zjhm)s
+        ORDER BY a."ajxx_fasj" DESC
     """
     return query_all(sql, {"zjhm": zjhm})
 
@@ -115,14 +116,15 @@ def get_hotel_records(zjhm: str) -> list[dict]:
 
 def get_co_suspects(zjhm: str) -> list[dict]:
     sql = """
-        SELECT DISTINCT x2.xyrxx_sfzh AS zjhm, x2.xyrxx_xm AS xm,
+        SELECT x2."xyrxx_sfzh" AS zjhm, x2."xyrxx_xm" AS xm,
                COUNT(*) AS case_count
-        FROM "ywdata"."zq_zfba_wcnr_xyr" x1
-        JOIN "ywdata"."zq_zfba_wcnr_xyr" x2
-          ON x2.ajxx_join_ajxx_ajbh = x1.ajxx_join_ajxx_ajbh
-          AND x2.xyrxx_sfzh <> x1.xyrxx_sfzh
-        WHERE x1.xyrxx_sfzh = %(zjhm)s
-        GROUP BY x2.xyrxx_sfzh, x2.xyrxx_xm
+        FROM "ywdata"."zq_zfba_xyrxx" x1
+        JOIN "ywdata"."zq_zfba_xyrxx" x2
+          ON x2."ajxx_join_ajxx_ajbh" = x1."ajxx_join_ajxx_ajbh"
+          AND x2."xyrxx_sfzh" <> x1."xyrxx_sfzh"
+        WHERE x1."xyrxx_sfzh" = %(zjhm)s
+          AND NULLIF(BTRIM(COALESCE(x2."xyrxx_sfzh", '')), '') IS NOT NULL
+        GROUP BY x2."xyrxx_sfzh", x2."xyrxx_xm"
         ORDER BY case_count DESC
         LIMIT 10
     """

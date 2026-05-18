@@ -28,12 +28,13 @@ def find_shortest_path(from_zjhm: str, to_zjhm: str, max_hops: int = 4) -> dict:
 
 def _get_co_suspects(zjhm: str) -> list[str]:
     sql = """
-        SELECT DISTINCT x2.xyrxx_sfzh
-        FROM "ywdata"."zq_zfba_wcnr_xyr" x1
-        JOIN "ywdata"."zq_zfba_wcnr_xyr" x2
-          ON x2.ajxx_join_ajxx_ajbh = x1.ajxx_join_ajxx_ajbh
-          AND x2.xyrxx_sfzh <> x1.xyrxx_sfzh
-        WHERE x1.xyrxx_sfzh = %(zjhm)s
+        SELECT DISTINCT x2."xyrxx_sfzh"
+        FROM "ywdata"."zq_zfba_xyrxx" x1
+        JOIN "ywdata"."zq_zfba_xyrxx" x2
+          ON x2."ajxx_join_ajxx_ajbh" = x1."ajxx_join_ajxx_ajbh"
+          AND x2."xyrxx_sfzh" <> x1."xyrxx_sfzh"
+        WHERE x1."xyrxx_sfzh" = %(zjhm)s
+          AND NULLIF(BTRIM(COALESCE(x2."xyrxx_sfzh", '')), '') IS NOT NULL
     """
     rows = query_all(sql, {"zjhm": zjhm})
     return [r["xyrxx_sfzh"] for r in rows if r.get("xyrxx_sfzh")]

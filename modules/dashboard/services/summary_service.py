@@ -10,8 +10,18 @@ def get_summary() -> dict:
         WHERE total_score >= 60
     """
     month_cases_sql = """
-        SELECT COUNT(*) AS total FROM "ywdata"."zq_zfba_wcnr_ajxx"
-        WHERE ajxx_fasj >= DATE_TRUNC('month', CURRENT_DATE)
+        SELECT COUNT(DISTINCT a."ajxx_ajbh") AS total
+        FROM "ywdata"."zq_zfba_ajxx" a
+        WHERE a."ajxx_fasj" >= DATE_TRUNC('month', CURRENT_DATE)
+          AND EXISTS (
+              SELECT 1 FROM "ywdata"."zq_zfba_xyrxx" x
+              WHERE x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
+                AND LENGTH(x."xyrxx_sfzh") = 18
+                AND DATE_PART('year',
+                      AGE(a."ajxx_fasj"::date,
+                          TO_DATE(SUBSTR(x."xyrxx_sfzh", 7, 8), 'YYYYMMDD'))
+                    ) < 18
+          )
     """
     extreme_risk_sql = """
         SELECT COUNT(*) AS total FROM "jcgkzx_monitor"."wcnr_score"

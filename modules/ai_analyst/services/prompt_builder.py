@@ -101,7 +101,11 @@ def build_person_analysis_prompt(person_data: dict) -> list[dict]:
     ]
 
 
-def build_serial_case_prompt(cases: list[dict], similar_pairs: list[dict]) -> list[dict]:
+def build_serial_case_prompt(
+    cases: list[dict],
+    similar_pairs: list[dict],
+    used_embedding: bool = True,
+) -> list[dict]:
     case_lines = []
     for i, c in enumerate(cases, 1):
         case_lines.append(
@@ -110,20 +114,25 @@ def build_serial_case_prompt(cases: list[dict], similar_pairs: list[dict]) -> li
         )
     case_text = "\n".join(case_lines)
 
-    pair_lines = []
-    for p in similar_pairs[:15]:
-        pair_lines.append(
-            f"- 案件{p['i']+1} ↔ 案件{p['j']+1} (相似度: {p['score']:.3f})"
+    if used_embedding and similar_pairs:
+        pair_lines = []
+        for p in similar_pairs[:15]:
+            pair_lines.append(
+                f"- 案件{p['i']+1} ↔ 案件{p['j']+1} (相似度: {p['score']:.3f})"
+            )
+        hint_section = f"AI向量分析发现的高相似度案件对：\n" + "\n".join(pair_lines)
+    else:
+        hint_section = (
+            "（向量相似度服务暂不可用，请直接根据案件信息进行串并分析。）"
         )
-    pair_text = "\n".join(pair_lines) if pair_lines else "未发现高相似度案件对"
 
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {
             "role": "user",
             "content": (
-                f"以下是近期未成年人侵财案件列表：\n\n{case_text}\n\n"
-                f"AI向量分析发现的高相似度案件对：\n{pair_text}\n\n"
+                f"以下是近期未成年人侵财案件列表（共{len(cases)}起）：\n\n{case_text}\n\n"
+                f"{hint_section}\n\n"
                 "请分析：\n"
                 "1. 哪些案件可能是同一团伙或同一人所为（串并案），给出理由\n"
                 "2. 作案手法的共同特征\n"

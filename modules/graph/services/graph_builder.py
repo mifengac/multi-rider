@@ -95,10 +95,11 @@ def build_person_graph(zjhm: str, depth: int = 1) -> dict:
 
 def _add_cases(zjhm: str, nodes: dict, edges: list):
     sql = """
-        SELECT a.ajxx_ajbh, a.ajxx_ajmc, a.ajxx_ay, a.ajxx_fasj
-        FROM "ywdata"."zq_zfba_wcnr_ajxx" a
-        JOIN "ywdata"."zq_zfba_wcnr_xyr" x ON x.ajxx_join_ajxx_ajbh = a.ajxx_ajbh
-        WHERE x.xyrxx_sfzh = %(zjhm)s
+        SELECT a."ajxx_ajbh", a."ajxx_ajmc", a."ajxx_ay", a."ajxx_fasj"
+        FROM "ywdata"."zq_zfba_ajxx" a
+        JOIN "ywdata"."zq_zfba_xyrxx" x
+          ON x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
+        WHERE x."xyrxx_sfzh" = %(zjhm)s
     """
     cases = query_all(sql, {"zjhm": zjhm})
     for c in cases:
@@ -114,12 +115,13 @@ def _add_cases(zjhm: str, nodes: dict, edges: list):
 
 def _add_co_suspects(zjhm: str, nodes: dict, edges: list):
     sql = """
-        SELECT DISTINCT x2.xyrxx_sfzh, x2.xyrxx_xm
-        FROM "ywdata"."zq_zfba_wcnr_xyr" x1
-        JOIN "ywdata"."zq_zfba_wcnr_xyr" x2
-          ON x2.ajxx_join_ajxx_ajbh = x1.ajxx_join_ajxx_ajbh
-          AND x2.xyrxx_sfzh <> x1.xyrxx_sfzh
-        WHERE x1.xyrxx_sfzh = %(zjhm)s
+        SELECT DISTINCT x2."xyrxx_sfzh", x2."xyrxx_xm"
+        FROM "ywdata"."zq_zfba_xyrxx" x1
+        JOIN "ywdata"."zq_zfba_xyrxx" x2
+          ON x2."ajxx_join_ajxx_ajbh" = x1."ajxx_join_ajxx_ajbh"
+          AND x2."xyrxx_sfzh" <> x1."xyrxx_sfzh"
+        WHERE x1."xyrxx_sfzh" = %(zjhm)s
+          AND NULLIF(BTRIM(COALESCE(x2."xyrxx_sfzh", '')), '') IS NOT NULL
     """
     score_sql = """
         SELECT zjhm, total_score, risk_level
@@ -196,8 +198,8 @@ def search_nodes(keyword: str) -> list[dict]:
         LIMIT 10
     """
     case_sql = """
-        SELECT ajxx_ajbh, ajxx_ajmc FROM "ywdata"."zq_zfba_wcnr_ajxx"
-        WHERE ajxx_ajmc LIKE %(kw)s OR ajxx_ajbh LIKE %(kw)s
+        SELECT "ajxx_ajbh", "ajxx_ajmc" FROM "ywdata"."zq_zfba_ajxx"
+        WHERE "ajxx_ajmc" LIKE %(kw)s OR "ajxx_ajbh" LIKE %(kw)s
         LIMIT 10
     """
     kw = f"%{keyword}%"

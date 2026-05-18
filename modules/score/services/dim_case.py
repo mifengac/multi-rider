@@ -4,11 +4,11 @@ from shared.db.kingbase import query_all
 
 def calc_case_score(zjhm: str) -> tuple[int, dict]:
     cases_sql = """
-        SELECT a.ajxx_ajbh, a.ajxx_ay, a.ajxx_fasj
-        FROM "ywdata"."zq_zfba_wcnr_ajxx" a
-        JOIN "ywdata"."zq_zfba_wcnr_xyr" x
-          ON x.ajxx_join_ajxx_ajbh = a.ajxx_ajbh
-        WHERE x.xyrxx_sfzh = %(zjhm)s
+        SELECT a."ajxx_ajbh", a."ajxx_ay", a."ajxx_fasj"
+        FROM "ywdata"."zq_zfba_ajxx" a
+        JOIN "ywdata"."zq_zfba_xyrxx" x
+          ON x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
+        WHERE x."xyrxx_sfzh" = %(zjhm)s
     """
     bczj_sql = """
         SELECT ajbh, ay, wfsj AS ajxx_fasj

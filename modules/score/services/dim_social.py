@@ -3,12 +3,14 @@ from shared.db.kingbase import query_all
 
 def calc_social_score(zjhm: str) -> tuple[int, dict]:
     co_suspects_sql = """
-        SELECT DISTINCT x2.xyrxx_sfzh, x2.xyrxx_xm, x1.ajxx_join_ajxx_ajbh
-        FROM "ywdata"."zq_zfba_wcnr_xyr" x1
-        JOIN "ywdata"."zq_zfba_wcnr_xyr" x2
-          ON x2.ajxx_join_ajxx_ajbh = x1.ajxx_join_ajxx_ajbh
-          AND x2.xyrxx_sfzh <> x1.xyrxx_sfzh
-        WHERE x1.xyrxx_sfzh = %(zjhm)s
+        SELECT DISTINCT x2."xyrxx_sfzh", x2."xyrxx_xm",
+               x1."ajxx_join_ajxx_ajbh"
+        FROM "ywdata"."zq_zfba_xyrxx" x1
+        JOIN "ywdata"."zq_zfba_xyrxx" x2
+          ON x2."ajxx_join_ajxx_ajbh" = x1."ajxx_join_ajxx_ajbh"
+          AND x2."xyrxx_sfzh" <> x1."xyrxx_sfzh"
+        WHERE x1."xyrxx_sfzh" = %(zjhm)s
+          AND NULLIF(BTRIM(COALESCE(x2."xyrxx_sfzh", '')), '') IS NOT NULL
     """
     co_suspects = query_all(co_suspects_sql, {"zjhm": zjhm})
 

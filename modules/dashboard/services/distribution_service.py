@@ -3,10 +3,20 @@ from shared.db.kingbase import query_all
 
 def get_case_type_distribution() -> list[dict]:
     sql = """
-        SELECT ajxx_ay AS label, COUNT(*) AS value
-        FROM "ywdata"."zq_zfba_wcnr_ajxx"
-        WHERE ajxx_ay IS NOT NULL
-        GROUP BY ajxx_ay
+        SELECT a."ajxx_ay" AS label,
+               COUNT(DISTINCT a."ajxx_ajbh") AS value
+        FROM "ywdata"."zq_zfba_ajxx" a
+        WHERE a."ajxx_ay" IS NOT NULL
+          AND EXISTS (
+              SELECT 1 FROM "ywdata"."zq_zfba_xyrxx" x
+              WHERE x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
+                AND LENGTH(x."xyrxx_sfzh") = 18
+                AND DATE_PART('year',
+                      AGE(COALESCE(a."ajxx_fasj"::date, CURRENT_DATE),
+                          TO_DATE(SUBSTR(x."xyrxx_sfzh", 7, 8), 'YYYYMMDD'))
+                    ) < 18
+          )
+        GROUP BY a."ajxx_ay"
         ORDER BY value DESC
         LIMIT 10
     """

@@ -94,16 +94,21 @@ def analyze_serial():
     body = request.get_json(force=True)
     months = body.get("months", 6)
 
-    cases = fetch_recent_qincai_cases(months)
+    try:
+        cases = fetch_recent_qincai_cases(months)
+    except Exception as e:
+        return _sse_text(f"查询案件数据失败: {e}")
+
     if len(cases) < 2:
         return _sse_text(f"近{months}个月内侵财案件不足2起，无法进行串并分析。")
 
-    similar_pairs = find_serial_candidates(cases)
-    messages = build_serial_case_prompt(cases, similar_pairs)
+    similar_pairs, used_embedding = find_serial_candidates(cases)
+    messages = build_serial_case_prompt(cases, similar_pairs, used_embedding)
 
     result_meta = {
         "case_count": len(cases),
         "pair_count": len(similar_pairs),
+        "used_embedding": used_embedding,
     }
 
     try:
