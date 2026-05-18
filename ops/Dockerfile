@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=python:3.10-slim-bullseye
+ARG BASE_IMAGE=python:3.12-slim-bookworm
 FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -71,8 +71,8 @@ COPY wheels/clip-1.0-py3-none-any.whl ./wheels/
 RUN grep -Ev '^(torch|torchvision|triton|nvidia-[^=]+)==' requirements.lock > requirements.docker.lock \
     && /usr/local/bin/python -m pip install --no-cache-dir --no-deps \
         --index-url https://download.pytorch.org/whl/cpu \
-        torch==2.8.0+cpu \
-        torchvision==0.23.0 \
+        torch==2.6.0+cpu \
+        torchvision==0.21.0 \
     && (/usr/local/bin/python -m pip install --no-cache-dir \
         --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
         -r requirements.docker.lock \
