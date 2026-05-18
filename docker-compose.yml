@@ -1,10 +1,7 @@
 name: multi-rider
 
 x-app-common: &app-common
-  image: multi-rider:latest
-  build:
-    context: .
-    dockerfile: ops/Dockerfile
+  image: ${MULTI_RIDER_IMAGE:-multi-rider:offline-20260517}
   env_file:
     - ${APP_ENV_FILE:-./app.env}
   volumes:

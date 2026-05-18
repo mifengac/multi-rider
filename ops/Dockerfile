@@ -1,6 +1,8 @@
 ARG BASE_IMAGE=python:3.12-slim-bookworm
 FROM ${BASE_IMAGE}
 
+ARG REQUIRE_ORACLE_CLIENT=true
+
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin \
     PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
@@ -21,7 +23,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     YOLO_TELEMETRY=false
 
 RUN set -eux; \
-    cp -a /etc/apt/sources.list /tmp/sources.list.official; \
+    if [ -f /etc/apt/sources.list ]; then cp -a /etc/apt/sources.list /tmp/sources.list.official; fi; \
+    if [ -f /etc/apt/sources.list.d/debian.sources ]; then cp -a /etc/apt/sources.list.d/debian.sources /tmp/debian.sources.official; fi; \
     if [ -f /etc/apt/sources.list ]; then \
         sed -i -e 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' \
                -e 's|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list; \
@@ -32,10 +35,8 @@ RUN set -eux; \
     fi; \
     if ! apt-get update; then \
         echo "Tsinghua apt mirror failed, falling back to official Debian sources"; \
-        cp -a /tmp/sources.list.official /etc/apt/sources.list; \
-        if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
-            sed -i -e 's|mirrors.tuna.tsinghua.edu.cn|deb.debian.org|g' /etc/apt/sources.list.d/debian.sources; \
-        fi; \
+        if [ -f /tmp/sources.list.official ]; then cp -a /tmp/sources.list.official /etc/apt/sources.list; fi; \
+        if [ -f /tmp/debian.sources.official ]; then cp -a /tmp/debian.sources.official /etc/apt/sources.list.d/debian.sources; fi; \
         apt-get update; \
     fi; \
     if ! apt-get install -y --no-install-recommends \
@@ -47,10 +48,8 @@ RUN set -eux; \
         libxext6 \
         libxrender1; then \
         echo "Tsinghua apt install failed, falling back to official Debian sources"; \
-        cp -a /tmp/sources.list.official /etc/apt/sources.list; \
-        if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
-            sed -i -e 's|mirrors.tuna.tsinghua.edu.cn|deb.debian.org|g' /etc/apt/sources.list.d/debian.sources; \
-        fi; \
+        if [ -f /tmp/sources.list.official ]; then cp -a /tmp/sources.list.official /etc/apt/sources.list; fi; \
+        if [ -f /tmp/debian.sources.official ]; then cp -a /tmp/debian.sources.official /etc/apt/sources.list.d/debian.sources; fi; \
         apt-get update; \
         apt-get install -y --no-install-recommends \
             ca-certificates \
@@ -73,11 +72,11 @@ RUN grep -Ev '^(torch|torchvision|triton|nvidia-[^=]+)==' requirements.lock > re
         --index-url https://download.pytorch.org/whl/cpu \
         torch==2.6.0+cpu \
         torchvision==0.21.0 \
-    && (/usr/local/bin/python -m pip install --no-cache-dir \
+    && (/usr/local/bin/python -m pip install --no-cache-dir --no-deps \
         --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
         -r requirements.docker.lock \
         || (echo "Tsinghua pip mirror failed, falling back to official PyPI" \
-            && /usr/local/bin/python -m pip install --no-cache-dir \
+            && /usr/local/bin/python -m pip install --no-cache-dir --no-deps \
                 --index-url https://pypi.org/simple \
                 -r requirements.docker.lock))
 
@@ -97,7 +96,13 @@ RUN test -f /app/model/biaochezhajiev2.pt || (echo "Missing model/biaochezhajiev
     && test -f /app/model/det_10g.onnx || (echo "Missing model/det_10g.onnx" >&2; exit 1) \
     && test -f /app/model/w600k_r50.onnx || (echo "Missing model/w600k_r50.onnx" >&2; exit 1) \
     && test -f /app/static/dist/tailwind.css || (echo "Missing built Tailwind CSS at static/dist/tailwind.css; run npm run build:css before docker build" >&2; exit 1) \
-    && test -f /app/instantclient_11_2/libclntsh.so.11.1 || (echo "Missing Linux Oracle Instant Client under instantclient_11_2/" >&2; exit 1) \
+    && if [ "${REQUIRE_ORACLE_CLIENT}" = "true" ]; then \
+        test -f /app/instantclient_11_2/libclntsh.so.11.1 || (echo "Missing /app/instantclient_11_2/libclntsh.so.11.1" >&2; exit 1); \
+        test -f /app/instantclient_11_2/libnnz11.so || (echo "Missing /app/instantclient_11_2/libnnz11.so" >&2; exit 1); \
+        test -f /app/instantclient_11_2/libociei.so || (echo "Missing /app/instantclient_11_2/libociei.so" >&2; exit 1); \
+    else \
+        echo "Skipping Oracle Instant Client validation; image will rely on python-oracledb thin mode unless client libs are mounted later."; \
+    fi \
     && mkdir -p /data/output /data/upload_tmp /data/face_data /data/datasets /data/train_runs
 
 VOLUME ["/data"]

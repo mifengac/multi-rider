@@ -181,7 +181,7 @@ docker compose down
 ### 快速结论
 
 1. 当前仓库内的 `instantclient_11_2/` 已切换为 Linux x86_64 版共享库，可直接打入 Linux Docker 镜像。
-2. Docker 镜像默认启用 `python-oracledb` thick mode；如需切回 thin mode，可在 `.env` 中把 `ORACLE_USE_THICK_MODE=false`。
+2. 当前仓库默认按 `python-oracledb` thick mode 运行；构建镜像前需先把 Linux x86_64 Instant Client 共享库放入 `instantclient_11_2/`，其中至少包含 `libclntsh.so.11.1`、`libnnz11.so`、`libociei.so`。
 3. 离线部署建议直接参考 [docs/OFFLINE_DEPLOY_CENTOS_STREAM10.md](docs/OFFLINE_DEPLOY_CENTOS_STREAM10.md)。
 
 ### 最小部署步骤
