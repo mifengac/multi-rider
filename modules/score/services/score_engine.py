@@ -60,7 +60,7 @@ def calculate_score(zjhm: str) -> dict:
 
 
 def batch_recalculate() -> dict:
-    sql = 'SELECT zjhm FROM "jcgkzx_monitoer"."wcnr_target_pool"'
+    sql = 'SELECT zjhm FROM "jcgkzx_monitor"."wcnr_target_pool"'
     rows = query_all(sql)
 
     total = len(rows)

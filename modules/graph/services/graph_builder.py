@@ -63,8 +63,8 @@ def build_person_graph(zjhm: str, depth: int = 1) -> dict:
 
     center_sql = """
         SELECT p.zjhm, p.xm, s.total_score, s.risk_level
-        FROM "jcgkzx_monitoer"."wcnr_target_pool" p
-        LEFT JOIN "jcgkzx_monitoer"."wcnr_score" s ON s.zjhm = p.zjhm
+        FROM "jcgkzx_monitor"."wcnr_target_pool" p
+        LEFT JOIN "jcgkzx_monitor"."wcnr_score" s ON s.zjhm = p.zjhm
         WHERE p.zjhm = %(zjhm)s
     """
     center = query_one(center_sql, {"zjhm": zjhm})
@@ -123,7 +123,7 @@ def _add_co_suspects(zjhm: str, nodes: dict, edges: list):
     """
     score_sql = """
         SELECT zjhm, total_score, risk_level
-        FROM "jcgkzx_monitoer"."wcnr_score"
+        FROM "jcgkzx_monitor"."wcnr_score"
         WHERE zjhm = %(co_zjhm)s
     """
     co_suspects = query_all(sql, {"zjhm": zjhm})
@@ -191,7 +191,7 @@ def _add_school(zjhm: str, nodes: dict, edges: list):
 
 def search_nodes(keyword: str) -> list[dict]:
     person_sql = """
-        SELECT zjhm, xm FROM "jcgkzx_monitoer"."wcnr_target_pool"
+        SELECT zjhm, xm FROM "jcgkzx_monitor"."wcnr_target_pool"
         WHERE xm LIKE %(kw)s OR zjhm LIKE %(kw)s
         LIMIT 10
     """

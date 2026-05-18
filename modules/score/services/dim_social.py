@@ -31,7 +31,7 @@ def calc_social_score(zjhm: str) -> tuple[int, dict]:
         params = {f"s{i}": sfzh for i, sfzh in enumerate(unique_suspects.keys())}
         score_sql = f"""
             SELECT zjhm, total_score
-            FROM "jcgkzx_monitoer"."wcnr_score"
+            FROM "jcgkzx_monitor"."wcnr_score"
             WHERE zjhm IN ({placeholders}) AND total_score >= 60
         """
         high_risk_rows = query_all(score_sql, params)

@@ -1,6 +1,6 @@
-CREATE SCHEMA IF NOT EXISTS jcgkzx_monitoer;
+CREATE SCHEMA IF NOT EXISTS jcgkzx_monitor;
 
-SET search_path TO jcgkzx_monitoer;
+SET search_path TO jcgkzx_monitor;
 
 CREATE TABLE IF NOT EXISTS wcnr_target_pool (
     zjhm VARCHAR(18) PRIMARY KEY,

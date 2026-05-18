@@ -5,14 +5,14 @@ def get_basic_info(zjhm: str) -> dict:
     sql = """
         SELECT c.zjhm, c.xm, c.xb, c.mz, c.csrq, c.hjdz, c.xzdxz, c.whcd,
                c.fqxm, c.fqzjhm, c.mqxm, c.mqzjhm, c.lxdh
-        FROM "jcgkzx_monitoer"."wcnr_czrk" c
+        FROM "jcgkzx_monitor"."wcnr_czrk" c
         WHERE c.zjhm = %(zjhm)s
     """
     row = query_one(sql, {"zjhm": zjhm})
     if not row:
         pool_sql = """
             SELECT zjhm, xm, xb, csrq, ssfj, sspcs
-            FROM "jcgkzx_monitoer"."wcnr_target_pool"
+            FROM "jcgkzx_monitor"."wcnr_target_pool"
             WHERE zjhm = %(zjhm)s
         """
         row = query_one(pool_sql, {"zjhm": zjhm})
@@ -22,7 +22,7 @@ def get_basic_info(zjhm: str) -> dict:
 def get_photo(zjhm: str) -> dict:
     sql = """
         SELECT zjhm, zp, zp_source
-        FROM "jcgkzx_monitoer"."wcnr_rk_zp"
+        FROM "jcgkzx_monitor"."wcnr_rk_zp"
         WHERE zjhm = %(zjhm)s
     """
     return query_one(sql, {"zjhm": zjhm})
@@ -105,7 +105,7 @@ def get_behaviors(zjhm: str) -> list[dict]:
 def get_hotel_records(zjhm: str) -> list[dict]:
     sql = """
         SELECT lgmc, lgdz, rzsj, lksj, tfrxm, tfrzjhm
-        FROM "jcgkzx_monitoer"."wcnr_ly_checkin"
+        FROM "jcgkzx_monitor"."wcnr_ly_checkin"
         WHERE zjhm = %(zjhm)s
         ORDER BY rzsj DESC
         LIMIT 10
@@ -133,7 +133,7 @@ def get_score_info(zjhm: str) -> dict:
     sql = """
         SELECT total_score, risk_level, dim_case, dim_behavior,
                dim_family, dim_education, dim_social, calc_time
-        FROM "jcgkzx_monitoer"."wcnr_score"
+        FROM "jcgkzx_monitor"."wcnr_score"
         WHERE zjhm = %(zjhm)s
     """
     return query_one(sql, {"zjhm": zjhm})

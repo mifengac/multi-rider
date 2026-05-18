@@ -3,10 +3,10 @@ from shared.db.kingbase import query_one
 
 def get_summary() -> dict:
     total_persons_sql = """
-        SELECT COUNT(*) AS total FROM "jcgkzx_monitoer"."wcnr_target_pool"
+        SELECT COUNT(*) AS total FROM "jcgkzx_monitor"."wcnr_target_pool"
     """
     high_risk_sql = """
-        SELECT COUNT(*) AS total FROM "jcgkzx_monitoer"."wcnr_score"
+        SELECT COUNT(*) AS total FROM "jcgkzx_monitor"."wcnr_score"
         WHERE total_score >= 60
     """
     month_cases_sql = """
@@ -14,12 +14,12 @@ def get_summary() -> dict:
         WHERE ajxx_fasj >= DATE_TRUNC('month', CURRENT_DATE)
     """
     extreme_risk_sql = """
-        SELECT COUNT(*) AS total FROM "jcgkzx_monitoer"."wcnr_score"
+        SELECT COUNT(*) AS total FROM "jcgkzx_monitor"."wcnr_score"
         WHERE total_score >= 80
     """
     avg_score_sql = """
         SELECT ROUND(AVG(total_score), 1) AS avg_score
-        FROM "jcgkzx_monitoer"."wcnr_score"
+        FROM "jcgkzx_monitor"."wcnr_score"
         WHERE total_score > 0
     """
 

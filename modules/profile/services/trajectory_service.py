@@ -4,7 +4,7 @@ from shared.db.kingbase import query_all, query_one
 def get_recent_trajectory(zjhm: str, days: int = 30) -> list[dict]:
     sql = """
         SELECT device_name, shot_time, jd, wd, ssfj, sspcs
-        FROM "jcgkzx_monitoer"."wcnr_ryrl_gj"
+        FROM "jcgkzx_monitor"."wcnr_ryrl_gj"
         WHERE zjhm = %(zjhm)s
           AND shot_time >= CURRENT_TIMESTAMP - make_interval(days => %(days)s)
         ORDER BY shot_time DESC
@@ -17,7 +17,7 @@ def get_hotspots(zjhm: str, days: int = 90) -> list[dict]:
     sql = """
         SELECT device_name AS location, COUNT(*) AS count,
                AVG(jd) AS avg_jd, AVG(wd) AS avg_wd
-        FROM "jcgkzx_monitoer"."wcnr_ryrl_gj"
+        FROM "jcgkzx_monitor"."wcnr_ryrl_gj"
         WHERE zjhm = %(zjhm)s
           AND shot_time >= CURRENT_TIMESTAMP - make_interval(days => %(days)s)
           AND device_name IS NOT NULL
@@ -33,7 +33,7 @@ def get_time_pattern(zjhm: str, days: int = 90) -> dict:
         SELECT
             EXTRACT(HOUR FROM shot_time)::INTEGER AS hour,
             COUNT(*) AS count
-        FROM "jcgkzx_monitoer"."wcnr_ryrl_gj"
+        FROM "jcgkzx_monitor"."wcnr_ryrl_gj"
         WHERE zjhm = %(zjhm)s
           AND shot_time >= CURRENT_TIMESTAMP - make_interval(days => %(days)s)
         GROUP BY EXTRACT(HOUR FROM shot_time)
@@ -60,7 +60,7 @@ def get_time_pattern(zjhm: str, days: int = 90) -> dict:
 def get_last_seen(zjhm: str) -> dict:
     sql = """
         SELECT device_name, shot_time, jd, wd
-        FROM "jcgkzx_monitoer"."wcnr_ryrl_gj"
+        FROM "jcgkzx_monitor"."wcnr_ryrl_gj"
         WHERE zjhm = %(zjhm)s
         ORDER BY shot_time DESC
         LIMIT 1

@@ -1,4 +1,4 @@
-SET search_path TO jcgkzx_monitoer;
+SET search_path TO jcgkzx_monitor;
 
 INSERT INTO wcnr_target_pool (
     zjhm,
