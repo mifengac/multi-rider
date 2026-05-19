@@ -83,6 +83,10 @@ def create_app() -> Flask:
     app.register_blueprint(ai_analyst_bp)
     app.register_blueprint(ai_analyst_page_bp)
     app.register_blueprint(workbench_page_bp)
+    if os.environ.get("WCNR_SCHEDULER_ENABLED", "1") == "1":
+        from shared.scheduler import start_scheduler
+
+        start_scheduler(app)
     return app
 
 

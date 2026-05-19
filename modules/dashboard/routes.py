@@ -8,6 +8,7 @@ from .services.distribution_service import (
     get_gender_distribution, get_source_distribution, get_school_ranking,
 )
 from .services.alert_service import get_recent_alerts, mark_alert_read, handle_alert
+from .services.alert_rule_engine import run_all_rules
 from .services.heatmap_service import get_heatmap
 
 
@@ -55,6 +56,11 @@ def distribution():
 def alerts():
     limit = request.args.get("limit", 20, type=int)
     return jsonify({"items": get_recent_alerts(limit)})
+
+
+@dashboard_bp.route("/alerts/scan", methods=["POST"])
+def alert_scan():
+    return jsonify({"result": run_all_rules()})
 
 
 @dashboard_bp.route("/heatmap", methods=["GET"])

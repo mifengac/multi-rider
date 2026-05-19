@@ -13,6 +13,8 @@
     .control-btn { background: #334155; border: none; color: #94a3b8; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; }
     .control-btn:hover { background: #475569; color: white; }
     .control-btn.active { background: #3b82f6; color: white; }
+    .filter-select { background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 0.75rem; min-width: 120px; padding: 5px 8px; }
+    .filter-select:focus { outline: none; border-color: #3b82f6; }
   </style>
 {% endblock %}
 
@@ -27,11 +29,36 @@
           <button type="submit" class="control-btn">搜索</button>
         </form>
       </div>
-      <div class="flex items-center gap-2">
-        <div class="flex gap-1 mr-4">
+      <div class="flex items-center gap-3">
+        <div class="flex gap-1">
           <button class="control-btn active" onclick="setDepth(1)">1层</button>
           <button class="control-btn" onclick="setDepth(2)">2层</button>
+          <button class="control-btn" onclick="setDepth(3)">3层</button>
         </div>
+        <label class="flex items-center gap-2 text-xs text-slate-400">
+          关系筛选
+          <select id="relationFilter" class="filter-select" multiple size="3" onchange="reloadCurrentGraph()">
+            <option value="suspected_in" selected>涉案</option>
+            <option value="co_suspect" selected>共犯</option>
+            <option value="guardian_of" selected>监护</option>
+            <option value="studies_at" selected>就读</option>
+            <option value="appeared_at" selected>轨迹</option>
+            <option value="checked_in" selected>入住</option>
+            <option value="lives_at" selected>居住</option>
+            <option value="same_school" selected>同校</option>
+            <option value="same_area" selected>同辖区</option>
+          </select>
+        </label>
+        <label class="flex items-center gap-2 text-xs text-slate-400">
+          时间范围
+          <select id="timeRange" class="filter-select" onchange="reloadCurrentGraph()">
+            <option value="">全部</option>
+            <option value="1m">近 1 月</option>
+            <option value="3m">近 3 月</option>
+            <option value="6m">近 6 月</option>
+            <option value="1y">近 1 年</option>
+          </select>
+        </label>
       </div>
     </div>
 
@@ -45,6 +72,8 @@
           <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div> 案件</div>
           <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> 学校</div>
           <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> 监护人</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#14b8a6"></div> 地点</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div> 机构</div>
           <div class="legend-item"><div class="legend-dot" style="background:#dc2626"></div> 高风险</div>
         </div>
         <!-- Placeholder -->

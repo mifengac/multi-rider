@@ -88,6 +88,7 @@ def _prepare_environment() -> None:
             "FACE_MODEL_REC": str(MODEL_INSIGHTFACE_DIR / "w600k_r50.onnx"),
             "APP_HOST": "127.0.0.1",
             "APP_PORT": "5001",
+            "WCNR_SCHEDULER_ENABLED": "0",
         }
     )
 

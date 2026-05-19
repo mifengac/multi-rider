@@ -1,6 +1,8 @@
 from itertools import combinations
 
+from shared.config.config import logger
 from shared.db.kingbase import query_one, query_all
+from modules.score.services.score_store import get_score_trend
 
 
 def get_basic_info(zjhm: str) -> dict:
@@ -208,6 +210,11 @@ def assemble_profile(zjhm: str) -> dict:
     if not basic:
         return {}
     co_suspects = get_co_suspects(zjhm)
+    try:
+        score_trend = get_score_trend(zjhm, 6)
+    except Exception as exc:
+        logger.warning("Score trend skipped for %s: %s", zjhm, exc)
+        score_trend = []
 
     return {
         "basic": basic,
@@ -222,4 +229,5 @@ def assemble_profile(zjhm: str) -> dict:
             "gang": detect_gang(zjhm, basic.get("xm"), co_suspects),
         },
         "score": get_score_info(zjhm),
+        "score_trend": score_trend,
     }

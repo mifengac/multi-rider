@@ -15,10 +15,23 @@
 
   async function loadSummary() {
     const d = await fetchJSON(`${API}/summary`);
-    document.getElementById('statTotal').textContent = (d.total_persons || 0).toLocaleString();
-    document.getElementById('statHighRisk').textContent = (d.high_risk_count || 0).toLocaleString();
-    document.getElementById('statMonthCases').textContent = (d.month_cases || 0).toLocaleString();
-    document.getElementById('statAvgScore').textContent = d.avg_score || '--';
+    renderStat('statTotal', (d.total_persons || 0).toLocaleString(), d.total_persons_change_pct);
+    renderStat('statHighRisk', (d.high_risk_count || 0).toLocaleString(), d.high_risk_count_change_pct);
+    renderStat('statMonthCases', (d.month_cases || 0).toLocaleString(), d.month_cases_change_pct);
+    renderStat('statAvgScore', d.avg_score || '--', d.avg_score_change_pct);
+  }
+
+  function renderStat(id, value, changePct) {
+    const el = document.getElementById(id);
+    el.textContent = value;
+    const parent = el.parentElement;
+    parent.querySelectorAll('.stat-change').forEach(node => node.remove());
+    if (changePct === null || changePct === undefined || Number.isNaN(Number(changePct))) return;
+    const change = document.createElement('div');
+    const direction = Number(changePct) >= 0 ? 'up' : 'down';
+    change.className = `stat-change ${direction} mt-2`;
+    change.textContent = `${Number(changePct) >= 0 ? '↑' : '↓'} ${Math.abs(Number(changePct)).toFixed(1)}%`;
+    parent.appendChild(change);
   }
 
   async function loadCaseTypeChart() {
@@ -98,6 +111,50 @@
     window.addEventListener('resize', () => chart.resize());
   }
 
+  async function loadHeatmap() {
+    const d = await fetchJSON(`${API}/heatmap?days=30`);
+    const chart = echarts.init(document.getElementById('chartHeatmap'));
+    const points = (d.items || []).map(i => [Number(i.lng), Number(i.lat), Number(i.weight || 0)])
+      .filter(i => Number.isFinite(i[0]) && Number.isFinite(i[1]));
+    const maxWeight = points.reduce((max, item) => Math.max(max, item[2]), 1);
+    chart.setOption({
+      tooltip: {
+        trigger: 'item',
+        formatter: p => `经度: ${p.value[0]}<br/>纬度: ${p.value[1]}<br/>权重: ${p.value[2]}`
+      },
+      grid: { left: 8, right: 8, top: 15, bottom: 8 },
+      visualMap: {
+        min: 0,
+        max: maxWeight,
+        show: false,
+        inRange: { color: ['#2563eb', '#22c55e', '#f59e0b', '#ef4444'] }
+      },
+      xAxis: {
+        type: 'value',
+        scale: true,
+        axisLabel: { show: false },
+        axisTick: { show: false },
+        axisLine: { show: false },
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        scale: true,
+        axisLabel: { show: false },
+        axisTick: { show: false },
+        axisLine: { show: false },
+        splitLine: { show: false }
+      },
+      series: [{
+        type: 'scatter',
+        data: points,
+        symbolSize: val => Math.max(6, Math.min(28, Math.sqrt(val[2] || 1) * 4)),
+        itemStyle: { opacity: 0.85 }
+      }]
+    });
+    window.addEventListener('resize', () => chart.resize());
+  }
+
   async function loadAlerts() {
     const d = await fetchJSON(`${API}/alerts?limit=15`);
     const container = document.getElementById('alertList');
@@ -128,6 +185,7 @@
   loadRiskLevelChart();
   loadRankingChart();
   loadAgeChart();
+  loadHeatmap();
   loadAlerts();
 
   setInterval(loadAlerts, 30000);

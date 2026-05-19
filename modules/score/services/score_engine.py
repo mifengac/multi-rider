@@ -1,5 +1,5 @@
 from shared.config.config import logger
-from shared.db.kingbase import query_all
+from shared.db.kingbase import execute, query_all
 from .dim_case import calc_case_score
 from .dim_behavior import calc_behavior_score
 from .dim_family import calc_family_score
@@ -80,3 +80,28 @@ def batch_recalculate() -> dict:
 
     logger.info("Batch recalculate complete: total=%d success=%d failed=%d", total, success, failed)
     return {"total": total, "success": success, "failed": failed}
+
+
+def monthly_decay(decrement: int = 2) -> dict:
+    """Decay scores by `decrement` for all rows whose total_score > 0."""
+    try:
+        decrement = max(0, int(decrement))
+    except (TypeError, ValueError):
+        decrement = 2
+
+    sql = """
+        UPDATE "jcgkzx_monitor"."wcnr_score"
+        SET total_score = GREATEST(total_score - %(decrement)s, 0),
+            risk_level = CASE
+                WHEN GREATEST(total_score - %(decrement)s, 0) >= 80 THEN 'extreme'
+                WHEN GREATEST(total_score - %(decrement)s, 0) >= 60 THEN 'high'
+                WHEN GREATEST(total_score - %(decrement)s, 0) >= 40 THEN 'medium'
+                WHEN GREATEST(total_score - %(decrement)s, 0) >= 20 THEN 'low'
+                ELSE 'normal'
+            END,
+            calc_time = CURRENT_TIMESTAMP
+        WHERE total_score > 0
+    """
+    updated = execute(sql, {"decrement": decrement})
+    logger.info("Monthly score decay complete: decrement=%s updated=%s", decrement, updated)
+    return {"updated": updated}

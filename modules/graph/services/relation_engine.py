@@ -1,4 +1,4 @@
-from shared.db.kingbase import query_all
+from shared.db.kingbase import query_all, query_one
 
 
 def _format_time(value):
@@ -128,5 +128,165 @@ def victims_of_case(ajbh: str) -> list[dict]:
             "xm": row.get("xm") or row.get("saryxx_xm"),
             "csrq": row.get("csrq") or row.get("saryxx_csrq"),
             "shfd": row.get("shfd") or row.get("saryxx_shfd"),
+        })
+    return results
+
+
+def lives_at(zjhm: str) -> list[dict]:
+    sql = """
+        SELECT hjdz, xzdxz
+        FROM "jcgkzx_monitor"."wcnr_czrk"
+        WHERE zjhm = %(zjhm)s
+        LIMIT 1
+    """
+    row = query_one(sql, {"zjhm": zjhm})
+    if not row:
+        return []
+
+    addresses = []
+    for field in ("xzdxz", "hjdz"):
+        value = row.get(field)
+        if value and value not in addresses:
+            addresses.append(value)
+
+    results = []
+    for address in addresses:
+        node_id = f"L_{address}"
+        results.append({
+            "node": {
+                "id": node_id,
+                "type": "location",
+                "label": address,
+                "properties": {
+                    "name": address,
+                    "address": address,
+                    "hjdz": row.get("hjdz"),
+                    "xzdxz": row.get("xzdxz"),
+                },
+            },
+            "edge": {
+                "source": f"P_{zjhm}",
+                "target": node_id,
+                "type": "LIVES_AT",
+                "label": "居住",
+            },
+        })
+    return results
+
+
+def same_school(zjhm: str, limit: int = 5) -> list[dict]:
+    school_sql = """
+        SELECT yxx
+        FROM "ywdata"."b_per_qscxwcnr"
+        WHERE zjhm = %(zjhm)s
+          AND NULLIF(BTRIM(COALESCE(yxx, '')), '') IS NOT NULL
+        LIMIT 1
+    """
+    row = query_one(school_sql, {"zjhm": zjhm})
+    school_name = (row or {}).get("yxx")
+    if not school_name:
+        sfz_sql = """
+            SELECT yxx
+            FROM "ywdata"."zq_zfba_wcnr_sfzxx"
+            WHERE sfzhm = %(zjhm)s
+              AND NULLIF(BTRIM(COALESCE(yxx, '')), '') IS NOT NULL
+            LIMIT 1
+        """
+        row = query_one(sfz_sql, {"zjhm": zjhm})
+        school_name = (row or {}).get("yxx")
+    if not school_name:
+        return []
+
+    peers_sql = """
+        SELECT DISTINCT p.zjhm,
+               COALESCE(p.xm, c.xm, s.xm) AS xm,
+               sc.total_score,
+               sc.risk_level
+        FROM "jcgkzx_monitor"."wcnr_target_pool" p
+        LEFT JOIN "ywdata"."b_per_qscxwcnr" c ON c.zjhm = p.zjhm
+        LEFT JOIN "ywdata"."zq_zfba_wcnr_sfzxx" s ON s.sfzhm = p.zjhm
+        LEFT JOIN "jcgkzx_monitor"."wcnr_score" sc ON sc.zjhm = p.zjhm
+        WHERE p.zjhm <> %(zjhm)s
+          AND (c.yxx = %(school)s OR s.yxx = %(school)s)
+        LIMIT %(limit)s
+    """
+    results = []
+    for row in query_all(peers_sql, {"zjhm": zjhm, "school": school_name, "limit": limit}):
+        peer_zjhm = row.get("zjhm")
+        if not peer_zjhm:
+            continue
+        node_id = f"P_{peer_zjhm}"
+        results.append({
+            "node": {
+                "id": node_id,
+                "type": "person",
+                "label": row.get("xm") or peer_zjhm[:6],
+                "properties": {
+                    "zjhm": peer_zjhm,
+                    "xm": row.get("xm"),
+                    "school": school_name,
+                    "risk_score": row.get("total_score"),
+                    "risk_level": row.get("risk_level"),
+                },
+            },
+            "edge": {
+                "source": f"P_{zjhm}",
+                "target": node_id,
+                "type": "SAME_SCHOOL",
+                "label": "同校",
+                "properties": {"school": school_name},
+            },
+        })
+    return results
+
+
+def same_area(zjhm: str, limit: int = 5) -> list[dict]:
+    area_sql = """
+        SELECT sspcs
+        FROM "jcgkzx_monitor"."wcnr_target_pool"
+        WHERE zjhm = %(zjhm)s
+          AND sspcs IS NOT NULL
+        LIMIT 1
+    """
+    row = query_one(area_sql, {"zjhm": zjhm})
+    area_name = (row or {}).get("sspcs")
+    if not area_name:
+        return []
+
+    peers_sql = """
+        SELECT p.zjhm, p.xm, sc.total_score, sc.risk_level
+        FROM "jcgkzx_monitor"."wcnr_target_pool" p
+        LEFT JOIN "jcgkzx_monitor"."wcnr_score" sc ON sc.zjhm = p.zjhm
+        WHERE p.sspcs = %(sspcs)s
+          AND p.zjhm <> %(zjhm)s
+        ORDER BY sc.total_score DESC NULLS LAST
+        LIMIT %(limit)s
+    """
+    results = []
+    for row in query_all(peers_sql, {"zjhm": zjhm, "sspcs": area_name, "limit": limit}):
+        peer_zjhm = row.get("zjhm")
+        if not peer_zjhm:
+            continue
+        node_id = f"P_{peer_zjhm}"
+        results.append({
+            "node": {
+                "id": node_id,
+                "type": "person",
+                "label": row.get("xm") or peer_zjhm[:6],
+                "properties": {
+                    "zjhm": peer_zjhm,
+                    "xm": row.get("xm"),
+                    "sspcs": area_name,
+                    "risk_score": row.get("total_score"),
+                    "risk_level": row.get("risk_level"),
+                },
+            },
+            "edge": {
+                "source": f"P_{zjhm}",
+                "target": node_id,
+                "type": "SAME_AREA",
+                "label": "同辖区",
+                "properties": {"sspcs": area_name},
+            },
         })
     return results

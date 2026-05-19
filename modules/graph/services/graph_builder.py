@@ -1,15 +1,22 @@
 from datetime import datetime, timedelta
 
 from shared.db.kingbase import query_all, query_one
-from .relation_engine import appeared_at, checked_in, victims_of_case
+from .relation_engine import (
+    appeared_at,
+    checked_in,
+    lives_at,
+    same_area,
+    same_school,
+    victims_of_case,
+)
 
 NODE_STYLES = {
     "person": {"fill": "#3B82F6", "size": 40},
     "case": {"fill": "#7C3AED", "size": 35},
     "school": {"fill": "#F59E0B", "size": 30},
     "guardian": {"fill": "#10B981", "size": 30},
-    "location": {"fill": "#22C55E", "size": 28},
-    "organization": {"fill": "#8B5CF6", "size": 30},
+    "location": {"fill": "#14b8a6", "size": 28},
+    "organization": {"fill": "#a855f7", "size": 30},
 }
 
 RISK_COLORS = {
@@ -27,7 +34,12 @@ RELATION_NAMES = {
     "studies_at",
     "appeared_at",
     "checked_in",
+    "lives_at",
+    "same_school",
+    "same_area",
 }
+
+OPTIONAL_RELATION_NAMES = {"lives_at", "same_school", "same_area"}
 
 TIME_RANGE_DAYS = {
     "1m": 30,
@@ -69,6 +81,10 @@ def _normalize_relations(relations):
 
 def _relation_enabled(selected, name: str) -> bool:
     return selected is None or name in selected
+
+
+def _optional_relation_enabled(selected, name: str) -> bool:
+    return selected is not None and name in selected
 
 
 def _time_range_start(time_range):
@@ -193,6 +209,12 @@ def build_person_graph(zjhm: str, depth: int = 1, relations=None, time_range=Non
         _add_appeared_at(zjhm, nodes, edges)
     if _relation_enabled(selected_relations, "checked_in"):
         _add_checked_in(zjhm, nodes, edges)
+    if _optional_relation_enabled(selected_relations, "lives_at"):
+        _add_lives_at(zjhm, nodes, edges)
+    if _optional_relation_enabled(selected_relations, "same_school"):
+        _add_same_school(zjhm, nodes, edges)
+    if _optional_relation_enabled(selected_relations, "same_area"):
+        _add_same_area(zjhm, nodes, edges)
 
     if depth >= 2 and _relation_enabled(selected_relations, "suspected_in"):
         first_layer_persons = [
@@ -357,7 +379,77 @@ def _add_checked_in(zjhm: str, nodes: dict, edges: list):
             "type": "CHECKED_IN",
             "label": "入住",
         }
-        edge.setdefault("style", {"stroke": "#8B5CF6"})
+        edge.setdefault("style", {"stroke": "#a855f7"})
+        _append_edge(edges, edge)
+
+
+def _add_lives_at(zjhm: str, nodes: dict, edges: list):
+    for relation in lives_at(zjhm):
+        props = relation.get("node", {}).get("properties", {})
+        address = props.get("address") or props.get("name")
+        if not address:
+            continue
+        node = _location_node(address)
+        node["properties"].update(props)
+        if node["id"] not in nodes:
+            nodes[node["id"]] = node
+        edge = relation.get("edge") or {
+            "source": f"P_{zjhm}",
+            "target": node["id"],
+            "type": "LIVES_AT",
+            "label": "居住",
+        }
+        edge.setdefault("style", {"stroke": "#14b8a6"})
+        _append_edge(edges, edge)
+
+
+def _add_same_school(zjhm: str, nodes: dict, edges: list):
+    for relation in same_school(zjhm):
+        props = relation.get("node", {}).get("properties", {})
+        peer_zjhm = props.get("zjhm")
+        if not peer_zjhm:
+            continue
+        node = _person_node(
+            peer_zjhm,
+            props.get("xm") or relation.get("node", {}).get("label"),
+            props.get("risk_score"),
+            props.get("risk_level"),
+        )
+        node["properties"].update(props)
+        if node["id"] not in nodes:
+            nodes[node["id"]] = node
+        edge = relation.get("edge") or {
+            "source": f"P_{zjhm}",
+            "target": node["id"],
+            "type": "SAME_SCHOOL",
+            "label": "同校",
+        }
+        edge.setdefault("style", {"stroke": "#f59e0b", "lineWidth": 1.5})
+        _append_edge(edges, edge)
+
+
+def _add_same_area(zjhm: str, nodes: dict, edges: list):
+    for relation in same_area(zjhm):
+        props = relation.get("node", {}).get("properties", {})
+        peer_zjhm = props.get("zjhm")
+        if not peer_zjhm:
+            continue
+        node = _person_node(
+            peer_zjhm,
+            props.get("xm") or relation.get("node", {}).get("label"),
+            props.get("risk_score"),
+            props.get("risk_level"),
+        )
+        node["properties"].update(props)
+        if node["id"] not in nodes:
+            nodes[node["id"]] = node
+        edge = relation.get("edge") or {
+            "source": f"P_{zjhm}",
+            "target": node["id"],
+            "type": "SAME_AREA",
+            "label": "同辖区",
+        }
+        edge.setdefault("style", {"stroke": "#14b8a6", "lineWidth": 1.5})
         _append_edge(edges, edge)
 
 

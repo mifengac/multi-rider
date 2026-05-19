@@ -2,6 +2,17 @@
   let chart = null;
   let currentDepth = 1;
   let graphData = { nodes: [], edges: [] };
+  let currentRoot = null;
+  let searchResults = [];
+
+  const typeLabels = {
+    person: '人员',
+    case: '案件',
+    school: '学校',
+    guardian: '监护人',
+    location: '地点',
+    organization: '机构'
+  };
 
   function initChart() {
     chart = echarts.init(document.getElementById('graphCanvas'));
@@ -26,23 +37,27 @@
       { name: '人员', itemStyle: { color: '#3b82f6' } },
       { name: '案件', itemStyle: { color: '#7c3aed' } },
       { name: '学校', itemStyle: { color: '#f59e0b' } },
-      { name: '监护人', itemStyle: { color: '#10b981' } }
+      { name: '监护人', itemStyle: { color: '#10b981' } },
+      { name: '地点', itemStyle: { color: '#14b8a6' } },
+      { name: '机构', itemStyle: { color: '#a855f7' } }
     ];
-    const categoryMap = { person: 0, case: 1, school: 2, guardian: 3 };
+    const categoryMap = { person: 0, case: 1, school: 2, guardian: 3, location: 4, organization: 5 };
 
-    const nodes = data.nodes.map(n => ({
+    const nodes = (data.nodes || []).map(n => ({
       id: n.id,
       name: n.label,
       symbolSize: (n.style && n.style.size) || 30,
-      category: categoryMap[n.type] || 0,
+      category: Object.prototype.hasOwnProperty.call(categoryMap, n.type) ? categoryMap[n.type] : 0,
       itemStyle: { color: (n.style && n.style.fill) || '#3b82f6' },
       properties: n.properties || {},
       nodeType: n.type
     }));
 
-    const edges = data.edges.map(e => ({
+    const edges = (data.edges || []).map(e => ({
       source: e.source,
       target: e.target,
+      edgeType: e.type,
+      properties: e.properties || {},
       label: { show: true, formatter: e.label || '', fontSize: 10, color: '#94a3b8' },
       lineStyle: {
         color: (e.style && e.style.stroke) || '#475569',
@@ -57,13 +72,14 @@
         formatter: function (params) {
           if (params.dataType === 'node') {
             const p = params.data.properties || {};
-            let tip = `<b>${params.data.name}</b><br/>类型: ${params.data.nodeType || ''}`;
-            if (p.zjhm) tip += `<br/>证件号: ${p.zjhm}`;
+            let tip = `<b>${escapeHtml(params.data.name)}</b><br/>类型: ${typeLabels[params.data.nodeType] || params.data.nodeType || ''}`;
+            if (p.zjhm) tip += `<br/>证件号: ${escapeHtml(p.zjhm)}`;
             if (p.risk_score != null) tip += `<br/>风险分: ${p.risk_score}`;
-            if (p.ajbh) tip += `<br/>案件编号: ${p.ajbh}`;
+            if (p.ajbh) tip += `<br/>案件编号: ${escapeHtml(p.ajbh)}`;
+            if (p.name) tip += `<br/>名称: ${escapeHtml(p.name)}`;
             return tip;
           }
-          return params.data.label ? params.data.label.formatter : '';
+          return params.data.edgeType || '';
         }
       },
       legend: { show: false },
@@ -99,9 +115,27 @@
     }, true);
   }
 
+  function getSelectedRelations() {
+    const select = document.getElementById('relationFilter');
+    if (!select) return '';
+    const values = Array.from(select.selectedOptions).map(option => option.value);
+    return values.length ? values.join(',') : 'none';
+  }
+
+  function getTimeRange() {
+    const select = document.getElementById('timeRange');
+    return select ? select.value : '';
+  }
+
   async function loadGraph(zjhm) {
     try {
-      const res = await fetch(`/api/graph/person/${encodeURIComponent(zjhm)}?depth=${currentDepth}`);
+      currentRoot = { type: 'person', id: zjhm };
+      const params = new URLSearchParams();
+      params.set('depth', currentDepth);
+      params.set('relations', getSelectedRelations());
+      const timeRange = getTimeRange();
+      if (timeRange) params.set('time_range', timeRange);
+      const res = await fetch(`/api/graph/person/${encodeURIComponent(zjhm)}?${params.toString()}`);
       if (!res.ok) {
         alert('未找到该人员的关系数据');
         return;
@@ -109,6 +143,25 @@
       const data = await res.json();
       if (!data.nodes || !data.nodes.length) {
         alert('未找到该人员的关系数据');
+        return;
+      }
+      renderGraph(data);
+    } catch (e) {
+      alert('加载失败: ' + e.message);
+    }
+  }
+
+  async function loadCaseGraph(ajbh) {
+    try {
+      currentRoot = { type: 'case', id: ajbh };
+      const res = await fetch(`/api/graph/case/${encodeURIComponent(ajbh)}?depth=${currentDepth}`);
+      if (!res.ok) {
+        alert('未找到该案件的关系数据');
+        return;
+      }
+      const data = await res.json();
+      if (!data.nodes || !data.nodes.length) {
+        alert('未找到该案件的关系数据');
         return;
       }
       renderGraph(data);
@@ -137,6 +190,8 @@
       }
       if (results.length === 1 && results[0].type === 'person') {
         loadGraph(results[0].id);
+      } else if (results.length === 1 && results[0].type === 'case') {
+        loadCaseGraph(results[0].id);
       } else {
         showSearchResults(results);
       }
@@ -150,24 +205,43 @@
     const sidebar = document.getElementById('sidebar');
     const content = document.getElementById('sidebarContent');
     sidebar.classList.remove('sidebar-hidden');
+    searchResults = results;
 
     content.innerHTML = `
       <div class="text-xs text-slate-400 mb-3">找到 ${results.length} 条结果</div>
-      ${results.map(r => `
+      ${results.map((r, index) => `
         <div class="py-2 border-b border-slate-700 cursor-pointer hover:bg-slate-700/50 px-2 rounded"
-             onclick="window._graphSelectResult('${r.id}', '${r.type}')">
-          <div class="text-sm text-slate-200">${r.label || r.id}</div>
-          <div class="text-xs text-slate-500">${r.type === 'person' ? '人员' : '案件'} · ${r.id}</div>
+             onclick="window._graphSelectResult(${index})">
+          <div class="text-sm text-slate-200">${escapeHtml(r.label || r.id)}</div>
+          <div class="text-xs text-slate-500">${typeLabels[r.type] || r.type || ''} · ${escapeHtml(r.id)}</div>
         </div>
       `).join('')}
     `;
   }
 
-  window._graphSelectResult = function (id, type) {
-    if (type === 'person') {
-      loadGraph(id);
+  window._graphSelectResult = function (index) {
+    const result = searchResults[index];
+    if (!result) return;
+    if (result.type === 'person') {
+      loadGraph(result.id);
+    } else if (result.type === 'case') {
+      loadCaseGraph(result.id);
+    } else if (result.type === 'location') {
+      showLocationResult(result);
     }
   };
+
+  function showLocationResult(result) {
+    currentRoot = null;
+    const sidebar = document.getElementById('sidebar');
+    const content = document.getElementById('sidebarContent');
+    sidebar.classList.remove('sidebar-hidden');
+    content.innerHTML = `
+      <div class="text-xs text-slate-400 mb-1">地点</div>
+      <div class="text-lg font-bold text-white mb-3">${escapeHtml(result.label || result.id)}</div>
+      <div class="text-sm text-slate-400">该节点仅用于定位展示，请选择人员或案件加载关系图。</div>
+    `;
+  }
 
   function showNodeDetail(nodeData) {
     const sidebar = document.getElementById('sidebar');
@@ -175,43 +249,76 @@
     sidebar.classList.remove('sidebar-hidden');
 
     const p = nodeData.properties || {};
-    const typeLabels = { person: '人员', case: '案件', school: '学校', guardian: '监护人' };
 
     let html = `<div class="text-xs text-slate-400 mb-1">${typeLabels[nodeData.nodeType] || ''}</div>`;
-    html += `<div class="text-lg font-bold text-white mb-3">${nodeData.name}</div>`;
+    html += `<div class="text-lg font-bold text-white mb-3">${escapeHtml(nodeData.name || '')}</div>`;
 
     if (nodeData.nodeType === 'person') {
       html += `<div class="space-y-2 text-sm">`;
-      if (p.zjhm) html += `<div><span class="text-slate-400">证件号:</span> <span class="text-slate-200">${p.zjhm}</span></div>`;
+      if (p.zjhm) html += `<div><span class="text-slate-400">证件号:</span> <span class="text-slate-200">${escapeHtml(p.zjhm)}</span></div>`;
       if (p.risk_score != null) html += `<div><span class="text-slate-400">风险评分:</span> <span class="text-slate-200">${p.risk_score}</span></div>`;
       if (p.risk_level) html += `<div><span class="text-slate-400">风险等级:</span> <span class="text-slate-200">${riskLabel(p.risk_level)}</span></div>`;
       html += `</div>`;
       html += `<div class="mt-4 flex gap-2">`;
-      html += `<a href="/profile/${p.zjhm}" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">查看画像</a>`;
-      html += `<button onclick="window._graphExpandNode('${p.zjhm}')" class="text-xs bg-slate-600 text-white px-3 py-1.5 rounded hover:bg-slate-500">展开关系</button>`;
+      html += `<a href="/profile/${encodeURIComponent(p.zjhm || '')}" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">查看画像</a>`;
+      html += `<button data-action="expand" data-node-id="${escapeAttr(nodeData.id)}" data-node-type="${escapeAttr(nodeData.nodeType)}" class="text-xs bg-slate-600 text-white px-3 py-1.5 rounded hover:bg-slate-500">展开关系</button>`;
       html += `</div>`;
     } else if (nodeData.nodeType === 'case') {
       html += `<div class="space-y-2 text-sm">`;
-      if (p.ajbh) html += `<div><span class="text-slate-400">案件编号:</span> <span class="text-slate-200">${p.ajbh}</span></div>`;
-      if (p.ajmc) html += `<div><span class="text-slate-400">案件名称:</span> <span class="text-slate-200">${p.ajmc}</span></div>`;
-      if (p.ay) html += `<div><span class="text-slate-400">案由:</span> <span class="text-slate-200">${p.ay}</span></div>`;
-      if (p.fasj) html += `<div><span class="text-slate-400">发案时间:</span> <span class="text-slate-200">${p.fasj}</span></div>`;
+      if (p.ajbh) html += `<div><span class="text-slate-400">案件编号:</span> <span class="text-slate-200">${escapeHtml(p.ajbh)}</span></div>`;
+      if (p.ajmc) html += `<div><span class="text-slate-400">案件名称:</span> <span class="text-slate-200">${escapeHtml(p.ajmc)}</span></div>`;
+      if (p.ay) html += `<div><span class="text-slate-400">案由:</span> <span class="text-slate-200">${escapeHtml(p.ay)}</span></div>`;
+      if (p.fasj) html += `<div><span class="text-slate-400">发案时间:</span> <span class="text-slate-200">${escapeHtml(p.fasj)}</span></div>`;
       html += `</div>`;
     } else if (nodeData.nodeType === 'guardian') {
       html += `<div class="space-y-2 text-sm">`;
-      if (p.xm) html += `<div><span class="text-slate-400">姓名:</span> <span class="text-slate-200">${p.xm}</span></div>`;
-      if (p.lxdh) html += `<div><span class="text-slate-400">联系电话:</span> <span class="text-slate-200">${p.lxdh}</span></div>`;
+      if (p.xm) html += `<div><span class="text-slate-400">姓名:</span> <span class="text-slate-200">${escapeHtml(p.xm)}</span></div>`;
+      if (p.lxdh) html += `<div><span class="text-slate-400">联系电话:</span> <span class="text-slate-200">${escapeHtml(p.lxdh)}</span></div>`;
       html += `</div>`;
-    } else if (nodeData.nodeType === 'school') {
-      html += `<div class="text-sm"><span class="text-slate-400">学校名称:</span> <span class="text-slate-200">${p.name || ''}</span></div>`;
+    } else {
+      html += `<div class="space-y-2 text-sm">`;
+      Object.keys(p).slice(0, 8).forEach(key => {
+        if (p[key] !== null && p[key] !== undefined) {
+          html += `<div><span class="text-slate-400">${escapeHtml(key)}:</span> <span class="text-slate-200">${escapeHtml(String(p[key]))}</span></div>`;
+        }
+      });
+      html += `</div>`;
     }
 
     content.innerHTML = html;
+    const expandButton = content.querySelector('[data-action="expand"]');
+    if (expandButton) {
+      expandButton.addEventListener('click', () => {
+        window._graphExpandNode(expandButton.dataset.nodeId, expandButton.dataset.nodeType);
+      });
+    }
   }
 
-  window._graphExpandNode = function (zjhm) {
-    loadGraph(zjhm);
+  window._graphExpandNode = async function (nodeId, nodeType) {
+    if (!nodeId || !nodeType) return;
+    try {
+      const res = await fetch('/api/graph/expand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ node_id: nodeId, node_type: nodeType, direction: 'both' })
+      });
+      if (!res.ok) {
+        alert('展开关系失败');
+        return;
+      }
+      mergeGraph(await res.json());
+    } catch (e) {
+      alert('展开关系失败: ' + e.message);
+    }
   };
+
+  function mergeGraph(increment) {
+    const nodeMap = new Map((graphData.nodes || []).map(node => [node.id, node]));
+    const edgeMap = new Map((graphData.edges || []).map(edge => [`${edge.source}|${edge.target}|${edge.type || ''}`, edge]));
+    (increment.nodes || []).forEach(node => nodeMap.set(node.id, node));
+    (increment.edges || []).forEach(edge => edgeMap.set(`${edge.source}|${edge.target}|${edge.type || ''}`, edge));
+    renderGraph({ nodes: Array.from(nodeMap.values()), edges: Array.from(edgeMap.values()) });
+  }
 
   function closeSidebar() {
     document.getElementById('sidebar').classList.add('sidebar-hidden');
@@ -226,9 +333,14 @@
         btn.classList.remove('active');
       }
     });
-    const input = document.getElementById('searchInput');
-    if (input.value.trim()) {
-      handleSearch(new Event('submit'));
+    reloadCurrentGraph();
+  }
+
+  function reloadCurrentGraph() {
+    if (currentRoot && currentRoot.type === 'person') {
+      loadGraph(currentRoot.id);
+    } else if (currentRoot && currentRoot.type === 'case') {
+      loadCaseGraph(currentRoot.id);
     }
   }
 
@@ -237,15 +349,27 @@
     return map[level] || level || '';
   }
 
-  // Expose globals for inline handlers
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(value) {
+    return escapeHtml(value).replace(/`/g, '&#96;');
+  }
+
   window.handleSearch = handleSearch;
   window.setDepth = setDepth;
+  window.reloadCurrentGraph = reloadCurrentGraph;
   window.closeSidebar = closeSidebar;
+  window.loadCaseGraph = loadCaseGraph;
 
-  // Init
   initChart();
 
-  // Auto-load if zjhm is in URL
   const params = new URLSearchParams(window.location.search);
   const zjhm = params.get('zjhm');
   if (zjhm) {
