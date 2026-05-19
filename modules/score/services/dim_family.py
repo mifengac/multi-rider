@@ -3,7 +3,13 @@ from shared.db.kingbase import query_one
 
 def calc_family_score(zjhm: str) -> tuple[int, dict]:
     sql = """
-        SELECT jtqk, knjtlx, etlb, fmsftswc, jhr1xm, jhr1lxdh
+        SELECT
+            qttsqk AS jtqk,
+            knjtlx,
+            etlb,
+            NULL::VARCHAR AS fmsftswc,
+            jhr1xm,
+            jhr1lxdh
         FROM "ywdata"."b_per_qskjwcnr"
         WHERE zjhm = %(zjhm)s
         LIMIT 1

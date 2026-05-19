@@ -10,7 +10,7 @@ WITH normalized AS (
 formatted AS (
     SELECT id_no
     FROM normalized
-    WHERE id_no <> ''
+    WHERE id_no IS NOT NULL
       AND CHAR_LENGTH(id_no) = 18
       AND id_no ~ '^[1-9][0-9]{5}(18|19|20)[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[0-9]{3}[0-9X]$'
       AND TO_CHAR(TO_DATE(SUBSTRING(id_no, 7, 8), 'YYYYMMDD'), 'YYYYMMDD') = SUBSTRING(id_no, 7, 8)

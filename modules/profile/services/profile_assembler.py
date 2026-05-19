@@ -30,17 +30,26 @@ def get_photo(zjhm: str) -> dict:
 
 def get_family_info(zjhm: str) -> dict:
     sql = """
-        SELECT jtqk, knjtlx, etlb, fmsftswc, jhr1xm, jhr1zjhm, jhr1lxdh, fxdj
+        SELECT knjtlx, etlb, fmsftswc, jhr1xm, jhr1zjhm, jhr1lxdh, fxdj
         FROM "ywdata"."b_per_qskjwcnr"
         WHERE zjhm = %(zjhm)s
         LIMIT 1
     """
-    return query_one(sql, {"zjhm": zjhm})
+    try:
+        return query_one(sql, {"zjhm": zjhm})
+    except Exception:
+        return {}
 
 
 def get_education_info(zjhm: str) -> dict:
     dropout_sql = """
-        SELECT zjhm, xm, yxx, nj, jxqk, ssbm
+        SELECT
+            zjhm,
+            xm,
+            NULL::VARCHAR AS yxx,
+            NULL::VARCHAR AS nj,
+            jxqk,
+            NULL::VARCHAR AS ssbm
         FROM "ywdata"."b_per_qscxwcnr"
         WHERE zjhm = %(zjhm)s LIMIT 1
     """

@@ -27,7 +27,15 @@ class RuizhiApiError(RuntimeError):
 
 class _RuizhiClient:
     def __init__(self) -> None:
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            # The RuiZhi intranet gateway will negotiate zstd if offered, but
+            # zstd decoding in httpx depends on an optional `zstandard` extra
+            # that we do not pin. Restrict to codecs httpx always decodes
+            # natively so responses (and SSE streams) never come back as
+            # undecodable zstd. See docs/0519_debug.md.
+            "Accept-Encoding": "gzip, deflate",
+        }
         if RUIZHI_API_KEY:
             headers["Authorization"] = f"Bearer {RUIZHI_API_KEY}"
         self._client = httpx.Client(

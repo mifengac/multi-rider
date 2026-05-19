@@ -43,3 +43,8 @@ model/*
 !model/README.md
 CLIP/
 .claude/
+
+# Locally-generated mock data / DB sample dumps (kept local for UI demo, not versioned)
+generate_mock_data.py
+mock_database_samples/
+kingbase_latest_samples/

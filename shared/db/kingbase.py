@@ -18,7 +18,7 @@ except Exception:
 
 KINGBASE_HOST = os.getenv("KINGBASE_HOST", "")
 KINGBASE_PORT = int(os.getenv("KINGBASE_PORT", "54321"))
-KINGBASE_DB = os.getenv("KINGBASE_DB", "")
+KINGBASE_DB = os.getenv("KINGBASE_DB", os.getenv("KINGBASE_DBNAME", ""))
 KINGBASE_USER = os.getenv("KINGBASE_USER", "")
 KINGBASE_PASSWORD = os.getenv("KINGBASE_PASSWORD", "")
 
@@ -79,11 +79,22 @@ def get_connection() -> Iterator[Any]:
     db_pool = init_pool()
     try:
         conn = db_pool.getconn()
+        # Discard connections that the server already closed
+        if getattr(conn, "closed", 0):
+            db_pool.putconn(conn, close=True)
+            conn = db_pool.getconn()
         yield conn
         conn.commit()
     except Exception:
         if conn is not None:
-            conn.rollback()
+            is_closed = bool(getattr(conn, "closed", 0))
+            if not is_closed:
+                try:
+                    conn.rollback()
+                except Exception:
+                    is_closed = True
+            db_pool.putconn(conn, close=is_closed)
+            conn = None
         raise
     finally:
         if conn is not None:
