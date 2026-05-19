@@ -30,7 +30,7 @@ def get_photo(zjhm: str) -> dict:
 
 def get_family_info(zjhm: str) -> dict:
     sql = """
-        SELECT knjtlx, etlb, fmsftswc, jhr1xm, jhr1zjhm, jhr1lxdh, fxdj
+        SELECT knjtlx, etlb, fmsftswc, jhr1xm, jhr1lxdh, fxdj
         FROM "ywdata"."b_per_qskjwcnr"
         WHERE zjhm = %(zjhm)s
         LIMIT 1

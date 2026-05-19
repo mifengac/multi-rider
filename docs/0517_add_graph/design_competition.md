@@ -665,7 +665,7 @@ JOIN "ywdata"."zq_zfba_wcnr_xyr" x2
 WHERE x1.xyrxx_sfzh = :zjhm;
 
 -- 3. 监护关系
-SELECT jhr1xm, jhr1zjhm, jhr1lxdh
+SELECT jhr1xm, jhr1lxdh
 FROM "ywdata"."b_per_qskjwcnr"
 WHERE zjhm = :zjhm AND jhr1xm IS NOT NULL;
 ```

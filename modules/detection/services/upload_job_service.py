@@ -481,7 +481,12 @@ def _run_upload_job(
             current["message"] = "running"
         _persist_job_state(job_id)
 
-        model = get_model(runtime_job["model_key"])
+        try:
+            model = get_model(runtime_job["model_key"])
+        except Exception as exc:
+            raise RuntimeError(
+                f"模型文件加载失败（{runtime_job['model_key']}），请重新部署模型文件: {exc}"
+            ) from exc
         result_store = create_result_store(job_id, "upload", source_type, runtime_job.get("source_name", ""))
         allowed_classes, prompt_classes = _resolve_model_filters(runtime_job["model_key"], model, classes_raw)
 

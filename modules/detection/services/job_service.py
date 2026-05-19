@@ -296,7 +296,12 @@ def _run_job(
 
     result_store = None
     try:
-        model = get_model(runtime_job["model_key"])
+        try:
+            model = get_model(runtime_job["model_key"])
+        except Exception as exc:
+            raise RuntimeError(
+                f"模型文件加载失败（{runtime_job['model_key']}），请重新部署模型文件: {exc}"
+            ) from exc
         result_store = create_result_store(job_id, "oracle", "oracle", "oracle")
         allowed_classes: Optional[Set[int]] = None
         prompt_classes: list[str] | None = None

@@ -148,7 +148,7 @@ School(学校)     b_yfszxxxsxx               xxmc
                  b_per_qscxwcnr             yxx(原学校)
                  sh_fzxxsj_xx
 
-Guardian(监护人) b_per_qskjwcnr             jhr1xm, jhr1zjhm, jhr1lxdh
+Guardian(监护人) b_per_qskjwcnr             jhr1xm, jhr1lxdh
                  zq_zfba_wcnr_sfzxx         jhr, lxdh
                  b_per_yfblqxwcnrcj_jhrxx
 
@@ -163,7 +163,7 @@ Organization(机构) b_org_fjjssgy            废旧金属收购业
 | SUSPECTED_IN | Person | Case | zq_zfba_wcnr_xyr.ajxx_join_ajxx_ajbh | 涉嫌案件 |
 | VICTIM_OF | Person | Case | zq_zfba_saryxx.ajxx_ajbhs | 是受害人 |
 | CO_SUSPECT | Person | Person | 同案件编号下的不同嫌疑人 | 共同犯罪 |
-| GUARDIAN_OF | Person | Person | jhr1zjhm → zjhm | 监护关系 |
+| GUARDIAN_OF | Guardian | Person | jhr1xm → zjhm | 监护关系 |
 | LIVES_AT | Person | Location | hjdz/xzdxz/jtzz | 居住于 |
 | COMMITTED_AT | Case | Location | ajxx_fadd / wfdd | 案发地点 |
 | STUDIES_AT | Person | School | b_yfszxxxsxx/b_per_qscxwcnr.yxx | 就读于 |

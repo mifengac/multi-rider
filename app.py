@@ -32,6 +32,7 @@ from modules.profile.page_routes import profile_page_bp
 from modules.graph.page_routes import graph_page_bp
 from modules.ai_analyst import ai_analyst_bp
 from modules.ai_analyst.page_routes import ai_analyst_page_bp
+from modules.workbench.page_routes import workbench_page_bp
 from shared.inference.infer_service import get_model
 
 
@@ -81,6 +82,7 @@ def create_app() -> Flask:
     app.register_blueprint(graph_page_bp)
     app.register_blueprint(ai_analyst_bp)
     app.register_blueprint(ai_analyst_page_bp)
+    app.register_blueprint(workbench_page_bp)
     return app
 
 

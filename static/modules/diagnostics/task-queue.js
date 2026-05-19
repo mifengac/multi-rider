@@ -233,6 +233,11 @@ function initTaskQueueDiagnostics() {
       setTaskQueueAutoRefresh(auto.checked && !document.getElementById('tabDiagnostics').classList.contains('hidden'));
     });
   }
+  var tab = document.getElementById('tabDiagnostics');
+  if (tab && !tab.classList.contains('hidden')) {
+    refreshTaskQueueDiagnostics();
+    setTaskQueueAutoRefresh(!auto || auto.checked);
+  }
 }
 
 window.addEventListener('load', initTaskQueueDiagnostics);

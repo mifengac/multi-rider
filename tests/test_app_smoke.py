@@ -129,6 +129,15 @@ def test_task_queue_diagnostics_template_has_read_only_controls():
     assert "delete" not in template.lower()
 
 
+def test_task_queue_diagnostics_auto_refreshes_when_visible():
+    script = (REPO_ROOT / "static" / "modules" / "diagnostics" / "task-queue.js").read_text(encoding="utf-8")
+
+    assert "var tab = document.getElementById('tabDiagnostics');" in script
+    assert "if (tab && !tab.classList.contains('hidden')) {" in script
+    assert "refreshTaskQueueDiagnostics();" in script
+    assert "setTaskQueueAutoRefresh(!auto || auto.checked);" in script
+
+
 def test_header_primary_button_has_tab_specific_actions():
     template = (REPO_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
     script = (REPO_ROOT / "static" / "modules" / "detection" / "tasks.js").read_text(encoding="utf-8")

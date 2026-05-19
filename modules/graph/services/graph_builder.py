@@ -149,7 +149,7 @@ def _add_co_suspects(zjhm: str, nodes: dict, edges: list):
 
 def _add_guardian(zjhm: str, nodes: dict, edges: list):
     sql = """
-        SELECT jhr1xm, jhr1zjhm, jhr1lxdh
+        SELECT jhr1xm, jhr1lxdh
         FROM "ywdata"."b_per_qskjwcnr"
         WHERE zjhm = %(zjhm)s AND jhr1xm IS NOT NULL
         LIMIT 1
@@ -157,7 +157,7 @@ def _add_guardian(zjhm: str, nodes: dict, edges: list):
     row = query_one(sql, {"zjhm": zjhm})
     if not row or not row.get("jhr1xm"):
         return
-    node = _guardian_node(row["jhr1xm"], row.get("jhr1zjhm"), row.get("jhr1lxdh"))
+    node = _guardian_node(row["jhr1xm"], None, row.get("jhr1lxdh"))
     if node["id"] not in nodes:
         nodes[node["id"]] = node
     edges.append({

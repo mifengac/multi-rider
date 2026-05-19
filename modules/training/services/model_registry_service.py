@@ -80,8 +80,34 @@ def _save_slot_registry(payload: dict) -> None:
     _write_json_file(DEPLOYMENT_SLOTS_PATH, payload)
 
 
+def _registered_model_path(registry: dict[str, str], model_name: str) -> str:
+    normalized_name = os.path.basename(str(model_name or "").strip())
+    if not normalized_name:
+        return ""
+
+    model_path = registry.get(normalized_name)
+    if model_path:
+        return model_path
+
+    normalized_lower = normalized_name.lower()
+    for registered_name, registered_path in registry.items():
+        if registered_name.lower() == normalized_lower:
+            return registered_path
+    return ""
+
+
 def _model_meta_path(model_name: str) -> str:
-    stem, _ext = os.path.splitext(os.path.join(MODEL_DIR, model_name))
+    normalized_name = os.path.basename(str(model_name or "").strip())
+    if not normalized_name:
+        return os.path.join(MODEL_DIR, ".meta.json")
+
+    registry = list_upload_model_paths()
+    model_path = _registered_model_path(registry, normalized_name)
+    if model_path:
+        stem, _ext = os.path.splitext(model_path)
+        return stem + ".meta.json"
+
+    stem, _ext = os.path.splitext(os.path.join(MODEL_DIR, normalized_name))
     return stem + ".meta.json"
 
 
@@ -205,6 +231,7 @@ def list_managed_models() -> list[dict]:
         metadata = _decorate_model_metadata(model_name, raw_metadata, category)
         stat = os.stat(model_path)
         summary = metadata.get("summary") or {}
+        metadata_path = _model_meta_path(model_name)
         items.append(
             {
                 "name": model_name,
@@ -234,7 +261,7 @@ def list_managed_models() -> list[dict]:
                     "mAP50": summary.get("metrics/mAP50(B)") or "",
                     "mAP50_95": summary.get("metrics/mAP50-95(B)") or "",
                 },
-                "metadata_path": _model_meta_path(model_name) if os.path.isfile(_model_meta_path(model_name)) else "",
+                "metadata_path": metadata_path if os.path.isfile(metadata_path) else "",
                 "slot_refs": slot_assignments.get(model_name.lower(), []),
                 "slot_labels": [
                     DEPLOYMENT_SLOT_LABELS.get(slot_key, slot_key)
@@ -247,15 +274,14 @@ def list_managed_models() -> list[dict]:
 
 def get_model_slot_views() -> list[dict]:
     slot_registry = _load_slot_registry()
+    registry = list_upload_model_paths()
     views = []
     for slot_key, label in DEPLOYMENT_SLOT_LABELS.items():
         slot_state = (slot_registry.get("slots") or {}).get(slot_key) or {}
         current_name = _current_model_name_for_slot(slot_key)
         current_path = ""
         if current_name:
-            current_path = os.path.join(MODEL_DIR, current_name)
-            if not os.path.isfile(current_path):
-                current_path = ""
+            current_path = _registered_model_path(registry, current_name)
         history = _trim_history(list(slot_state.get("history") or []))
         views.append(
             {
