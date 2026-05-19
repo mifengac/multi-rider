@@ -6,6 +6,17 @@ import os
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(CONFIG_DIR, "..", ".."))
 MODEL_DIR = os.path.join(BASE_DIR, "model")
+MODEL_YOLO_DIR = os.path.join(MODEL_DIR, "yolo")
+MODEL_YOLO_FOUNDATION_DIR = os.path.join(MODEL_YOLO_DIR, "foundation")
+MODEL_YOLO_PRODUCTION_DIR = os.path.join(MODEL_YOLO_DIR, "production")
+MODEL_INSIGHTFACE_DIR = os.path.join(MODEL_DIR, "insightface")
+MODEL_ASSETS_DIR = os.path.join(MODEL_DIR, "assets")
+MODEL_SEARCH_ROOTS = (
+    MODEL_YOLO_DIR,
+    MODEL_INSIGHTFACE_DIR,
+    MODEL_ASSETS_DIR,
+    MODEL_DIR,
+)
 DEPLOYMENT_SLOTS_PATH = os.path.join(MODEL_DIR, "deployment_slots.json")
 UPLOAD_MODEL_EXTS = {".pt"}
 PROMPT_MODEL_DEFAULT_CLASSES = "person,motorcycle,bicycle,car,bus,truck"
@@ -16,6 +27,35 @@ def _resolve_path(path_value: str) -> str:
     if os.path.isabs(path_value):
         return path_value
     return os.path.abspath(os.path.join(BASE_DIR, path_value))
+
+
+def _find_model_file(filename: str) -> str:
+    target_name = os.path.basename((filename or "").strip())
+    if not target_name:
+        return ""
+
+    for search_root in MODEL_SEARCH_ROOTS:
+        if not os.path.isdir(search_root):
+            continue
+        for dirpath, dirnames, filenames in os.walk(search_root):
+            dirnames.sort(key=str.lower)
+            for entry in sorted(filenames, key=str.lower):
+                if entry.lower() == target_name.lower():
+                    return os.path.abspath(os.path.join(dirpath, entry))
+    return ""
+
+
+def _model_fallback_dir(default_filename: str) -> str:
+    lower = os.path.basename(default_filename).lower()
+    if lower.endswith(".onnx"):
+        return MODEL_INSIGHTFACE_DIR
+    if lower.endswith(".ts") or lower == "vit-b-32.pt":
+        return MODEL_ASSETS_DIR
+    if lower in {"yolo26n.pt", "yolo26s.pt"}:
+        return MODEL_YOLO_FOUNDATION_DIR
+    if lower.endswith(".pt"):
+        return MODEL_YOLO_PRODUCTION_DIR
+    return MODEL_DIR
 
 
 def _load_env_file(*paths: str) -> None:
@@ -57,7 +97,6 @@ SMS_ORACLE_PASSWORD = os.getenv("SMS_ORACLE_PASSWORD", ORACLE_PASSWORD)
 
 
 def _resolve_model_path(default_filename: str, *env_names: str) -> str:
-    project_model_path = os.path.join(MODEL_DIR, default_filename)
     for env_name in env_names:
         env_value = (os.getenv(env_name, "") or "").strip()
         if not env_value:
@@ -65,7 +104,16 @@ def _resolve_model_path(default_filename: str, *env_names: str) -> str:
         candidate = _resolve_path(env_value)
         if os.path.isfile(candidate):
             return os.path.abspath(candidate)
-    return os.path.abspath(project_model_path)
+        found_path = _find_model_file(os.path.basename(candidate))
+        if found_path:
+            return found_path
+        return os.path.abspath(candidate)
+
+    found_path = _find_model_file(default_filename)
+    if found_path:
+        return found_path
+
+    return os.path.abspath(os.path.join(_model_fallback_dir(default_filename), default_filename))
 
 
 def _resolve_model_path_candidates(default_filenames: tuple[str, ...], *env_names: str) -> str:
@@ -76,14 +124,17 @@ def _resolve_model_path_candidates(default_filenames: tuple[str, ...], *env_name
         candidate = _resolve_path(env_value)
         if os.path.isfile(candidate):
             return os.path.abspath(candidate)
+        found_path = _find_model_file(os.path.basename(candidate))
+        if found_path:
+            return found_path
         return os.path.abspath(candidate)
 
     for default_filename in default_filenames:
-        candidate = os.path.join(MODEL_DIR, default_filename)
-        if os.path.isfile(candidate):
-            return os.path.abspath(candidate)
+        found_path = _find_model_file(default_filename)
+        if found_path:
+            return found_path
 
-    return os.path.abspath(os.path.join(MODEL_DIR, default_filenames[0]))
+    return os.path.abspath(os.path.join(_model_fallback_dir(default_filenames[0]), default_filenames[0]))
 
 
 MODEL_REGISTRY = {
@@ -119,8 +170,8 @@ MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(1024 * 1024 * 1024)))
 VIDEO_FRAME_INTERVAL = int(os.getenv("VIDEO_FRAME_INTERVAL", "5"))
 JOB_RETENTION_DAYS = int(os.getenv("JOB_RETENTION_DAYS", "0"))
 
-FACE_MODEL_DET = _resolve_path(os.getenv("FACE_MODEL_DET", os.path.join(MODEL_DIR, "det_10g.onnx")))
-FACE_MODEL_REC = _resolve_path(os.getenv("FACE_MODEL_REC", os.path.join(MODEL_DIR, "w600k_r50.onnx")))
+FACE_MODEL_DET = _resolve_model_path("det_10g.onnx", "FACE_MODEL_DET")
+FACE_MODEL_REC = _resolve_model_path("w600k_r50.onnx", "FACE_MODEL_REC")
 FACE_DATA_DIR = _resolve_path(os.getenv("FACE_DATA_DIR", os.path.join(BASE_DIR, "face_data")))
 FACE_SIMILARITY_THR = float(os.getenv("FACE_SIMILARITY_THR", "0.35"))
 FACE_MATCH_TOP_K = max(1, int(os.getenv("FACE_MATCH_TOP_K", "5")))
@@ -131,9 +182,11 @@ FACE_SQL_PORT = int(os.getenv("FACE_SQL_PORT", "5432"))
 FACE_SQL_DB = os.getenv("FACE_SQL_DB", "")
 FACE_SQL_USER = os.getenv("FACE_SQL_USER", "")
 FACE_SQL_PASSWORD = os.getenv("FACE_SQL_PASSWORD", "")
-FACE_SQL_QUERY_PATH = _resolve_path(
-    os.getenv("FACE_SQL_QUERY_PATH", os.path.join(BASE_DIR, "modules", "face", "sql", "face_library.sql"))
-)
+# Look for face_library.sql next to app.env (project root) first, then fall back to the bundled copy.
+_face_sql_root = os.path.join(BASE_DIR, "face_library.sql")
+_face_sql_bundled = os.path.join(BASE_DIR, "modules", "face", "sql", "face_library.sql")
+_face_sql_default = _face_sql_root if os.path.isfile(_face_sql_root) else _face_sql_bundled
+FACE_SQL_QUERY_PATH = _resolve_path(os.getenv("FACE_SQL_QUERY_PATH", _face_sql_default))
 
 DISPATCH_AUTH_URL = os.getenv(
     "DISPATCH_AUTH_URL",
@@ -212,8 +265,7 @@ def get_deployment_slot_model_name(slot_key: str) -> str:
         return ""
     if os.path.splitext(model_name)[1].lower() not in UPLOAD_MODEL_EXTS:
         return ""
-    candidate = os.path.join(MODEL_DIR, model_name)
-    return model_name if os.path.isfile(candidate) else ""
+    return model_name if _find_model_file(model_name) else ""
 
 
 def model_supports_text_prompt(model_key: str) -> bool:
@@ -239,9 +291,13 @@ def list_upload_model_paths() -> dict[str, str]:
     _register(MODEL_REGISTRY.get("general"))
     _register(MODEL_REGISTRY.get("bczj"))
 
-    if os.path.isdir(MODEL_DIR):
-        for entry in sorted(os.listdir(MODEL_DIR), key=str.lower):
-            _register(os.path.join(MODEL_DIR, entry))
+    for search_root in MODEL_SEARCH_ROOTS:
+        if not os.path.isdir(search_root):
+            continue
+        for dirpath, dirnames, filenames in os.walk(search_root):
+            dirnames.sort(key=str.lower)
+            for entry in sorted(filenames, key=str.lower):
+                _register(os.path.join(dirpath, entry))
 
     return registry
 
@@ -251,10 +307,18 @@ def resolve_model_path(model_key: str) -> str:
     if key in MODEL_REGISTRY:
         override_name = get_deployment_slot_model_name(key)
         if override_name:
-            override_path = os.path.join(MODEL_DIR, override_name)
-            if os.path.isfile(override_path):
-                return os.path.abspath(override_path)
-        return MODEL_REGISTRY[key]
+            override_path = _find_model_file(override_name)
+            if override_path:
+                return override_path
+        registry_path = MODEL_REGISTRY[key]
+        if os.path.isfile(registry_path):
+            return os.path.abspath(registry_path)
+        registry_basename = os.path.basename(registry_path)
+        if registry_basename:
+            found_path = _find_model_file(registry_basename)
+            if found_path:
+                return found_path
+        return registry_path
 
     registry = list_upload_model_paths()
     if key in registry:
@@ -401,6 +465,9 @@ os.makedirs(UPLOAD_TEMP_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 os.makedirs(DATASETS_DIR, exist_ok=True)
 os.makedirs(TRAIN_RUNS_DIR, exist_ok=True)
+os.makedirs(MODEL_YOLO_DIR, exist_ok=True)
+os.makedirs(MODEL_INSIGHTFACE_DIR, exist_ok=True)
+os.makedirs(MODEL_ASSETS_DIR, exist_ok=True)
 
 # Disable ultralytics telemetry and version checks for intranet hosts.
 os.environ.setdefault("YOLO_TELEMETRY", "false")

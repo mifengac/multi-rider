@@ -15,10 +15,10 @@
 
 | key | 文件 | 说明 |
 |---|---|---|
-| `general` | `model/yolov8s-worldv2.pt` | YOLO-World 开放词表，支持英文提示词（留空=自动检测） |
-| `bczj` | `model/biaochezhajiev2.pt` | 私有训练模型，针对飙车炸街场景，支持类别索引过滤 |
+| `general` | `model/yolo/production/yolov8s-worldv2.pt` | YOLO-World 开放词表，支持英文提示词（留空=自动检测） |
+| `bczj` | `model/yolo/production/biaochezhajiev2.pt` | 私有训练模型，针对飙车炸街场景，支持类别索引过滤 |
 
-> **注意**：模型文件不随仓库提交，需手动放入 `model/` 目录。
+> **注意**：模型文件不随仓库提交，需按类型放入 `model/yolo/production`、`model/yolo/foundation`、`model/insightface`、`model/assets`。
 
 ## 项目结构
 
@@ -124,7 +124,7 @@ npm run build:css
 
 - Windows 10 已安装并启用 Docker Desktop 或兼容的 Docker 环境
 - 建议启用 Linux 容器模式，使用项目提供的 `compose.yaml` 启动
-- 模型文件已放入 `model/`：`biaochezhajiev2.pt`、`yolov8s-worldv2.pt`
+- 模型文件已按分类放入 `model/`：`model/yolo/production/biaochezhajiev2.pt`、`model/yolo/production/yolov8s-worldv2.pt`
 - `static/dist/tailwind.css` 已存在；如修改过模板 class，在构建机上执行 `npm run build:css` 后再带入内网
 - 共享数据目录、结果目录和 `jobs.sqlite3` 需按 Docker 挂载方式持久化
 

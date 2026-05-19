@@ -91,10 +91,10 @@ COPY static ./static
 COPY model ./model
 COPY instantclient_11_2 ./instantclient_11_2
 
-RUN test -f /app/model/biaochezhajiev2.pt || (echo "Missing model/biaochezhajiev2.pt" >&2; exit 1) \
-    && test -f /app/model/yolov8s-worldv2.pt || (echo "Missing model/yolov8s-worldv2.pt" >&2; exit 1) \
-    && test -f /app/model/det_10g.onnx || (echo "Missing model/det_10g.onnx" >&2; exit 1) \
-    && test -f /app/model/w600k_r50.onnx || (echo "Missing model/w600k_r50.onnx" >&2; exit 1) \
+RUN test -f /app/model/yolo/production/biaochezhajiev2.pt || (echo "Missing model/yolo/production/biaochezhajiev2.pt" >&2; exit 1) \
+    && test -f /app/model/yolo/production/yolov8s-worldv2.pt || (echo "Missing model/yolo/production/yolov8s-worldv2.pt" >&2; exit 1) \
+    && test -f /app/model/insightface/det_10g.onnx || (echo "Missing model/insightface/det_10g.onnx" >&2; exit 1) \
+    && test -f /app/model/insightface/w600k_r50.onnx || (echo "Missing model/insightface/w600k_r50.onnx" >&2; exit 1) \
     && test -f /app/static/dist/tailwind.css || (echo "Missing built Tailwind CSS at static/dist/tailwind.css; run npm run build:css before docker build" >&2; exit 1) \
     && if [ "${REQUIRE_ORACLE_CLIENT}" = "true" ]; then \
         test -f /app/instantclient_11_2/libclntsh.so.11.1 || (echo "Missing /app/instantclient_11_2/libclntsh.so.11.1" >&2; exit 1); \

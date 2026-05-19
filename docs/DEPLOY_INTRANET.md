@@ -25,10 +25,10 @@ git checkout feature/ai-analyst-rag
 git pull
 
 # 确认关键文件存在
-ls model/biaochezhajiev2.pt
-ls model/yolov8s-worldv2.pt
-ls model/det_10g.onnx
-ls model/w600k_r50.onnx
+ls model/yolo/production/biaochezhajiev2.pt
+ls model/yolo/production/yolov8s-worldv2.pt
+ls model/insightface/det_10g.onnx
+ls model/insightface/w600k_r50.onnx
 ls static/dist/tailwind.css          # 如果没有，运行: npm run build:css
 ls instantclient_11_2/libclntsh.so.11.1
 ```
