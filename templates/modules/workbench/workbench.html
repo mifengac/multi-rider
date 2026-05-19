@@ -1,0 +1,148 @@
+{% extends "base_sentinel.html" %}
+
+{% macro wb_icon(name) -%}
+  {%- if name == 'search' -%}
+    <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+  {%- elif name == 'upload' -%}
+    <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+  {%- elif name == 'send' -%}
+    <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+  {%- elif name == 'cpu' -%}
+    <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+  {%- elif name == 'server' -%}
+    <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+  {%- endif -%}
+{%- endmacro %}
+
+{% block title %}工作台 - 未成年人智能管控中心{% endblock %}
+
+{% block head %}
+</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='modules/workbench/workbench.css') }}" />
+<style>
+{% endblock %}
+
+{% block content %}
+<div id="page-workbench" class="wb-root" data-active-subtab="{{ active_subtab }}">
+  <nav class="wb-subnav" aria-label="工作台二级导航">
+    <a href="/workbench?tab=oracle"
+       class="wb-subnav-tab {% if active_subtab == 'oracle' %}active{% endif %}"
+       data-subtab="oracle"
+       {% if active_subtab == 'oracle' %}aria-current="page"{% endif %}>
+      {{ wb_icon('search') }}
+      <span>数据巡检</span>
+    </a>
+    <a href="/workbench?tab=upload"
+       class="wb-subnav-tab {% if active_subtab == 'upload' %}active{% endif %}"
+       data-subtab="upload"
+       {% if active_subtab == 'upload' %}aria-current="page"{% endif %}>
+      {{ wb_icon('upload') }}
+      <span>本地素材</span>
+    </a>
+    <a href="/workbench?tab=dispatch"
+       class="wb-subnav-tab {% if active_subtab == 'dispatch' %}active{% endif %}"
+       data-subtab="dispatch"
+       {% if active_subtab == 'dispatch' %}aria-current="page"{% endif %}>
+      {{ wb_icon('send') }}
+      <span>任务下发</span>
+    </a>
+    <a href="/workbench?tab=train"
+       class="wb-subnav-tab {% if active_subtab == 'train' %}active{% endif %}"
+       data-subtab="train"
+       {% if active_subtab == 'train' %}aria-current="page"{% endif %}>
+      {{ wb_icon('cpu') }}
+      <span>模型训练</span>
+    </a>
+    <a href="/workbench?tab=diagnostics"
+       class="wb-subnav-tab {% if active_subtab == 'diagnostics' %}active{% endif %}"
+       data-subtab="diagnostics"
+       {% if active_subtab == 'diagnostics' %}aria-current="page"{% endif %}>
+      {{ wb_icon('server') }}
+      <span>系统诊断</span>
+    </a>
+  </nav>
+
+  <div class="wb-body">
+    {% include 'modules/detection/_oracle_tab.html' %}
+    {% include 'modules/detection/_upload_tab.html' %}
+    {% include 'modules/dispatch/_dispatch_tab.html' %}
+    {% include 'modules/training/_train_tab.html' %}
+    {% include 'modules/diagnostics/_task_queue_tab.html' %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Initialize workbench configuration and tab visibility -->
+<script>
+  (function() {
+    'use strict';
+
+    // Set up global bootstrap configuration for detection and training scripts
+    window.INDEX_PAGE_BOOTSTRAP = {
+      uploadModels: {{ upload_models | tojson }},
+      uploadModelDefault: {{ upload_model_default | tojson }},
+      trainBaseModels: {{ train_base_models | tojson }},
+      urls: {
+        cancelJob: {{ url_for("job.cancel_job", job_id="__J__") | tojson }},
+        listJobs: {{ url_for("job.list_jobs") | tojson }},
+        jobProgress: {{ url_for("job.get_progress", job_id="__J__") | tojson }},
+        downloadZip: {{ url_for("file.download_zip", job_id="__J__") | tojson }},
+        downloadSummary: {{ url_for("file.download_summary", job_id="__J__") | tojson }},
+        startJob: {{ url_for("job.start_job") | tojson }},
+        startUploadJob: {{ url_for("upload.upload_start") | tojson }},
+        uploadProgress: {{ url_for("upload.upload_progress", job_id="__J__") | tojson }}
+      }
+    };
+
+    const ACTIVE_TAB = '{{ active_subtab }}';
+    const TAB_MAP = {
+      oracle: 'tabOracle',
+      upload: 'tabUpload',
+      dispatch: 'tabDispatch',
+      train: 'tabTrain',
+      diagnostics: 'tabDiagnostics'
+    };
+
+    window.addEventListener('DOMContentLoaded', function() {
+      Object.values(TAB_MAP).forEach(function(tabId) {
+        const el = document.getElementById(tabId);
+        if (el) {
+          el.classList.add('hidden');
+        }
+      });
+
+      const activeTabId = TAB_MAP[ACTIVE_TAB];
+      if (activeTabId) {
+        const el = document.getElementById(activeTabId);
+        if (el) {
+          el.classList.remove('hidden');
+        }
+      }
+
+      const navLinks = document.querySelectorAll('.wb-subnav-tab');
+      navLinks.forEach(function(link) {
+        const url = new URL(link.href);
+        const tab = url.searchParams.get('tab');
+        if (tab === ACTIVE_TAB) {
+          link.classList.add('active');
+          link.setAttribute('aria-current', 'page');
+        } else {
+          link.classList.remove('active');
+          link.removeAttribute('aria-current');
+        }
+      });
+    });
+  })();
+</script>
+
+<!-- Load detection-related scripts for oracle and upload tabs -->
+<script src="{{ url_for('static', filename='modules/detection/tasks.js') }}" defer></script>
+<script src="{{ url_for('static', filename='modules/detection/results.js') }}" defer></script>
+<!-- Load dispatch-related scripts for dispatch tab -->
+<script src="{{ url_for('static', filename='modules/dispatch/dispatch.js') }}" defer></script>
+<!-- Load training-related scripts for train tab -->
+<script src="{{ url_for('static', filename='modules/training/training.js') }}" defer></script>
+<!-- Load diagnostics-related scripts for diagnostics tab -->
+<script src="{{ url_for('static', filename='modules/diagnostics/task-queue.js') }}" defer></script>
+{% endblock %}

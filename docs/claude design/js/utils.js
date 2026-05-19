@@ -235,7 +235,7 @@ var PageManager = {
     var subtitles = {
       dashboard: '态势总览', profile: '个人画像',
       graph: '关系图谱', analyst: 'AI 研判助手',
-      workbench: '工作台'
+      workbench: '统一工作台'
     };
     var subEl = document.getElementById('page-subtitle');
     if (subEl) subEl.textContent = subtitles[name] || '';

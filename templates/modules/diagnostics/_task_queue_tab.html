@@ -1,11 +1,14 @@
-<div id="tabDiagnostics" class="hidden">
-<div class="grid grid-cols-1 xl:grid-cols-12 gap-xl">
-  <div class="xl:col-span-12 space-y-xl">
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+<div id="tabDiagnostics" class="wb-subpage hidden">
+<div class="wb-layout wb-layout-diagnostics">
+  <div class="wb-col wb-col-12 xl:col-span-12 space-y-xl">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
         <div class="flex justify-between items-start mb-4">
             <div>
                 <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">任务队列诊断</div>
-                <h2 class="font-headline-md text-headline-md text-on-surface">任务队列诊断</h2>
+                <h2 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+                    <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                    任务队列诊断
+                </h2>
                 <p class="font-body-md text-on-surface-variant mt-2 text-sm max-w-3xl">只读查看 Worker 队列、健康检查和最近任务状态。用于判断 Web、SQLite 和 Worker 是否协同正常。</p>
             </div>
             <div class="flex items-center gap-4">
@@ -44,21 +47,29 @@
     </section>
   </div>
 
-  <div class="xl:col-span-5 space-y-xl">
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+  <div class="wb-col wb-col-5 xl:col-span-5 space-y-xl">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
         <div class="flex justify-between items-start mb-4">
             <div>
                 <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">系统健康</div>
-                <h3 class="font-headline-md text-headline-md text-on-surface">健康摘要</h3>
+                <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+                    <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                    健康摘要
+                </h3>
             </div>
-            <span id="diag系统健康Badge" class="bg-surface-variant text-on-surface-variant px-3 py-1 rounded-full text-xs border border-outline-variant">--</span>
+            <span id="diagHealthBadge" class="bg-surface-variant text-on-surface-variant px-3 py-1 rounded-full text-xs border border-outline-variant">--</span>
+            <span id="diag系统健康Badge" class="hidden">--</span>
         </div>
-        <div id="diag系统健康Details" class="bg-surface-container-low p-4 rounded-xl text-sm text-on-surface-variant overflow-auto max-h-64 whitespace-pre-wrap font-mono text-xs">等待刷新...</div>
+        <div id="diagHealthDetails" class="bg-surface-container-low p-4 rounded-xl text-sm text-on-surface-variant overflow-auto max-h-64 whitespace-pre-wrap font-mono text-xs">等待刷新...</div>
+        <div id="diag系统健康Details" class="hidden">等待刷新...</div>
     </section>
 
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
         <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">分布统计</div>
-        <h3 class="font-headline-md text-headline-md text-on-surface mb-4">分布统计</h3>
+        <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface mb-4">
+            <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            分布统计
+        </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <div class="text-xs font-bold text-on-surface-variant mb-2">按状态</div>
@@ -72,12 +83,15 @@
     </section>
   </div>
 
-  <div class="xl:col-span-7 space-y-xl">
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+  <div class="wb-col wb-col-7 xl:col-span-7 space-y-xl">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
             <div>
                 <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">近期队列任务</div>
-                <h3 class="font-headline-md text-headline-md text-on-surface">最近队列任务</h3>
+                <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+                    <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    最近队列任务
+                </h3>
                 <p id="diagLastRefresh" class="text-xs text-on-surface-variant mt-1">尚未刷新</p>
             </div>
             <div class="flex gap-2">
@@ -116,7 +130,7 @@
 
         <div class="bg-surface-container-low rounded-xl overflow-hidden border border-outline-variant">
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs">
+                <table class="wb-table w-full text-left text-xs">
                     <thead class="bg-surface-variant text-on-surface-variant border-b border-outline-variant">
                         <tr>
                             <th class="p-3 font-bold">任务</th>

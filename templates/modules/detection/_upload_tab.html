@@ -1,21 +1,24 @@
-<div id="tabUpload" class="hidden">
-<div class="grid grid-cols-1 xl:grid-cols-12 gap-xl">
+<div id="tabUpload" class="wb-subpage hidden">
+<div class="wb-layout wb-layout-upload">
   <!-- Left Column -->
-  <div class="xl:col-span-8 space-y-xl">
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
-      <h3 class="font-headline-md text-headline-md text-on-surface mb-md">上传现场素材</h3>
+  <div class="wb-col wb-col-8 xl:col-span-8 space-y-xl">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+      <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface mb-md">
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        上传现场素材
+      </h3>
       <p class="font-body-md text-on-surface-variant mb-md">支持图片包和视频素材，适合对民警现场采集内容做快速研判。</p>
       
-      <form id="uploadForm" onsubmit="return startUploadJob(event)" class="space-y-md">
+      <form id="uploadForm" onsubmit="return startUploadJob(event)" class="wb-form-grid space-y-md">
         <div class="space-y-base">
           <label id="uploadDropZone" for="uploadFile" class="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low px-6 py-10 text-center transition hover:border-primary">
-            <span class="material-symbols-outlined text-4xl text-outline-variant group-hover:text-primary transition-colors">cloud_upload</span>
+            <svg class="icon-inline text-outline-variant group-hover:text-primary transition-colors" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span class="mt-4 font-label-sm text-sm text-on-surface group-hover:text-primary">点击选择文件，或将文件拖放至此</span>
             <span class="mt-1 text-xs text-on-surface-variant">.zip 图片包 · .mp4 / .avi / .mov / .mpg 视频</span>
             <input id="uploadFile" name="file" type="file" accept=".zip,.mp4,.avi,.mov,.mkv,.mpg,.mpeg" class="hidden" onchange="onUploadFileChange(this)" />
           </label>
           <div id="uploadFileInfo" class="hidden mt-4 flex items-center gap-3 bg-surface-variant p-3 rounded-xl border border-outline-variant">
-            <span class="material-symbols-outlined text-primary">description</span>
+            <svg class="icon-inline text-primary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <div class="min-w-0 flex-1">
               <div id="uploadFileName" class="truncate text-sm font-bold text-on-surface"></div>
               <div id="uploadFileSize" class="text-xs text-on-surface-variant"></div>
@@ -32,6 +35,7 @@
                         <option value="general">通用（general）</option>
                         <option value="bczj">飙车炸街（bczj）</option>
                     </select>
+                    <p id="uploadModelHint" class="mt-2 text-xs leading-6 text-slate-500"></p>
                 </div>
                 <div class="space-y-base lg:col-span-2">
                     <label for="uploadClasses" id="uploadClassesLabel" class="font-label-sm text-label-sm text-on-surface block">检测提示词</label>
@@ -72,10 +76,13 @@
     </section>
 
     <!-- Upload Progress and Results -->
-    <section class="space-y-6">
-        <div id="uploadProgressBox" class="hidden bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+    <section class="wb-card space-y-6">
+        <div id="uploadProgressBox" class="hidden wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="font-headline-md text-headline-md text-on-surface">检测进度</h3>
+                <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+                  <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  检测进度
+                </h3>
                 <span id="uploadProgressStatus" class="bg-tertiary-fixed text-on-tertiary-fixed-variant px-3 py-1 rounded-full text-xs">运行中</span>
             </div>
             <div class="bg-surface-container-low p-4 rounded-xl">
@@ -93,9 +100,12 @@
             </div>
         </div>
 
-        <div id="uploadResultPanel" class="hidden bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+        <div id="uploadResultPanel" class="hidden wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
           <div class="flex justify-between items-center mb-4">
-            <h3 class="font-headline-md text-headline-md text-on-surface">结果图身份识别</h3>
+            <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+              <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              结果图身份识别
+            </h3>
             <div class="flex gap-2">
                 <button type="button" onclick="toggleAllResults('upload', true)" class="bg-surface-variant px-3 py-1 rounded-lg text-sm">全选</button>
                 <button type="button" onclick="toggleAllResults('upload', false)" class="bg-surface-variant px-3 py-1 rounded-lg text-sm">清空</button>
@@ -114,10 +124,13 @@
   </div>
   
   <!-- Right Column (办理提示s) -->
-  <div class="xl:col-span-4 space-y-xl">
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+  <div class="wb-col wb-col-4 xl:col-span-4 space-y-xl">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
       <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-2">办理提示</div>
-      <h3 class="font-headline-md text-headline-md text-on-surface mb-4">办理提示</h3>
+      <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface mb-4">
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        办理提示
+      </h3>
       <div class="space-y-4 text-sm text-on-surface-variant">
         <div class="bg-surface-container-low p-4 rounded-xl">
             <strong class="text-on-surface block mb-1">图片素材包</strong>

@@ -1,12 +1,15 @@
-<div id="tabTrain" class="hidden">
-<div class="grid grid-cols-1 xl:grid-cols-12 gap-xl">
-  <div class="xl:col-span-7 space-y-xl">
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+<div id="tabTrain" class="wb-subpage hidden">
+<div class="wb-layout wb-layout-train">
+  <div class="wb-col wb-col-7 xl:col-span-7 space-y-xl">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
         <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">训练流程</div>
-        <h2 class="font-headline-md text-headline-md text-on-surface">样本沉淀与数据集管理</h2>
+        <h2 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+            <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+            样本沉淀与数据集管理
+        </h2>
         <p class="font-body-md text-on-surface-variant mt-2 text-sm mb-8">围绕基层实战场景，把结果图回流、样本整理、人工复核、预标注和训练任务串成一条闭环，减少重复拷贝和离线整理。</p>
 
-        <form id="trainDatasetForm" onsubmit="return createTrainDataset(event)" class="space-y-4 pt-6 border-t border-outline-variant">
+        <form id="trainDatasetForm" onsubmit="return createTrainDataset(event)" class="wb-form-grid space-y-4 pt-6 border-t border-outline-variant">
             <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-base">
                     <label class="font-label-sm text-on-surface block">数据集名称</label>
@@ -30,10 +33,13 @@
 
         <div class="mt-8 pt-8 border-t border-outline-variant">
             <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">ZIP 导入</div>
-            <h3 class="font-headline-md text-headline-md text-on-surface mb-2">批量导入图片</h3>
+            <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface mb-2">
+                <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                批量导入图片
+            </h3>
             <p class="font-body-md text-on-surface-variant text-sm mb-6">选择已有数据集后，上传一个包含图片的 ZIP 包。系统会自动解压有效图片到 images 目录，并记录图片元数据用于后续标注和训练。</p>
             
-            <form id="trainImportForm" onsubmit="return importTrainZip(event)" class="space-y-4">
+            <form id="trainImportForm" onsubmit="return importTrainZip(event)" class="wb-form-grid space-y-4">
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-base">
                         <label class="font-label-sm text-on-surface block">目标数据集</label>
@@ -59,7 +65,10 @@
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">数据集列表</div>
-                    <h3 class="font-headline-md text-headline-md text-on-surface">现有数据集</h3>
+                    <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+                        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                        现有数据集
+                    </h3>
                 </div>
                 <button type="button" onclick="refreshTrainTab()" class="bg-surface-variant px-3 py-1 rounded-lg text-sm">刷新</button>
             </div>
@@ -69,9 +78,12 @@
         </div>
     </section>
 
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
         <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">数据集状态</div>
-        <h3 class="font-headline-md text-headline-md text-on-surface mb-4">工作区概览</h3>
+        <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface mb-4">
+            <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="4" rx="1.5"/><rect x="14" y="11" width="7" height="10" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+            工作区概览
+        </h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-surface-container-low p-4 rounded-xl">
                 <div class="text-xs text-on-surface-variant">数据集</div>
@@ -93,13 +105,16 @@
     </section>
   </div>
 
-  <div class="xl:col-span-5 space-y-xl">
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+  <div class="wb-col wb-col-5 xl:col-span-5 space-y-xl">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
         <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">发起训练任务</div>
-        <h3 class="font-headline-md text-headline-md text-on-surface">发起训练任务</h3>
+        <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+            <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            发起训练任务
+        </h3>
         <p class="font-body-md text-on-surface-variant mt-2 text-sm mb-6">系统会自动准备训练清单、目录和日志，并启动训练。可勾选“仅使用已确认样本”。</p>
 
-        <form id="trainRunForm" onsubmit="return createTrainJob(event)" class="space-y-4">
+        <form id="trainRunForm" onsubmit="return createTrainJob(event)" class="wb-form-grid space-y-4">
             <div class="space-y-base">
                 <label class="font-label-sm text-on-surface block">训练数据集</label>
                 <select id="trainRunDataset" disabled class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:border-primary focus:ring-0 font-body-md rounded-none px-0 py-sm">
@@ -152,11 +167,14 @@
         </form>
     </section>
 
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
         <div class="flex justify-between items-start mb-4">
             <div>
                 <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">近期运行</div>
-                <h3 class="font-headline-md text-headline-md text-on-surface">最近训练任务</h3>
+                <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+                    <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    最近训练任务
+                </h3>
             </div>
             <button type="button" onclick="refreshTrainJobs()" class="bg-surface-variant px-3 py-1 rounded-lg text-sm">刷新</button>
         </div>
@@ -165,11 +183,14 @@
         </div>
     </section>
 
-    <section class="bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
+    <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
         <div class="flex justify-between items-start mb-4">
             <div>
                 <div class="text-xs text-on-surface-variant uppercase tracking-widest mb-1">模型版本管理</div>
-                <h3 class="font-headline-md text-headline-md text-on-surface">模型版本管理</h3>
+                <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+                    <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                    模型版本管理
+                </h3>
             </div>
             <a href="{{ url_for('train.train_model_registry_page') }}" target="_blank" class="bg-surface-variant px-3 py-1 rounded-lg text-sm border border-outline-variant hover:bg-outline-variant text-on-surface transition-colors inline-block">管理页</a>
         </div>
