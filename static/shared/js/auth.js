@@ -102,14 +102,9 @@ function switchAuthPanel(name) {
 }
 
 function showAppShell(session) {
-  var authShell = document.getElementById('authShell');
-  var appShell = document.getElementById('appShell');
-  var userName = document.getElementById('currentUserName');
-  var userUnit = document.getElementById('currentUserUnit');
-  if (authShell) authShell.classList.add('hidden');
-  if (appShell) appShell.classList.remove('hidden');
-  if (userName) userName.textContent = session && session.name ? session.name : '值班员';
-  if (userUnit) userUnit.textContent = session && session.unit ? session.unit : '基层民警';
+  // Redirect to the new dark-theme entry point after login.
+  // The old index.html appShell is no longer the main UI.
+  window.location.href = '/dashboard';
 }
 
 function showAuthShell() {
@@ -178,8 +173,7 @@ function handleRegister(event) {
 
 function logoutApp() {
   clearAuthSession();
-  showAuthShell();
-  switchAuthPanel('login');
+  window.location.href = '/';
 }
 
 function quickEnterApp() {

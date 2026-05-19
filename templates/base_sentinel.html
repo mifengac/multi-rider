@@ -245,10 +245,12 @@
       </a>
     </nav>
 
-    <!-- Right: Clock & Refresh -->
+    <!-- Right: User info, Clock & actions -->
     <div class="sentinel-header-right">
+      <span id="sentinelUserName" class="text-xs text-slate-400 mr-2"></span>
       <div class="sentinel-clock" id="sentinelClock">--:--:--</div>
       <button class="sentinel-btn-refresh" onclick="location.reload()">刷新</button>
+      <button class="sentinel-btn-refresh" onclick="logoutApp()" style="margin-left:4px;background:#1e293b;color:#94a3b8;">注销</button>
     </div>
   </header>
 
@@ -297,6 +299,19 @@
   <!-- ═══════════════════════════════════════
        Child Template Scripts
   ═══════════════════════════════════════ -->
+  <script src="{{ url_for('static', filename='shared/js/auth.js') }}"></script>
+  <script>
+    (function () {
+      var session = getAuthSession && getAuthSession();
+      if (!session) {
+        window.location.href = '/';
+      } else {
+        var el = document.getElementById('sentinelUserName');
+        if (el) el.textContent = session.name || '值班员';
+      }
+    })();
+  </script>
+
   {% block scripts %}
     <!-- Scripts from child templates will be injected here -->
   {% endblock %}
