@@ -34,7 +34,19 @@ def get_risk_level_distribution() -> list[dict]:
     return query_all(sql)
 
 
-def get_area_distribution() -> list[dict]:
+def get_area_distribution(metric: str = "risk_count") -> list[dict]:
+    if metric == "case_count":
+        sql = """
+            SELECT a."ajxx_cbdw_mc" AS label,
+                   COUNT(DISTINCT a."ajxx_ajbh") AS value
+            FROM "ywdata"."zq_zfba_ajxx" a
+            WHERE a."ajxx_cbdw_mc" IS NOT NULL
+            GROUP BY a."ajxx_cbdw_mc"
+            ORDER BY value DESC
+            LIMIT 10
+        """
+        return query_all(sql)
+
     sql = """
         SELECT p.ssfj AS label, COUNT(*) AS value
         FROM "jcgkzx_monitor"."wcnr_score" s
@@ -42,6 +54,38 @@ def get_area_distribution() -> list[dict]:
         WHERE s.total_score >= 60 AND p.ssfj IS NOT NULL
         GROUP BY p.ssfj
         ORDER BY value DESC
+    """
+    return query_all(sql)
+
+
+def get_school_ranking(metric: str = "risk_count") -> list[dict]:
+    if metric == "case_count":
+        sql = """
+            SELECT sfz."yxx" AS label,
+                   COUNT(DISTINCT a."ajxx_ajbh") AS value
+            FROM "ywdata"."zq_zfba_ajxx" a
+            JOIN "ywdata"."zq_zfba_xyrxx" x
+              ON x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
+            JOIN "ywdata"."zq_zfba_wcnr_sfzxx" sfz
+              ON sfz."sfzhm" = x."xyrxx_sfzh"
+            WHERE sfz."yxx" IS NOT NULL
+            GROUP BY sfz."yxx"
+            ORDER BY value DESC
+            LIMIT 10
+        """
+        return query_all(sql)
+
+    sql = """
+        SELECT sfz."yxx" AS label,
+               COUNT(DISTINCT s.zjhm) AS value
+        FROM "jcgkzx_monitor"."wcnr_score" s
+        JOIN "ywdata"."zq_zfba_wcnr_sfzxx" sfz
+          ON sfz."sfzhm" = s.zjhm
+        WHERE s.total_score >= 60
+          AND sfz."yxx" IS NOT NULL
+        GROUP BY sfz."yxx"
+        ORDER BY value DESC
+        LIMIT 10
     """
     return query_all(sql)
 

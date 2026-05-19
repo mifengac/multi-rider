@@ -1,3 +1,5 @@
+from itertools import combinations
+
 from shared.db.kingbase import query_one, query_all
 
 
@@ -150,10 +152,62 @@ def get_score_info(zjhm: str) -> dict:
     return query_one(sql, {"zjhm": zjhm})
 
 
+def detect_gang(zjhm: str, xm: str | None, co_suspects: list[dict]) -> dict:
+    member_map = {zjhm: xm or ""}
+    for item in co_suspects:
+        co_zjhm = item.get("zjhm")
+        if co_zjhm:
+            member_map[co_zjhm] = item.get("xm") or ""
+
+    if len(member_map) < 3:
+        return {"is_gang": False, "size": 0, "members": []}
+
+    params = {f"p{i}": person_zjhm for i, person_zjhm in enumerate(member_map)}
+    placeholders = ", ".join([f"%(p{i})s" for i in range(len(member_map))])
+    sql = f"""
+        SELECT x."ajxx_join_ajxx_ajbh" AS ajbh,
+               x."xyrxx_sfzh" AS zjhm,
+               x."xyrxx_xm" AS xm
+        FROM "ywdata"."zq_zfba_xyrxx" x
+        WHERE x."xyrxx_sfzh" IN ({placeholders})
+          AND NULLIF(BTRIM(COALESCE(x."xyrxx_sfzh", '')), '') IS NOT NULL
+    """
+    rows = query_all(sql, params)
+    cases_by_person = {person_zjhm: set() for person_zjhm in member_map}
+    for row in rows:
+        row_zjhm = row.get("zjhm")
+        ajbh = row.get("ajbh")
+        if row_zjhm in cases_by_person and ajbh:
+            cases_by_person[row_zjhm].add(ajbh)
+            if row.get("xm"):
+                member_map[row_zjhm] = row.get("xm")
+
+    people = list(member_map.keys())
+    linked_pairs = set()
+    for left, right in combinations(people, 2):
+        if cases_by_person.get(left, set()) & cases_by_person.get(right, set()):
+            linked_pairs.add(frozenset((left, right)))
+
+    for size in range(len(people), 2, -1):
+        for group in combinations(people, size):
+            if zjhm not in group:
+                continue
+            if all(frozenset(pair) in linked_pairs for pair in combinations(group, 2)):
+                ordered = [zjhm] + [person_zjhm for person_zjhm in people if person_zjhm != zjhm and person_zjhm in group]
+                return {
+                    "is_gang": True,
+                    "size": len(ordered),
+                    "members": [{"zjhm": person_zjhm, "xm": member_map.get(person_zjhm, "")} for person_zjhm in ordered],
+                }
+
+    return {"is_gang": False, "size": 0, "members": []}
+
+
 def assemble_profile(zjhm: str) -> dict:
     basic = get_basic_info(zjhm)
     if not basic:
         return {}
+    co_suspects = get_co_suspects(zjhm)
 
     return {
         "basic": basic,
@@ -164,7 +218,8 @@ def assemble_profile(zjhm: str) -> dict:
         "behaviors": get_behaviors(zjhm),
         "hotels": get_hotel_records(zjhm),
         "relations": {
-            "co_suspects": get_co_suspects(zjhm),
+            "co_suspects": co_suspects,
+            "gang": detect_gang(zjhm, basic.get("xm"), co_suspects),
         },
         "score": get_score_info(zjhm),
     }

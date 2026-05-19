@@ -1,10 +1,15 @@
+from datetime import datetime, timedelta
+
 from shared.db.kingbase import query_all, query_one
+from .relation_engine import appeared_at, checked_in, victims_of_case
 
 NODE_STYLES = {
     "person": {"fill": "#3B82F6", "size": 40},
     "case": {"fill": "#7C3AED", "size": 35},
     "school": {"fill": "#F59E0B", "size": 30},
     "guardian": {"fill": "#10B981", "size": 30},
+    "location": {"fill": "#22C55E", "size": 28},
+    "organization": {"fill": "#8B5CF6", "size": 30},
 }
 
 RISK_COLORS = {
@@ -14,6 +19,72 @@ RISK_COLORS = {
     "low": "#3B82F6",
     "normal": "#6B7280",
 }
+
+RELATION_NAMES = {
+    "suspected_in",
+    "co_suspect",
+    "guardian_of",
+    "studies_at",
+    "appeared_at",
+    "checked_in",
+}
+
+TIME_RANGE_DAYS = {
+    "1m": 30,
+    "3m": 90,
+    "6m": 180,
+    "1y": 365,
+}
+
+
+def _format_time(value):
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def _to_float(value):
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return value
+
+
+def _normalize_relations(relations):
+    if not relations:
+        return None
+    normalized = {
+        item.strip().lower()
+        for item in str(relations).split(",")
+        if item.strip()
+    }
+    if not normalized or "all" in normalized:
+        return None
+    return normalized & RELATION_NAMES
+
+
+def _relation_enabled(selected, name: str) -> bool:
+    return selected is None or name in selected
+
+
+def _time_range_start(time_range):
+    if not time_range:
+        return None
+    days = TIME_RANGE_DAYS.get(str(time_range).strip().lower())
+    if not days:
+        return None
+    return datetime.now() - timedelta(days=days)
+
+
+def _append_edge(edges: list, edge: dict) -> None:
+    key = (edge.get("source"), edge.get("target"), edge.get("type"))
+    if any((item.get("source"), item.get("target"), item.get("type")) == key for item in edges):
+        return
+    edges.append(edge)
 
 
 def _person_node(zjhm, xm, risk_score=None, risk_level=None):
@@ -33,7 +104,7 @@ def _case_node(ajbh, ajmc, ay, fasj):
         "type": "case",
         "label": ay or ajmc or ajbh[:10],
         "style": NODE_STYLES["case"],
-        "properties": {"ajbh": ajbh, "ajmc": ajmc, "ay": ay, "fasj": str(fasj) if fasj else None},
+        "properties": {"ajbh": ajbh, "ajmc": ajmc, "ay": ay, "fasj": _format_time(fasj)},
     }
 
 
@@ -57,9 +128,42 @@ def _guardian_node(xm, zjhm=None, lxdh=None):
     }
 
 
-def build_person_graph(zjhm: str, depth: int = 1) -> dict:
+def _location_node(name, count=None, last_time=None, jd=None, wd=None):
+    return {
+        "id": f"L_{name}",
+        "type": "location",
+        "label": name[:12] if name else "未知地点",
+        "style": NODE_STYLES["location"],
+        "properties": {
+            "name": name,
+            "count": count,
+            "last_time": _format_time(last_time),
+            "jd": _to_float(jd),
+            "wd": _to_float(wd),
+        },
+    }
+
+
+def _organization_node(name, address=None, count=None, last_time=None):
+    return {
+        "id": f"O_{name}",
+        "type": "organization",
+        "label": name[:12] if name else "未知机构",
+        "style": NODE_STYLES["organization"],
+        "properties": {
+            "name": name,
+            "address": address,
+            "count": count,
+            "last_time": _format_time(last_time),
+        },
+    }
+
+
+def build_person_graph(zjhm: str, depth: int = 1, relations=None, time_range=None) -> dict:
     nodes = {}
     edges = []
+    selected_relations = _normalize_relations(relations)
+    since = _time_range_start(time_range)
 
     center_sql = """
         SELECT p.zjhm, p.xm, s.total_score, s.risk_level
@@ -77,31 +181,48 @@ def build_person_graph(zjhm: str, depth: int = 1) -> dict:
     )
     nodes[center_node["id"]] = center_node
 
-    _add_cases(zjhm, nodes, edges)
-    _add_co_suspects(zjhm, nodes, edges)
-    _add_guardian(zjhm, nodes, edges)
-    _add_school(zjhm, nodes, edges)
+    if _relation_enabled(selected_relations, "suspected_in"):
+        _add_cases(zjhm, nodes, edges, since)
+    if _relation_enabled(selected_relations, "co_suspect"):
+        _add_co_suspects(zjhm, nodes, edges)
+    if _relation_enabled(selected_relations, "guardian_of"):
+        _add_guardian(zjhm, nodes, edges)
+    if _relation_enabled(selected_relations, "studies_at"):
+        _add_school(zjhm, nodes, edges)
+    if _relation_enabled(selected_relations, "appeared_at"):
+        _add_appeared_at(zjhm, nodes, edges)
+    if _relation_enabled(selected_relations, "checked_in"):
+        _add_checked_in(zjhm, nodes, edges)
 
-    if depth >= 2:
+    if depth >= 2 and _relation_enabled(selected_relations, "suspected_in"):
         first_layer_persons = [
             nid.replace("P_", "") for nid in nodes
             if nid.startswith("P_") and nid != f"P_{zjhm}"
         ]
         for sub_zjhm in first_layer_persons[:5]:
-            _add_cases(sub_zjhm, nodes, edges)
+            _add_cases(sub_zjhm, nodes, edges, since)
 
     return {"nodes": list(nodes.values()), "edges": edges}
 
 
-def _add_cases(zjhm: str, nodes: dict, edges: list):
+def _add_cases(zjhm: str, nodes: dict, edges: list, since=None, exclude_ajbh=None):
+    conditions = ['x."xyrxx_sfzh" = %(zjhm)s']
+    params = {"zjhm": zjhm}
+    if since:
+        conditions.append('a."ajxx_fasj" >= %(since)s')
+        params["since"] = since
+    if exclude_ajbh:
+        conditions.append('a."ajxx_ajbh" <> %(exclude_ajbh)s')
+        params["exclude_ajbh"] = exclude_ajbh
+    where_clause = " AND ".join(conditions)
     sql = """
         SELECT a."ajxx_ajbh", a."ajxx_ajmc", a."ajxx_ay", a."ajxx_fasj"
         FROM "ywdata"."zq_zfba_ajxx" a
         JOIN "ywdata"."zq_zfba_xyrxx" x
           ON x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
-        WHERE x."xyrxx_sfzh" = %(zjhm)s
-    """
-    cases = query_all(sql, {"zjhm": zjhm})
+        WHERE {where_clause}
+    """.format(where_clause=where_clause)
+    cases = query_all(sql, params)
     for c in cases:
         ajbh = c.get("ajxx_ajbh")
         if not ajbh:
@@ -110,7 +231,7 @@ def _add_cases(zjhm: str, nodes: dict, edges: list):
         if node["id"] not in nodes:
             nodes[node["id"]] = node
         edge = {"source": f"P_{zjhm}", "target": node["id"], "label": "涉嫌", "type": "SUSPECTED_IN"}
-        edges.append(edge)
+        _append_edge(edges, edge)
 
 
 def _add_co_suspects(zjhm: str, nodes: dict, edges: list):
@@ -133,14 +254,14 @@ def _add_co_suspects(zjhm: str, nodes: dict, edges: list):
         co_zjhm = co.get("xyrxx_sfzh")
         if not co_zjhm:
             continue
-        score_info = query_one(score_sql, {"co_zjhm": co_zjhm})
+        score_info = query_one(score_sql, {"co_zjhm": co_zjhm}) or {}
         node = _person_node(
             co_zjhm, co.get("xyrxx_xm"),
             score_info.get("total_score"), score_info.get("risk_level"),
         )
         if node["id"] not in nodes:
             nodes[node["id"]] = node
-        edges.append({
+        _append_edge(edges, {
             "source": f"P_{zjhm}", "target": node["id"],
             "label": "共犯", "type": "CO_SUSPECT",
             "style": {"stroke": "#EF4444", "lineWidth": 2},
@@ -160,7 +281,7 @@ def _add_guardian(zjhm: str, nodes: dict, edges: list):
     node = _guardian_node(row["jhr1xm"], None, row.get("jhr1lxdh"))
     if node["id"] not in nodes:
         nodes[node["id"]] = node
-    edges.append({
+    _append_edge(edges, {
         "source": node["id"], "target": f"P_{zjhm}",
         "label": "监护", "type": "GUARDIAN_OF",
         "style": {"stroke": "#10B981"},
@@ -184,14 +305,169 @@ def _add_school(zjhm: str, nodes: dict, edges: list):
     node = _school_node(school_name)
     if node["id"] not in nodes:
         nodes[node["id"]] = node
-    edges.append({
+    _append_edge(edges, {
         "source": f"P_{zjhm}", "target": node["id"],
         "label": "就读", "type": "STUDIES_AT",
         "style": {"stroke": "#F59E0B"},
     })
 
 
-def search_nodes(keyword: str) -> list[dict]:
+def _add_appeared_at(zjhm: str, nodes: dict, edges: list):
+    for relation in appeared_at(zjhm, limit=3):
+        props = relation.get("node", {}).get("properties", {})
+        device_name = props.get("device_name") or props.get("name")
+        if not device_name:
+            continue
+        node = _location_node(
+            device_name,
+            props.get("count"),
+            props.get("last_time"),
+            props.get("jd"),
+            props.get("wd"),
+        )
+        if node["id"] not in nodes:
+            nodes[node["id"]] = node
+        edge = relation.get("edge") or {
+            "source": f"P_{zjhm}",
+            "target": node["id"],
+            "type": "APPEARED_AT",
+            "label": "出现",
+        }
+        edge.setdefault("style", {"stroke": "#22C55E"})
+        _append_edge(edges, edge)
+
+
+def _add_checked_in(zjhm: str, nodes: dict, edges: list):
+    for relation in checked_in(zjhm):
+        props = relation.get("node", {}).get("properties", {})
+        hotel_name = props.get("lgmc") or props.get("name")
+        if not hotel_name:
+            continue
+        node = _organization_node(
+            hotel_name,
+            props.get("lgdz") or props.get("address"),
+            props.get("count"),
+            props.get("last_time"),
+        )
+        if node["id"] not in nodes:
+            nodes[node["id"]] = node
+        edge = relation.get("edge") or {
+            "source": f"P_{zjhm}",
+            "target": node["id"],
+            "type": "CHECKED_IN",
+            "label": "入住",
+        }
+        edge.setdefault("style", {"stroke": "#8B5CF6"})
+        _append_edge(edges, edge)
+
+
+def build_case_graph(ajbh: str, depth: int = 1) -> dict:
+    nodes = {}
+    edges = []
+
+    case_sql = """
+        SELECT a."ajxx_ajbh", a."ajxx_ajmc", a."ajxx_ay", a."ajxx_fasj"
+        FROM "ywdata"."zq_zfba_ajxx" a
+        WHERE a."ajxx_ajbh" = %(ajbh)s
+        LIMIT 1
+    """
+    case = query_one(case_sql, {"ajbh": ajbh})
+    if not case:
+        return {"nodes": [], "edges": []}
+
+    case_node = _case_node(
+        case.get("ajxx_ajbh"),
+        case.get("ajxx_ajmc"),
+        case.get("ajxx_ay"),
+        case.get("ajxx_fasj"),
+    )
+    nodes[case_node["id"]] = case_node
+
+    suspects_sql = """
+        SELECT DISTINCT x."xyrxx_sfzh", x."xyrxx_xm",
+               s.total_score, s.risk_level
+        FROM "ywdata"."zq_zfba_xyrxx" x
+        LEFT JOIN "jcgkzx_monitor"."wcnr_score" s ON s.zjhm = x."xyrxx_sfzh"
+        WHERE x."ajxx_join_ajxx_ajbh" = %(ajbh)s
+          AND NULLIF(BTRIM(COALESCE(x."xyrxx_sfzh", '')), '') IS NOT NULL
+    """
+    suspects = query_all(suspects_sql, {"ajbh": ajbh})
+    suspect_ids = []
+    for suspect in suspects:
+        suspect_zjhm = suspect.get("xyrxx_sfzh")
+        if not suspect_zjhm:
+            continue
+        suspect_ids.append(suspect_zjhm)
+        node = _person_node(
+            suspect_zjhm,
+            suspect.get("xyrxx_xm"),
+            suspect.get("total_score"),
+            suspect.get("risk_level"),
+        )
+        if node["id"] not in nodes:
+            nodes[node["id"]] = node
+        _append_edge(edges, {
+            "source": node["id"],
+            "target": case_node["id"],
+            "label": "涉嫌",
+            "type": "SUSPECTED_IN",
+        })
+
+    for victim in victims_of_case(ajbh):
+        victim_zjhm = victim.get("zjhm") or victim.get("saryxx_sfzh")
+        if not victim_zjhm:
+            continue
+        node = _person_node(victim_zjhm, victim.get("xm") or victim.get("saryxx_xm"))
+        if node["id"] not in nodes:
+            nodes[node["id"]] = node
+        _append_edge(edges, {
+            "source": node["id"],
+            "target": case_node["id"],
+            "label": "受害",
+            "type": "VICTIM_OF",
+        })
+
+    if depth >= 2:
+        for suspect_zjhm in suspect_ids[:10]:
+            _add_cases(suspect_zjhm, nodes, edges, exclude_ajbh=ajbh)
+
+    return {"nodes": list(nodes.values()), "edges": edges}
+
+
+def _strip_node_prefix(node_id: str, prefix: str) -> str:
+    return node_id[len(prefix):] if node_id.startswith(prefix) else node_id
+
+
+def expand_node(node_id: str, node_type: str, direction: str = "both") -> dict:
+    nodes = {}
+    edges = []
+    normalized_type = (node_type or "").strip().lower()
+
+    if normalized_type == "person":
+        zjhm = _strip_node_prefix(node_id, "P_")
+        _add_cases(zjhm, nodes, edges)
+        _add_co_suspects(zjhm, nodes, edges)
+        _add_guardian(zjhm, nodes, edges)
+        _add_school(zjhm, nodes, edges)
+        _add_appeared_at(zjhm, nodes, edges)
+        _add_checked_in(zjhm, nodes, edges)
+        nodes.pop(f"P_{zjhm}", None)
+    elif normalized_type == "case":
+        ajbh = _strip_node_prefix(node_id, "C_")
+        graph = build_case_graph(ajbh, depth=1)
+        nodes = {node["id"]: node for node in graph["nodes"] if node.get("id") != f"C_{ajbh}"}
+        edges = graph["edges"]
+    else:
+        return {"nodes": [], "edges": []}
+
+    return {"nodes": list(nodes.values()), "edges": edges}
+
+
+def search_nodes(keyword: str, node_type: str | None = None) -> list[dict]:
+    normalized_type = node_type.strip().lower() if node_type else None
+    if normalized_type and normalized_type not in {"person", "case", "location"}:
+        return []
+
     person_sql = """
         SELECT zjhm, xm FROM "jcgkzx_monitor"."wcnr_target_pool"
         WHERE xm LIKE %(kw)s OR zjhm LIKE %(kw)s
@@ -202,10 +478,24 @@ def search_nodes(keyword: str) -> list[dict]:
         WHERE "ajxx_ajmc" LIKE %(kw)s OR "ajxx_ajbh" LIKE %(kw)s
         LIMIT 10
     """
+    location_sql = """
+        SELECT DISTINCT device_name
+        FROM "jcgkzx_monitor"."wcnr_ryrl_gj"
+        WHERE device_name LIKE %(kw)s
+          AND device_name IS NOT NULL
+        LIMIT 10
+    """
     kw = f"%{keyword}%"
     results = []
-    for row in query_all(person_sql, {"kw": kw}):
-        results.append({"id": row["zjhm"], "type": "person", "label": row.get("xm", "")})
-    for row in query_all(case_sql, {"kw": kw}):
-        results.append({"id": row["ajxx_ajbh"], "type": "case", "label": row.get("ajxx_ajmc", "")})
+    if normalized_type in (None, "person"):
+        for row in query_all(person_sql, {"kw": kw}):
+            results.append({"id": row["zjhm"], "type": "person", "label": row.get("xm", "")})
+    if normalized_type in (None, "case"):
+        for row in query_all(case_sql, {"kw": kw}):
+            results.append({"id": row["ajxx_ajbh"], "type": "case", "label": row.get("ajxx_ajmc", "")})
+    if normalized_type in (None, "location"):
+        for row in query_all(location_sql, {"kw": kw}):
+            device_name = row.get("device_name")
+            if device_name:
+                results.append({"id": device_name, "type": "location", "label": device_name})
     return results

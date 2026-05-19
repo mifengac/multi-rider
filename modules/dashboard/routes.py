@@ -5,9 +5,10 @@ from .services.trend_service import get_case_trend, get_person_trend, get_score_
 from .services.distribution_service import (
     get_case_type_distribution, get_risk_level_distribution,
     get_area_distribution, get_age_distribution,
-    get_gender_distribution, get_source_distribution,
+    get_gender_distribution, get_source_distribution, get_school_ranking,
 )
 from .services.alert_service import get_recent_alerts, mark_alert_read, handle_alert
+from .services.heatmap_service import get_heatmap
 
 
 @dashboard_bp.route("/summary", methods=["GET"])
@@ -56,6 +57,12 @@ def alerts():
     return jsonify({"items": get_recent_alerts(limit)})
 
 
+@dashboard_bp.route("/heatmap", methods=["GET"])
+def heatmap():
+    days = request.args.get("days", 30, type=int)
+    return jsonify({"days": days, "items": get_heatmap(days)})
+
+
 @dashboard_bp.route("/alerts/<int:alert_id>/read", methods=["POST"])
 def alert_read(alert_id):
     ok = mark_alert_read(alert_id)
@@ -72,6 +79,14 @@ def alert_handle(alert_id):
 
 @dashboard_bp.route("/ranking", methods=["GET"])
 def ranking():
+    by = request.args.get("by", "area")
     metric = request.args.get("metric", "risk_count")
-    data = get_area_distribution()
-    return jsonify({"metric": metric, "items": data[:10]})
+    if metric not in {"case_count", "risk_count"}:
+        return jsonify({"error": "invalid_metric", "valid": ["case_count", "risk_count"]}), 400
+    if by == "school":
+        data = get_school_ranking(metric)
+    elif by == "area":
+        data = get_area_distribution(metric)
+    else:
+        return jsonify({"error": "invalid_by", "valid": ["area", "school"]}), 400
+    return jsonify({"by": by, "metric": metric, "items": data[:10]})

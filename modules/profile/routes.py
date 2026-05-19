@@ -4,6 +4,7 @@ from .services.profile_assembler import assemble_profile, get_photo
 from .services.trajectory_service import (
     get_recent_trajectory, get_hotspots, get_time_pattern, get_last_seen,
 )
+from .services.timeline_service import build_timeline
 from .services.suggestion_engine import generate_suggestions
 
 
@@ -32,6 +33,11 @@ def profile_trajectory(zjhm):
         "time_pattern": get_time_pattern(zjhm, days),
         "last_seen": get_last_seen(zjhm),
     })
+
+
+@profile_bp.route("/<zjhm>/timeline", methods=["GET"])
+def profile_timeline(zjhm):
+    return jsonify({"items": build_timeline(zjhm)})
 
 
 @profile_bp.route("/<zjhm>/photo", methods=["GET"])

@@ -35,6 +35,7 @@ def score_trend(zjhm):
 
 
 @score_bp.route("/recalculate", methods=["POST"])
+@score_bp.route("/batch-recalculate", methods=["POST"])
 def recalculate():
     data = request.get_json(silent=True) or {}
     zjhm = data.get("zjhm", "all")
