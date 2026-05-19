@@ -1,44 +1,52 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>个人画像 - 未成年人智能管控中枢</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='dist/tailwind.css') }}" />
-  <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
+{% extends "base_sentinel.html" %}
+
+{% block title %}个人画像 - 未成年人智能管控中枢{% endblock %}
+
+{% block head %}
   <style>
-    body { background: #f8fafc; color: #1e293b; font-family: system-ui, -apple-system, sans-serif; }
-    .profile-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; }
-    .section-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
-    .risk-bar { height: 8px; border-radius: 4px; background: #e2e8f0; overflow: hidden; }
+    .profile-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; }
+    .section-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #334155; }
+    .risk-bar { height: 8px; border-radius: 4px; background: #334155; overflow: hidden; }
     .risk-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
     .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; color: white; }
-    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; background: #f1f5f9; color: #475569; margin: 2px; }
-    .nav-link { color: #64748b; text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 0.85rem; }
-    .nav-link:hover { background: #f1f5f9; color: #1e293b; }
-    .timeline-item { position: relative; padding-left: 24px; padding-bottom: 16px; border-left: 2px solid #e2e8f0; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; background: #334155; color: #94a3b8; margin: 2px; }
+    .timeline-item { position: relative; padding-left: 24px; padding-bottom: 16px; border-left: 2px solid #334155; }
     .timeline-item::before { content: ''; position: absolute; left: -5px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; }
   </style>
-</head>
-<body class="min-h-screen">
-  <header class="flex items-center justify-between px-8 py-4 border-b border-slate-200 bg-white sticky top-0 z-50">
-    <div class="flex items-center gap-4">
-      <a href="/dashboard" class="text-sm text-blue-500 hover:underline">&larr; 返回面板</a>
-      <h1 class="text-lg font-bold text-slate-800">个人画像</h1>
-    </div>
-    <nav class="flex items-center gap-2">
-      <a href="/dashboard" class="nav-link">态势总览</a>
-      <a href="/graph" class="nav-link">关系图谱</a>
-    </nav>
-  </header>
+{% endblock %}
 
+{% block content %}
   <main class="max-w-7xl mx-auto p-6" id="profileMain">
-    <div class="text-center py-20 text-slate-400" id="loadingState">加载中...</div>
+    {% if zjhm %}
+      <div class="text-center py-20 text-slate-400" id="loadingState">加载中...</div>
+    {% else %}
+      <section class="profile-card max-w-2xl mx-auto mt-16">
+        <div class="section-title">人员查询</div>
+        <h1 class="text-2xl font-bold mb-3">个人画像</h1>
+        <p class="text-sm text-slate-400 mb-6">请输入身份证号，查询人员画像、风险评分、关系网络和轨迹分析。</p>
+        <form method="get" action="/profile" class="flex gap-3">
+          <input
+            type="text"
+            name="zjhm"
+            autocomplete="off"
+            placeholder="请输入身份证号"
+            class="flex-1 rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-slate-100 outline-none focus:border-blue-500"
+          >
+          <button type="submit" class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+            搜索
+          </button>
+        </form>
+      </section>
+    {% endif %}
   </main>
+{% endblock %}
 
-  <script>
-    const ZJHM = "{{ zjhm }}";
-  </script>
-  <script src="{{ url_for('static', filename='modules/profile/profile.js') }}"></script>
-</body>
-</html>
+{% block scripts %}
+  {% if zjhm %}
+    <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
+    <script>
+      const ZJHM = {{ zjhm | tojson }};
+    </script>
+    <script src="{{ url_for('static', filename='modules/profile/profile.js') }}"></script>
+  {% endif %}
+{% endblock %}

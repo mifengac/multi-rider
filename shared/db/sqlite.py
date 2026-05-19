@@ -1292,6 +1292,10 @@ def list_jobs(owner_key: str, owner_ip: str, limit: int = 50) -> list[dict[str, 
     return [_row_to_job(row) for row in rows if row is not None]
 
 
+def list_saved_jobs(owner_key: str, owner_ip: str, limit: int = 50) -> list[dict[str, Any]]:
+    return list_jobs(owner_key, owner_ip, limit=limit)
+
+
 def list_all_jobs(limit: int = 50) -> list[dict[str, Any]]:
     safe_limit = max(1, min(int(limit or 50), 500))
     with _connect() as conn:

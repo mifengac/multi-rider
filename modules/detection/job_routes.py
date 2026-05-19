@@ -15,7 +15,7 @@ from shared.config.config import (
 )
 from shared.db.oracle import fetch_image_urls
 from shared.db.sqlite import get_job as get_saved_job
-from shared.db.sqlite import list_all_jobs as list_all_saved_jobs
+from shared.db.sqlite import list_saved_jobs
 from modules.detection.services.job_service import (
     get_job_snapshot,
     list_running_jobs,
@@ -227,7 +227,8 @@ def history():
     except Exception:
         limit = 50
 
-    records = list_all_saved_jobs(limit=limit)
+    owner_key, owner_ip = get_request_owner(request)
+    records = list_saved_jobs(owner_key, owner_ip, limit=limit)
     items = [_history_summary_payload(record) for record in records]
     return jsonify({"ok": True, "jobs": items})
 

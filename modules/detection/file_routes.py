@@ -2,10 +2,11 @@ import io
 import os
 import time
 
-from flask import Blueprint, send_file, url_for
+from flask import Blueprint, request, send_file, url_for
 
 from shared.db.sqlite import get_job as get_saved_job
 from modules.detection.services.job_service import _summarize, get_job_snapshot
+from shared.ownership.ownership import get_request_owner, job_matches_owner
 
 
 file_bp = Blueprint("file", __name__)
@@ -39,6 +40,10 @@ def download_zip(job_id: str):
     if not job:
         return "job not found", 404
 
+    owner_key, owner_ip = get_request_owner(request)
+    if not job_matches_owner(job, owner_key, owner_ip):
+        return "forbidden", 403
+
     if job.get("status") != "done":
         return "job not found or not ready", 404
 
@@ -64,7 +69,14 @@ def download_zip(job_id: str):
 @file_bp.get("/download/<job_id>/<part>")
 def download_zip_part(job_id: str, part: str):
     job = _resolve_job(job_id)
-    if not job or job.get("status") != "done":
+    if not job:
+        return "job not found or not ready", 404
+
+    owner_key, owner_ip = get_request_owner(request)
+    if not job_matches_owner(job, owner_key, owner_ip):
+        return "forbidden", 403
+
+    if job.get("status") != "done":
         return "job not found or not ready", 404
 
     parts = {item["name"]: item["path"] for item in (job.get("zip_parts") or [])}
@@ -80,6 +92,10 @@ def download_summary(job_id: str):
     job = _resolve_job(job_id)
     if not job:
         return "job not found", 404
+
+    owner_key, owner_ip = get_request_owner(request)
+    if not job_matches_owner(job, owner_key, owner_ip):
+        return "forbidden", 403
 
     text = job.get("summary_text") or _summarize(job)
     return send_file(
