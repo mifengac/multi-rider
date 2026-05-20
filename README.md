@@ -55,9 +55,9 @@ multi-rider/
 ├── tailwind.config.js       # Tailwind v3 配置，目标 Chrome 88+
 ├── docs/                    # 方案文档、交接记录、设计稿、辅助脚本
 ├── scripts/sql/             # KingBase 迁移脚本
-├── Dockerfile               # Python 3.12 容器镜像定义
+├── docker-compose.yml       # 唯一权威 Compose 配置（内网运行已导入镜像）
 ├── ops/
-│   ├── Dockerfile           # Linux Docker 镜像定义
+│   ├── Dockerfile           # Linux Docker 镜像构建定义
 │   └── app.env.example      # 环境变量模板
 ├── model/                   # 模型文件（不入库）
 ├── output/                  # 推理结果 ZIP 输出目录
@@ -158,7 +158,7 @@ uv run python scripts/run_migrations.py
 ### 前提条件
 
 - Windows 10 已安装并启用 Docker Desktop 或兼容的 Docker 环境
-- 建议启用 Linux 容器模式，使用项目提供的 `compose.yaml` 启动
+- 建议启用 Linux 容器模式，使用项目提供的 `docker-compose.yml` 启动
 - 模型文件已按分类放入 `model/`：`model/yolo/production/biaochezhajiev2.pt`、`model/yolo/production/yolov8s-worldv2.pt`
 - `static/dist/tailwind.css` 已存在；如修改过模板 class，在构建机上执行 `npm run build:css` 后再带入内网
 - 共享数据目录、结果目录和 `jobs.sqlite3` 需按 Docker 挂载方式持久化
@@ -167,10 +167,10 @@ uv run python scripts/run_migrations.py
 
 ```powershell
 cd multi-rider
-cp .env.example .env
+cp .env.example app.env
 ```
 
-根据实际环境修改 `.env` 中的数据库、模型和目录配置；内网环境下保持 `YOLO_TELEMETRY=false`。
+根据实际环境修改 `app.env` 中的数据库、模型和目录配置；内网环境下保持 `YOLO_TELEMETRY=false`。
 
 ### 2. 启动服务
 
@@ -211,26 +211,29 @@ docker compose down
 
 适用于 CentOS Stream 10 内网服务器，统一使用 Docker 部署，推荐生产环境使用。
 
-推荐使用项目根目录的 `compose.yaml` + `.env` 同目录启动，不再要求把配置放到 `/opt`。
+推荐使用项目根目录的 `docker-compose.yml` + `app.env` 同目录启动，不再要求把配置放到 `/opt`。
 
 ### 快速结论
 
 1. 当前仓库内的 `instantclient_11_2/` 已切换为 Linux x86_64 版共享库，可直接打入 Linux Docker 镜像。
 2. 当前仓库默认按 `python-oracledb` thick mode 运行；构建镜像前需先把 Linux x86_64 Instant Client 共享库放入 `instantclient_11_2/`，其中至少包含 `libclntsh.so.11.1`、`libnnz11.so`、`libociei.so`。
-3. 离线部署建议直接参考 [docs/OFFLINE_DEPLOY_CENTOS_STREAM10.md](docs/OFFLINE_DEPLOY_CENTOS_STREAM10.md)。
+3. 模型文件不打入镜像，内网运行时由 `docker-compose.yml` 默认挂载同目录的 `./model`。
+4. 离线部署建议直接参考 [docs/OFFLINE_DEPLOY_CENTOS_STREAM10.md](docs/OFFLINE_DEPLOY_CENTOS_STREAM10.md)。
 
 ### 最小部署步骤
 
 ```bash
 # 联网构建机
-docker build --platform linux/amd64 -f ops/Dockerfile -t multi-rider:centos-stream10 .
-docker save -o multi-rider-centos-stream10.tar multi-rider:centos-stream10
+npm install
+npm run build:css
+docker build --platform linux/amd64 -f ops/Dockerfile -t multi-rider:latest .
+docker save -o multi-rider-latest.tar multi-rider:latest
 
-# 内网主机（与 compose.yaml/.env 放在同一目录）
-sudo docker load -i multi-rider-centos-stream10.tar
-cp .env.example .env
-mkdir -p data/output data/upload_tmp data/face_data data/datasets data/train_runs
-[ -f data/jobs.sqlite3 ] || touch data/jobs.sqlite3
+# 内网主机（与 docker-compose.yml/app.env 放在同一目录）
+sudo docker load -i multi-rider-latest.tar
+cp .env.example app.env
+mkdir -p runtime/data runtime/output runtime/face_data runtime/datasets runtime/train_runs runtime/upload_tmp model
+[ -f runtime/data/jobs.sqlite3 ] || touch runtime/data/jobs.sqlite3
 sudo docker compose up -d
 ```
 

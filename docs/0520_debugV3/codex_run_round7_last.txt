@@ -1,0 +1,79 @@
+第七轮 Docker 全量梳理 — 改动清单与验收结果
+==============================================
+
+任务说明：codex 在沙箱里完成了所有文件编辑，但 `uv run pytest -q` 因 Windows
+tempfile.mkdtemp 在沙箱权限下不能继续建子目录而无法启动，验证阶段被卡住
+（约 37 分钟）。文件改动已落地，验证由主 agent 在真实环境完成。
+
+---
+
+策略决策
+--------
+
+1. **保留 model 外置 + 卷挂载**（方案 A）：模型文件不进镜像，运行时由
+   `docker-compose.yml` 通过 `${MULTI_RIDER_MODEL_ROOT:-./model}:/app/model`
+   挂入。`ops/Dockerfile` 不再校验模型；运行时由
+   `shared/config/config.py:_resolve_model_path` 在挂载目录递归查找。
+2. **以 `docker-compose.yml` 为唯一权威 Compose 配置**，删除 `compose.yaml`。
+3. **删除根目录的简单版 `Dockerfile`**，避免 compose 误用。`ops/Dockerfile`
+   是唯一镜像入口，必须显式 `docker build -f ops/Dockerfile ...`。
+4. **Tailwind CSS 构建前置**：不在镜像里装 Node.js；联网构建机必须先
+   `npm install && npm run build:css` 生成 `static/dist/tailwind.css`。
+
+---
+
+改动文件清单
+-----------
+
+| 文件 | 改动 | 验收 |
+|---|---|---|
+| `Dockerfile` (根目录) | 删除（简单版 stub） | git status 显示已删 |
+| `compose.yaml` | 删除（精简版 compose） | git status 显示已删 |
+| `ops/Dockerfile` | 移除 model 校验；保留 tailwind.css + Oracle Client 校验；加 `COPY scripts ./scripts` | grep 验证 `test -f /app/model` 已无 |
+| `docker-compose.yml` | 已是无 `build:`、`pull_policy: never`、image 默认 `multi-rider:latest`；web command 跳过缺失的 migrations | `docker compose config --quiet` exit=0 |
+| `.dockerignore` | 保留 `model/*` + `!model/README.md` 规则（model 不进镜像） | 已就位 |
+| `.env.example` | 加 `MULTI_RIDER_IMAGE` 说明、模型目录注释；模型路径指向子目录布局 | 已就位 |
+| `ops/app.env.ubuntu.example` | 模型路径同步到 `yolo/production`、`insightface`、`assets` 子目录 | 已就位 |
+| `README.md` | 第 210-235 行 CentOS 部署段改指向 `docker-compose.yml` | 已就位 |
+| `docs/DEPLOY_INTRANET.md` | 加 npm build:css 前置步骤；加 model/ 挂载说明；常见错误表新增 5 条 | 已就位 |
+| `docs/DOCKER_OVERVIEW.md` | 新文件：文件角色、构建步骤、部署步骤、常见错误对照表 | 128 行 |
+
+---
+
+验收命令（在主 agent 真实环境执行）
+-----------------------------------
+
+- `uv run pytest -q`：**124 passed in 4.04s** ✓
+- `uv run python -c "import app"`：exit 0 ✓
+- `docker compose -f docker-compose.yml config --quiet`：exit 0 ✓
+
+---
+
+用户后续要做的前置操作
+---------------------
+
+1. 联网构建机重新打包镜像（含 scripts/ 和 tailwind.css）：
+   ```bash
+   npm install
+   npm run build:css
+   docker build --platform linux/amd64 -f ops/Dockerfile -t multi-rider:latest .
+   docker save -o multi-rider-latest-20260520.tar multi-rider:latest
+   ```
+2. 拷到内网部署目录后：
+   ```bash
+   docker compose down
+   docker load -i multi-rider-latest-20260520.tar
+   APP_ENV_FILE=./app.env docker compose up -d
+   ```
+3. 确保部署目录有 `docker-compose.yml`、`app.env`、`model/` 三样；
+   **不需要** Dockerfile 或源码。
+
+---
+
+遗留风险
+--------
+
+- `ops/Dockerfile` 第 92 行还有 `COPY model ./model`。由于 `.dockerignore`
+  排除了 `model/*`（只留 `README.md`），实际只会拷 README，不会失败；但
+  保留这行让镜像里 `/app/model` 目录提前存在，作为运行时挂载点的占位。
+  下次大改时可以删除，进一步精简 Dockerfile。

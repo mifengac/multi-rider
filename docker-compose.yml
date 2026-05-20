@@ -1,9 +1,12 @@
 name: multi-rider
 
+# 离线/内网部署：镜像通过 `docker load -i multi-rider-*.tar` 提前导入，
+# compose 不再尝试 build；如需在联网构建机上重建，请使用
+#   docker build -f ops/Dockerfile -t ${MULTI_RIDER_IMAGE:-multi-rider:latest} .
+# 然后 `docker save` 出 tar 拷到内网。
 x-app-common: &app-common
-  build:
-    context: .
-  image: ${MULTI_RIDER_IMAGE:-multi-rider:offline-20260517}
+  image: ${MULTI_RIDER_IMAGE:-multi-rider:latest}
+  pull_policy: never
   env_file:
     - ${APP_ENV_FILE:-./app.env}
   volumes:
@@ -21,7 +24,7 @@ services:
   web:
     <<: *app-common
     container_name: multi-rider-web
-    command: sh -c "python scripts/run_migrations.py && python app.py"
+    command: sh -c "if [ -f scripts/run_migrations.py ]; then python scripts/run_migrations.py || echo '[warn] migrations failed, continuing'; else echo '[warn] scripts/run_migrations.py not in image, skipping migrations'; fi; exec python app.py"
     ports:
       - "${APP_PORT:-5001}:5001"
     healthcheck:
