@@ -4,6 +4,7 @@ import os
 import sqlite3
 import tempfile
 import time
+from datetime import datetime
 from typing import Any
 
 from shared.config.config import (
@@ -167,4 +168,23 @@ def get_health_report(now_ts: int | None = None) -> dict[str, Any]:
         "ok": all(check.get("ok") for check in checks.values()),
         "timestamp": now_ts,
         "checks": checks,
+    }
+
+
+def get_api_health_report() -> dict[str, str]:
+    from shared.db.kingbase import query_one
+    from shared.scheduler import is_scheduler_running
+
+    db_ok = False
+    try:
+        query_one("SELECT 1 AS ok")
+        db_ok = True
+    except Exception:
+        db_ok = False
+
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "db": "connected" if db_ok else "disconnected",
+        "scheduler": "running" if is_scheduler_running() else "stopped",
+        "timestamp": datetime.utcnow().isoformat(),
     }

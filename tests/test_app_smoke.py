@@ -12,6 +12,7 @@ def test_app_factory_registers_expected_endpoints(app_module):
     flask_app = app_module.create_app()
 
     assert "healthz" in flask_app.view_functions
+    assert "api_health" in flask_app.view_functions
     assert "livez" in flask_app.view_functions
     assert "diagnostics.task_queue_diagnostics" in flask_app.view_functions
     assert "job.index" in flask_app.view_functions
@@ -70,6 +71,29 @@ def test_healthz_returns_503_when_unhealthy(client, app_module, monkeypatch):
 
     assert response.status_code == 503
     assert response.get_json()["checks"]["sqlite"]["ok"] is False
+
+
+def test_api_health_returns_deploy_health_payload(client, app_module, monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "get_api_health_report",
+        lambda: {
+            "status": "ok",
+            "db": "connected",
+            "scheduler": "stopped",
+            "timestamp": "2026-05-20T00:00:00",
+        },
+    )
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "status": "ok",
+        "db": "connected",
+        "scheduler": "stopped",
+        "timestamp": "2026-05-20T00:00:00",
+    }
 
 
 def test_task_queue_diagnostics_route_returns_mocked_snapshot(client, monkeypatch):

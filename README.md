@@ -32,6 +32,10 @@ multi-rider/
 │   ├── detection/           # 检测模块：数据库检测、本地上传、结果下载
 │   ├── face/                # 人脸模块：人脸库、识别、身份核验
 │   ├── dispatch/            # 下发模块：认证、队列、短信、任务下发
+│   ├── dashboard/           # 未成年人管控态势、预警、排名 API
+│   ├── graph/               # 人员/案件关系图谱 API
+│   ├── profile/             # 个人画像、轨迹、时间轴 API
+│   ├── score/               # 风险评分、趋势、重算 API
 │   └── training/            # 训练模块：数据集、预标注、训练、模型注册
 ├── shared/
 │   ├── config/              # 全局配置与环境变量加载
@@ -50,6 +54,8 @@ multi-rider/
 ├── package.json             # Tailwind/PostCSS 构建脚本
 ├── tailwind.config.js       # Tailwind v3 配置，目标 Chrome 88+
 ├── docs/                    # 方案文档、交接记录、设计稿、辅助脚本
+├── scripts/sql/             # KingBase 迁移脚本
+├── Dockerfile               # Python 3.12 容器镜像定义
 ├── ops/
 │   ├── Dockerfile           # Linux Docker 镜像定义
 │   └── app.env.example      # 环境变量模板
@@ -65,14 +71,27 @@ multi-rider/
 - 人脸识别与身份核验：`modules/face/`
 - 任务下发与短信：`modules/dispatch/`
 - 训练、预标注、模型注册：`modules/training/`
+- 未成年人管控态势：`modules/dashboard/`
+- 风险评分、画像与图谱：`modules/score/`、`modules/profile/`、`modules/graph/`
 - 全局配置与环境变量：`shared/config/config.py`
 - 共享数据库接入：`shared/db/`
+- 参数校验：`shared/validators.py`
 - 共享推理能力：`shared/inference/infer_service.py`
 - 工作台页面壳层：`templates/index.html`
 - 模块页面模板：`templates/modules/`
 - 模块前端脚本：`static/modules/`
 - 运维与部署材料：`ops/`
+- 部署指南与 API 手册：`docs/DEPLOYMENT.md`、`docs/API.md`
 - 方案、交接、设计稿：`docs/`
+
+## 未成年人管控中枢模块
+
+本轮补齐了上线运维所需资产：
+
+- 数据库迁移：`scripts/run_migrations.py` 按顺序执行 `scripts/sql/v*.sql`，初始化 `jcgkzx_monitor.wcnr_alert` 与 `wcnr_score_history`。
+- API 文档：`docs/API.md` 列出图谱、评分、画像、态势面板、检测、人脸、派发、训练和诊断端点。
+- 部署文档：`docs/DEPLOYMENT.md` 说明 KingBase、调度器、Docker 和健康检查配置。
+- 健康检查：`GET /api/health` 返回 KingBase 与调度器状态。
 
 ## 前端样式构建
 
@@ -113,6 +132,22 @@ npm run build:css
 | `MAX_UPLOAD_BYTES` | `524288000` (500 MB) | 上传文件大小上限 |
 | `OUTPUT_DIR` | `./output` | 结果 ZIP 目录 |
 | `YOLO_TELEMETRY` | `false` | **禁用 ultralytics 联网检测**（内网必须保持 false） |
+| `KINGBASE_HOST` | *(必须修改)* | KingBase V8 主机 |
+| `KINGBASE_PORT` | `54321` | KingBase V8 端口 |
+| `KINGBASE_DB` | *(必须修改)* | KingBase 数据库名 |
+| `KINGBASE_USER` | *(必须修改)* | KingBase 用户名 |
+| `KINGBASE_PASSWORD` | *(必须修改)* | KingBase 密码 |
+| `KINGBASE_SCHEMA` | `ywdata` | 业务数据 schema |
+| `JCGKZX_MONITOR_SCHEMA` | `jcgkzx_monitor` | 聚合层 schema |
+| `WCNR_SCHEDULER_ENABLED` | `1` | 是否启动评分/预警调度器 |
+| `WCNR_SCHEDULER_BATCH_HOUR` | `3` | 日批评分小时 |
+| `WCNR_SCHEDULER_ALERT_SCAN_MINUTES` | `5` | 预警规则扫描间隔 |
+
+数据库初始化：
+
+```powershell
+uv run python scripts/run_migrations.py
+```
 
 ---
 

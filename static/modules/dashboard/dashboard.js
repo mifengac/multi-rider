@@ -12,8 +12,17 @@
   updateClock();
 
   async function fetchJSON(url) {
-    const res = await fetch(url);
-    return res.json();
+    try {
+      const res = await fetch(url);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || data.error || `HTTP ${res.status}`);
+      }
+      return data;
+    } catch (e) {
+      showError('加载数据失败，请稍后重试');
+      return {};
+    }
   }
 
   async function loadSummary() {
@@ -243,9 +252,10 @@
 
   async function dispatchPerson(zjhm) {
     if (!zjhm) {
-      alert('该预警缺少证件号，无法派发');
+      showError('该预警缺少证件号，无法派发');
       return;
     }
+    showLoading('正在校验派发对象...');
     try {
       const res = await fetch(`${API}/dispatch/from-person`, {
         method: 'POST',
@@ -254,12 +264,14 @@
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        alert('派发校验失败');
+        showError(data.message || data.error || '派发校验失败');
         return;
       }
       window.location.href = data.redirect || `/dispatch?zjhm=${encodeURIComponent(zjhm)}`;
     } catch (e) {
-      alert('派发失败: ' + e.message);
+      showError('派发失败: ' + e.message);
+    } finally {
+      hideLoading();
     }
   }
 

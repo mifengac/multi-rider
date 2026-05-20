@@ -4,21 +4,30 @@
   const timelineLabels = { case: '案件', behavior: '行为', trajectory: '轨迹', hotel: '入住' };
 
   async function load() {
-    const res = await fetch(`/api/profile/${ZJHM}`);
-    if (!res.ok) {
-      document.getElementById('loadingState').textContent = '未找到该人员信息';
-      return;
+    showLoading('加载个人画像...');
+    try {
+      const res = await fetch(`/api/profile/${ZJHM}`);
+      if (!res.ok) {
+        document.getElementById('loadingState').textContent = '未找到该人员信息';
+        showError('加载数据失败，请稍后重试');
+        return;
+      }
+      const data = await res.json();
+      const [timeline, photo] = await Promise.all([
+        fetchJSONSafe(`/api/profile/${ZJHM}/timeline`),
+        fetchJSONSafe(`/api/profile/${ZJHM}/photo`)
+      ]);
+      data.timeline = timeline.items || [];
+      if (photo && photo.zp) {
+        data.photo = photo;
+      }
+      render(data);
+    } catch (e) {
+      document.getElementById('loadingState').textContent = '加载失败';
+      showError('加载数据失败，请稍后重试');
+    } finally {
+      hideLoading();
     }
-    const data = await res.json();
-    const [timeline, photo] = await Promise.all([
-      fetchJSONSafe(`/api/profile/${ZJHM}/timeline`),
-      fetchJSONSafe(`/api/profile/${ZJHM}/photo`)
-    ]);
-    data.timeline = timeline.items || [];
-    if (photo && photo.zp) {
-      data.photo = photo;
-    }
-    render(data);
   }
 
   async function fetchJSONSafe(url) {
@@ -205,9 +214,10 @@
 
   async function dispatchPerson(zjhm) {
     if (!zjhm) {
-      alert('缺少证件号，无法派发');
+      showError('缺少证件号，无法派发');
       return;
     }
+    showLoading('正在校验派发对象...');
     try {
       const res = await fetch('/api/dashboard/dispatch/from-person', {
         method: 'POST',
@@ -216,12 +226,14 @@
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        alert('派发校验失败');
+        showError(data.message || data.error || '派发校验失败');
         return;
       }
       window.location.href = data.redirect || `/dispatch?zjhm=${encodeURIComponent(zjhm)}`;
     } catch (e) {
-      alert('派发失败: ' + e.message);
+      showError('派发失败: ' + e.message);
+    } finally {
+      hideLoading();
     }
   }
 

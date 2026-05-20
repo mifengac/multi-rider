@@ -16,6 +16,7 @@ from .services.distribution_service import (
 from .services.alert_service import get_recent_alerts, mark_alert_read, handle_alert
 from .services.alert_rule_engine import run_all_rules
 from .services.heatmap_service import get_heatmap
+from shared.validators import parse_int_arg, validate_allowed, validate_int_range, validate_zjhm
 
 
 @dashboard_bp.route("/summary", methods=["GET"])
@@ -25,8 +26,13 @@ def summary():
 
 @dashboard_bp.route("/trend", methods=["GET"])
 def trend():
-    months = request.args.get("months", 12, type=int)
-    metric = request.args.get("metric", "cases")
+    months = parse_int_arg(request.args.get("months"), 12)
+    metric = request.args.get("metric", "cases").strip()
+
+    if not validate_int_range(months, 1, 60):
+        return jsonify({"error": "invalid_months", "message": "months 必须为 1-60"}), 400
+    if not validate_allowed(metric, {"cases", "persons", "score"}):
+        return jsonify({"error": "invalid_metric", "valid": ["cases", "persons", "score"]}), 400
 
     if metric == "persons":
         data = get_person_trend(months)
@@ -60,7 +66,9 @@ def distribution():
 
 @dashboard_bp.route("/alerts", methods=["GET"])
 def alerts():
-    limit = request.args.get("limit", 20, type=int)
+    limit = parse_int_arg(request.args.get("limit"), 20)
+    if not validate_int_range(limit, 1, 100):
+        return jsonify({"error": "invalid_limit"}), 400
     return jsonify({"items": get_recent_alerts(limit)})
 
 
@@ -110,7 +118,9 @@ def alert_scan():
 
 @dashboard_bp.route("/heatmap", methods=["GET"])
 def heatmap():
-    days = request.args.get("days", 30, type=int)
+    days = parse_int_arg(request.args.get("days"), 30)
+    if not validate_int_range(days, 1, 365):
+        return jsonify({"error": "invalid_days"}), 400
     return jsonify({"days": days, "items": get_heatmap(days)})
 
 
@@ -123,7 +133,9 @@ def alert_read(alert_id):
 @dashboard_bp.route("/alerts/<int:alert_id>/handle", methods=["POST"])
 def alert_handle(alert_id):
     data = request.get_json(silent=True) or {}
-    status = data.get("status", "handled")
+    status = str(data.get("status", "handled") or "").strip()
+    if not validate_allowed(status, {"pending", "handled", "ignored", "closed"}):
+        return jsonify({"error": "invalid_status"}), 400
     ok = handle_alert(alert_id, status)
     return jsonify({"success": ok})
 
@@ -134,6 +146,8 @@ def dispatch_from_person():
     zjhm = str(data.get("zjhm") or "").strip()
     if not zjhm:
         return jsonify({"ok": False, "error": "missing_zjhm"}), 400
+    if not validate_zjhm(zjhm):
+        return jsonify({"ok": False, "error": "invalid_zjhm"}), 400
 
     sql = """
         SELECT zjhm

@@ -17,6 +17,20 @@ _last_alert_slot: int | None = None
 _last_incremental_score_slot: int | None = None
 
 
+def _int_env(name: str, default: int, minimum: int = 1) -> int:
+    try:
+        value = int(os.environ.get(name, str(default)) or default)
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, value)
+
+
+SCHEDULER_BATCH_HOUR = _int_env("WCNR_SCHEDULER_BATCH_HOUR", 3, 0)
+SCHEDULER_DECAY_DOM = _int_env("WCNR_SCHEDULER_DECAY_DOM", 1, 1)
+SCHEDULER_ALERT_SCAN_SECONDS = _int_env("WCNR_SCHEDULER_ALERT_SCAN_MINUTES", 5, 1) * 60
+SCHEDULER_INCREMENTAL_SECONDS = _int_env("WCNR_SCHEDULER_INCREMENTAL_MINUTES", 10, 1) * 60
+
+
 def _run_job(name: str, func) -> None:
     try:
         func()
@@ -36,10 +50,10 @@ def _scheduler_loop(app, stop_event: threading.Event) -> None:
             now = time.localtime()
             daily_key = (now.tm_year, now.tm_yday)
             monthly_key = (now.tm_year, now.tm_mon)
-            alert_slot = int(time.time() // 300)
-            incremental_score_slot = int(time.time() // 600)
+            alert_slot = int(time.time() // SCHEDULER_ALERT_SCAN_SECONDS)
+            incremental_score_slot = int(time.time() // SCHEDULER_INCREMENTAL_SECONDS)
 
-            if now.tm_hour == 3 and _last_daily_key != daily_key:
+            if now.tm_hour == SCHEDULER_BATCH_HOUR and _last_daily_key != daily_key:
                 _last_daily_key = daily_key
 
                 def daily_recalculate():
@@ -49,7 +63,7 @@ def _scheduler_loop(app, stop_event: threading.Event) -> None:
 
                 _run_job("score batch_recalculate", daily_recalculate)
 
-            if now.tm_mday == 1 and now.tm_hour == 4 and _last_monthly_key != monthly_key:
+            if now.tm_mday == SCHEDULER_DECAY_DOM and now.tm_hour == 4 and _last_monthly_key != monthly_key:
                 _last_monthly_key = monthly_key
 
                 def monthly_score_decay():
@@ -98,8 +112,8 @@ def start_scheduler(app=None) -> bool:
         if _scheduler_thread is not None and _scheduler_thread.is_alive():
             return False
         _stop_event = threading.Event()
-        _last_alert_slot = int(time.time() // 300)
-        _last_incremental_score_slot = int(time.time() // 600)
+        _last_alert_slot = int(time.time() // SCHEDULER_ALERT_SCAN_SECONDS)
+        _last_incremental_score_slot = int(time.time() // SCHEDULER_INCREMENTAL_SECONDS)
         _scheduler_thread = threading.Thread(
             target=_scheduler_loop,
             args=(app, _stop_event),
@@ -108,6 +122,11 @@ def start_scheduler(app=None) -> bool:
         )
         _scheduler_thread.start()
         return True
+
+
+def is_scheduler_running() -> bool:
+    with _state_lock:
+        return _scheduler_thread is not None and _scheduler_thread.is_alive()
 
 
 def shutdown_scheduler() -> None:

@@ -19,11 +19,11 @@ def test_graph_person_route_passes_filter_params(client, monkeypatch):
 
     monkeypatch.setattr(graph_routes, "build_person_graph", fake_build_person_graph)
 
-    response = client.get("/api/graph/person/4401?depth=9&relations=checked_in&time_range=6m")
+    response = client.get("/api/graph/person/441901200812045018?depth=3&relations=checked_in&time_range=6m")
 
     assert response.status_code == 200
     assert captured == {
-        "zjhm": "4401",
+        "zjhm": "441901200812045018",
         "depth": 3,
         "relations": "checked_in",
         "time_range": "6m",
@@ -41,7 +41,7 @@ def test_graph_case_route_caps_depth_and_returns_not_found(client, monkeypatch):
 
     monkeypatch.setattr(graph_routes, "build_case_graph", fake_build_case_graph, raising=False)
 
-    response = client.get("/api/graph/case/AJ001?depth=9")
+    response = client.get("/api/graph/case/AJ001?depth=3")
 
     assert response.status_code == 404
     assert response.get_json()["error"] == "not_found"
@@ -643,13 +643,13 @@ def test_dashboard_dispatch_from_person_validates_target_and_returns_redirect(cl
 
     monkeypatch.setattr(dashboard_routes, "query_one", fake_query_one, raising=False)
 
-    response = client.post("/api/dashboard/dispatch/from-person", json={"zjhm": "4401"})
+    response = client.post("/api/dashboard/dispatch/from-person", json={"zjhm": "441901200812045018"})
 
     assert response.status_code == 200
     assert response.get_json() == {
         "ok": True,
-        "zjhm": "4401",
-        "redirect": "/dispatch?zjhm=4401",
+        "zjhm": "441901200812045018",
+        "redirect": "/dispatch?zjhm=441901200812045018",
     }
     assert '"jcgkzx_monitor"."wcnr_target_pool"' in captured["sql"]
 

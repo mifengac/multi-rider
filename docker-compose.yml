@@ -1,6 +1,8 @@
 name: multi-rider
 
 x-app-common: &app-common
+  build:
+    context: .
   image: ${MULTI_RIDER_IMAGE:-multi-rider:offline-20260517}
   env_file:
     - ${APP_ENV_FILE:-./app.env}
@@ -18,9 +20,15 @@ services:
   web:
     <<: *app-common
     container_name: multi-rider-web
-    command: python app.py
+    command: sh -c "python scripts/run_migrations.py && python app.py"
     ports:
       - "${APP_PORT:-5001}:5001"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/api/health', timeout=5).read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   worker:
     <<: *app-common

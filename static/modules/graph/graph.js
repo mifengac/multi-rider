@@ -133,6 +133,7 @@
   }
 
   async function loadGraph(zjhm) {
+    showLoading('加载关系图谱...');
     try {
       currentRoot = { type: 'person', id: zjhm };
       const params = new URLSearchParams();
@@ -142,36 +143,41 @@
       if (timeRange) params.set('time_range', timeRange);
       const res = await fetch(`/api/graph/person/${encodeURIComponent(zjhm)}?${params.toString()}`);
       if (!res.ok) {
-        alert('未找到该人员的关系数据');
+        showError('未找到该人员的关系数据');
         return;
       }
       const data = await res.json();
       if (!data.nodes || !data.nodes.length) {
-        alert('未找到该人员的关系数据');
+        showError('未找到该人员的关系数据');
         return;
       }
       renderGraph(data);
     } catch (e) {
-      alert('加载失败: ' + e.message);
+      showError('加载数据失败，请稍后重试');
+    } finally {
+      hideLoading();
     }
   }
 
   async function loadCaseGraph(ajbh) {
+    showLoading('加载案件图谱...');
     try {
       currentRoot = { type: 'case', id: ajbh };
       const res = await fetch(`/api/graph/case/${encodeURIComponent(ajbh)}?depth=${currentDepth}`);
       if (!res.ok) {
-        alert('未找到该案件的关系数据');
+        showError('未找到该案件的关系数据');
         return;
       }
       const data = await res.json();
       if (!data.nodes || !data.nodes.length) {
-        alert('未找到该案件的关系数据');
+        showError('未找到该案件的关系数据');
         return;
       }
       renderGraph(data);
     } catch (e) {
-      alert('加载失败: ' + e.message);
+      showError('加载数据失败，请稍后重试');
+    } finally {
+      hideLoading();
     }
   }
 
@@ -185,23 +191,26 @@
       return false;
     }
 
+    showLoading('搜索中...');
     try {
       const res = await fetch(`/api/graph/search?keyword=${encodeURIComponent(keyword)}`);
       const data = await res.json();
       const results = data.results || [];
       if (!results.length) {
-        alert('未找到相关结果');
+        showError('未找到相关结果');
         return false;
       }
       if (results.length === 1 && results[0].type === 'person') {
-        loadGraph(results[0].id);
+        await loadGraph(results[0].id);
       } else if (results.length === 1 && results[0].type === 'case') {
-        loadCaseGraph(results[0].id);
+        await loadCaseGraph(results[0].id);
       } else {
         showSearchResults(results);
       }
     } catch (e) {
-      alert('搜索失败: ' + e.message);
+      showError('搜索失败: ' + e.message);
+    } finally {
+      hideLoading();
     }
     return false;
   }
@@ -301,6 +310,7 @@
 
   window._graphExpandNode = async function (nodeId, nodeType) {
     if (!nodeId || !nodeType) return;
+    showLoading('展开关系...');
     try {
       const res = await fetch('/api/graph/expand', {
         method: 'POST',
@@ -308,12 +318,14 @@
         body: JSON.stringify({ node_id: nodeId, node_type: nodeType, direction: 'both' })
       });
       if (!res.ok) {
-        alert('展开关系失败');
+        showError('展开关系失败');
         return;
       }
       mergeGraph(await res.json());
     } catch (e) {
-      alert('展开关系失败: ' + e.message);
+      showError('展开关系失败: ' + e.message);
+    } finally {
+      hideLoading();
     }
   };
 
@@ -361,7 +373,7 @@
         await document.exitFullscreen();
       }
     } catch (e) {
-      alert('全屏切换失败: ' + e.message);
+      showError('全屏切换失败: ' + e.message);
     } finally {
       updateFullscreenButton();
       setTimeout(() => chart && chart.resize(), 80);

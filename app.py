@@ -15,7 +15,7 @@ from shared.config.config import (
 )
 from shared.db.oracle import oracle_thick_mode_requested
 from shared.db.sqlite import cleanup_old_jobs, init_db, mark_running_jobs_interrupted
-from shared.health import get_health_report
+from shared.health import get_api_health_report, get_health_report
 from modules.diagnostics.routes import diagnostics_bp
 from modules.detection.file_routes import file_bp
 from modules.detection.job_routes import job_bp
@@ -46,6 +46,10 @@ def create_app() -> Flask:
     def healthz():
         report = get_health_report()
         return jsonify(report), (200 if report.get("ok") else 503)
+
+    @app.get("/api/health")
+    def api_health():
+        return jsonify(get_api_health_report()), 200
 
     @app.get("/livez")
     def livez():
