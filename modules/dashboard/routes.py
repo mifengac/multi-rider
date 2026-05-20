@@ -1,5 +1,11 @@
-from flask import request, jsonify
+import json
+import time
+from urllib.parse import quote
+
+from flask import request, jsonify, Response
 from . import dashboard_bp
+from shared.config.config import logger
+from shared.db.kingbase import query_one
 from .services.summary_service import get_summary
 from .services.trend_service import get_case_trend, get_person_trend, get_score_trend
 from .services.distribution_service import (
@@ -58,6 +64,45 @@ def alerts():
     return jsonify({"items": get_recent_alerts(limit)})
 
 
+def _alert_stream_events():
+    pushed_ids = set()
+    last_heartbeat = time.monotonic()
+    while True:
+        try:
+            alerts = get_recent_alerts(5) or []
+            new_alerts = []
+            for alert in alerts:
+                alert_id = alert.get("id")
+                if alert_id in pushed_ids:
+                    continue
+                pushed_ids.add(alert_id)
+                new_alerts.append(alert)
+
+            for alert in reversed(new_alerts):
+                payload = json.dumps(alert, ensure_ascii=False, default=str)
+                yield f"data: {payload}\n\n"
+                last_heartbeat = time.monotonic()
+
+            if time.monotonic() - last_heartbeat >= 30:
+                yield ":\n\n"
+                last_heartbeat = time.monotonic()
+
+            time.sleep(3)
+        except GeneratorExit:
+            return
+        except Exception as exc:
+            logger.warning("Dashboard alert stream failed: %s", exc)
+            time.sleep(3)
+
+
+@dashboard_bp.route("/alerts/stream", methods=["GET"])
+def alert_stream():
+    response = Response(_alert_stream_events(), mimetype="text/event-stream")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
+
+
 @dashboard_bp.route("/alerts/scan", methods=["POST"])
 def alert_scan():
     return jsonify({"result": run_all_rules()})
@@ -81,6 +126,32 @@ def alert_handle(alert_id):
     status = data.get("status", "handled")
     ok = handle_alert(alert_id, status)
     return jsonify({"success": ok})
+
+
+@dashboard_bp.route("/dispatch/from-person", methods=["POST"])
+def dispatch_from_person():
+    data = request.get_json(silent=True) or {}
+    zjhm = str(data.get("zjhm") or "").strip()
+    if not zjhm:
+        return jsonify({"ok": False, "error": "missing_zjhm"}), 400
+
+    sql = """
+        SELECT zjhm
+        FROM "jcgkzx_monitor"."wcnr_target_pool"
+        WHERE zjhm = %(zjhm)s
+        LIMIT 1
+    """
+    try:
+        row = query_one(sql, {"zjhm": zjhm})
+    except Exception as exc:
+        logger.warning("Dispatch from person validation failed for %s: %s", zjhm, exc)
+        row = {}
+    if not row:
+        return jsonify({"ok": False, "error": "invalid_zjhm"}), 400
+
+    # TODO: 后续接入 dispatch.services.store_service.create_queue_item_from_wcnr
+    redirect_url = "/dispatch?zjhm=" + quote(zjhm)
+    return jsonify({"ok": True, "zjhm": zjhm, "redirect": redirect_url})
 
 
 @dashboard_bp.route("/ranking", methods=["GET"])

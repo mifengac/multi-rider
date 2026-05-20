@@ -78,6 +78,7 @@
         </div>
         <div class="shrink-0 flex gap-2">
           <a href="/graph?zjhm=${encodeURIComponent(basic.zjhm || '')}" class="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">展开图谱</a>
+          <button type="button" data-action="dispatch-person" data-zjhm="${escapeAttr(basic.zjhm || ZJHM || '')}" class="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">派发任务</button>
         </div>
       </div>
 
@@ -196,6 +197,32 @@
 
     renderTimeChart(trajectory.time_pattern);
     renderScoreTrend(scoreTrend);
+    const dispatchButton = main.querySelector('[data-action="dispatch-person"]');
+    if (dispatchButton) {
+      dispatchButton.addEventListener('click', () => dispatchPerson(dispatchButton.dataset.zjhm));
+    }
+  }
+
+  async function dispatchPerson(zjhm) {
+    if (!zjhm) {
+      alert('缺少证件号，无法派发');
+      return;
+    }
+    try {
+      const res = await fetch('/api/dashboard/dispatch/from-person', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zjhm })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        alert('派发校验失败');
+        return;
+      }
+      window.location.href = data.redirect || `/dispatch?zjhm=${encodeURIComponent(zjhm)}`;
+    } catch (e) {
+      alert('派发失败: ' + e.message);
+    }
   }
 
   function renderAvatar(basic, photo) {

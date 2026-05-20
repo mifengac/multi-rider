@@ -19,7 +19,7 @@ def person_graph(zjhm):
 @graph_bp.route("/case/<ajbh>", methods=["GET"])
 def case_graph(ajbh):
     depth = request.args.get("depth", 1, type=int)
-    depth = max(1, min(depth, 3))
+    depth = max(0, min(depth, 3))
     result = build_case_graph(ajbh, depth)
     if not result["nodes"]:
         return jsonify({"error": "not_found"}), 404

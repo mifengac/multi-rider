@@ -167,6 +167,61 @@ def test_build_case_graph_adds_suspects_and_victims(monkeypatch):
     assert {edge["type"] for edge in graph["edges"]} == {"SUSPECTED_IN", "VICTIM_OF"}
 
 
+def test_build_case_graph_adds_related_case_edges_when_depth_enabled(monkeypatch):
+    import modules.graph.services.graph_builder as graph_builder
+
+    def fake_query_one(sql, params):
+        if '"zq_zfba_ajxx"' in sql:
+            return {
+                "ajxx_ajbh": params["ajbh"],
+                "ajxx_ajmc": "中心盗窃案",
+                "ajxx_ay": "盗窃",
+                "ajxx_fasj": datetime(2026, 5, 10, 8, 30),
+                "ajxx_cbdw_mc": "南山分局一所",
+                "ssfj": "南山分局",
+            }
+        return {}
+
+    def fake_query_all(sql, params=None):
+        if '"zq_zfba_xyrxx"' in sql:
+            return []
+        if "RELATED_CASE" in sql or "ajxx_fasj BETWEEN" in sql:
+            return [
+                {
+                    "ajxx_ajbh": "AJ002",
+                    "ajxx_ajmc": "相似盗窃案",
+                    "ajxx_ay": "盗窃",
+                    "ajxx_fasj": datetime(2026, 5, 15, 9, 0),
+                    "ajxx_cbdw_mc": "南山分局二所",
+                    "ssfj": "南山分局",
+                },
+                {
+                    "ajxx_ajbh": "AJ003",
+                    "ajxx_ajmc": "同类盗窃案",
+                    "ajxx_ay": "盗窃",
+                    "ajxx_fasj": datetime(2026, 5, 20, 9, 0),
+                    "ajxx_cbdw_mc": "南山分局三所",
+                    "ssfj": "南山分局",
+                },
+            ]
+        return []
+
+    monkeypatch.setattr(graph_builder, "query_one", fake_query_one)
+    monkeypatch.setattr(graph_builder, "query_all", fake_query_all)
+    monkeypatch.setattr(graph_builder, "victims_of_case", lambda ajbh: [], raising=False)
+
+    graph = graph_builder.build_case_graph("AJ001", depth=1)
+
+    assert {"C_AJ001", "C_AJ002", "C_AJ003"} <= {node["id"] for node in graph["nodes"]}
+    related_edges = [edge for edge in graph["edges"] if edge["type"] == "RELATED_CASE"]
+    assert {edge["target"] for edge in related_edges} == {"C_AJ002", "C_AJ003"}
+    assert all(edge["style"]["stroke"] == "#a78bfa" for edge in related_edges)
+    assert all(edge["style"]["lineDash"] == [4, 4] for edge in related_edges)
+
+    graph_depth_zero = graph_builder.build_case_graph("AJ001", depth=0)
+    assert "RELATED_CASE" not in {edge["type"] for edge in graph_depth_zero["edges"]}
+
+
 def test_expand_node_person_uses_incremental_helpers(monkeypatch):
     import modules.graph.services.graph_builder as graph_builder
 
@@ -449,6 +504,88 @@ def test_alert_rule_engine_scans_abnormal_hotel_checkin_and_degrades(monkeypatch
     assert alert_rule_engine.scan_abnormal_hotel_checkin() == 0
 
 
+def test_alert_rule_engine_scans_school_perimeter(monkeypatch):
+    from modules.dashboard.services import alert_rule_engine
+
+    inserted = []
+
+    def fake_query_one(sql, params=None):
+        params = params or {}
+        if "information_schema.tables" in sql:
+            return {"exists": 1}
+        if params.get("alert_type") == "school_perimeter_high_risk":
+            return {}
+        return {}
+
+    def fake_query_all(sql, params=None):
+        if "information_schema.columns" in sql:
+            return [{"column_name": "xxmc"}, {"column_name": "jd"}, {"column_name": "wd"}]
+        return [
+            {
+                "zjhm": "4401",
+                "xm": "张三",
+                "xxmc": "第一中学",
+                "dist": 123.4,
+                "shot_time": datetime(2026, 5, 18, 8, 30),
+            }
+        ]
+
+    monkeypatch.setattr(alert_rule_engine, "query_one", fake_query_one)
+    monkeypatch.setattr(alert_rule_engine, "query_all", fake_query_all)
+    monkeypatch.setattr(alert_rule_engine, "execute", lambda sql, params=None: inserted.append(params) or 1)
+
+    assert alert_rule_engine.scan_school_perimeter(200) == 1
+    assert inserted[0]["alert_type"] == "school_perimeter_high_risk"
+    assert inserted[0]["alert_level"] == "warning"
+    assert "张三 出现在学校 第一中学 周边 ~123米" == inserted[0]["alert_content"]
+
+
+def test_alert_rule_engine_scans_speeding_detection(monkeypatch):
+    from modules.dashboard.services import alert_rule_engine
+
+    inserted = []
+
+    monkeypatch.setattr(alert_rule_engine, "_table_exists", lambda schema, table: True)
+    monkeypatch.setattr(
+        alert_rule_engine,
+        "_call_detection_repository",
+        lambda window_minutes, min_confidence: [
+            {
+                "category": "飙车",
+                "confidence": 0.86,
+                "device_id": "DEV001",
+                "source_name": "路口摄像头",
+                "trigger_time": datetime(2026, 5, 18, 9, 0),
+            }
+        ],
+    )
+    monkeypatch.setattr(alert_rule_engine, "query_one", lambda sql, params=None: {})
+    monkeypatch.setattr(alert_rule_engine, "execute", lambda sql, params=None: inserted.append(params) or 1)
+
+    assert alert_rule_engine.scan_speeding_detection() == 1
+    assert inserted[0]["alert_type"] == "speeding_detected"
+    assert inserted[0]["alert_level"] == "warning"
+    assert inserted[0]["alert_content"] == "飙车检测命中 device=DEV001"
+
+
+def test_alert_rule_engine_run_all_rules_includes_round3_rules(monkeypatch):
+    from modules.dashboard.services import alert_rule_engine
+
+    monkeypatch.setattr(alert_rule_engine, "scan_high_risk_face_hit", lambda: 1)
+    monkeypatch.setattr(alert_rule_engine, "scan_night_aggregation", lambda: 2)
+    monkeypatch.setattr(alert_rule_engine, "scan_abnormal_hotel_checkin", lambda: 3)
+    monkeypatch.setattr(alert_rule_engine, "scan_school_perimeter", lambda: 4)
+    monkeypatch.setattr(alert_rule_engine, "scan_speeding_detection", lambda: 5)
+
+    assert alert_rule_engine.run_all_rules() == {
+        "high_risk_face_hit": 1,
+        "night_aggregation": 2,
+        "abnormal_hotel_checkin": 3,
+        "school_perimeter_high_risk": 4,
+        "speeding_detected": 5,
+    }
+
+
 def test_dashboard_alert_scan_route_calls_rule_engine(client, monkeypatch):
     import modules.dashboard.routes as dashboard_routes
 
@@ -459,6 +596,62 @@ def test_dashboard_alert_scan_route_calls_rule_engine(client, monkeypatch):
 
     assert response.status_code == 200
     assert response.get_json() == {"result": expected}
+
+
+def test_dashboard_alert_stream_sends_parseable_sse(client, monkeypatch):
+    import json
+    import modules.dashboard.routes as dashboard_routes
+
+    monkeypatch.setattr(
+        dashboard_routes,
+        "get_recent_alerts",
+        lambda limit=5: [
+            {
+                "id": 7,
+                "zjhm": "4401",
+                "xm": "张三",
+                "alert_type": "high_risk_face_hit",
+                "alert_level": "critical",
+                "alert_content": "张三 在 学校门口 出现",
+                "location": "学校门口",
+                "trigger_time": "2026-05-18T23:00:00",
+            }
+        ],
+        raising=False,
+    )
+
+    response = client.get("/api/dashboard/alerts/stream", buffered=False)
+    first_chunk = next(response.response).decode("utf-8")
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/event-stream"
+    assert first_chunk.startswith("data: ")
+    assert json.loads(first_chunk.removeprefix("data: ").strip())["id"] == 7
+    assert response.headers["Cache-Control"] == "no-cache"
+    assert response.headers["X-Accel-Buffering"] == "no"
+
+
+def test_dashboard_dispatch_from_person_validates_target_and_returns_redirect(client, monkeypatch):
+    import modules.dashboard.routes as dashboard_routes
+
+    captured = {}
+
+    def fake_query_one(sql, params=None):
+        captured["sql"] = sql
+        captured["params"] = params
+        return {"zjhm": params["zjhm"], "xm": "张三"}
+
+    monkeypatch.setattr(dashboard_routes, "query_one", fake_query_one, raising=False)
+
+    response = client.post("/api/dashboard/dispatch/from-person", json={"zjhm": "4401"})
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "ok": True,
+        "zjhm": "4401",
+        "redirect": "/dispatch?zjhm=4401",
+    }
+    assert '"jcgkzx_monitor"."wcnr_target_pool"' in captured["sql"]
 
 
 def test_monthly_decay_updates_scores_and_risk_level(monkeypatch):
@@ -478,6 +671,27 @@ def test_monthly_decay_updates_scores_and_risk_level(monkeypatch):
     assert "GREATEST(total_score - %(decrement)s, 0)" in captured["sql"]
     assert "CASE" in captured["sql"]
     assert captured["params"] == {"decrement": 2}
+
+
+def test_score_incremental_recalculate_only_updates_stale_people(monkeypatch):
+    import modules.score.services.score_engine as score_engine
+
+    new_time = datetime(2026, 5, 19, 10, 0)
+    calculated = []
+
+    monkeypatch.setattr(
+        score_engine,
+        "query_all",
+        lambda sql, params=None: [
+            {"zjhm": "A", "last_event_time": new_time, "calc_time": None},
+            {"zjhm": "B", "last_event_time": new_time, "calc_time": datetime(2026, 5, 19, 9, 0)},
+            {"zjhm": "C", "last_event_time": new_time, "calc_time": datetime(2026, 5, 19, 11, 0)},
+        ],
+    )
+    monkeypatch.setattr(score_engine, "calculate_score", lambda zjhm: calculated.append(zjhm) or {"zjhm": zjhm})
+
+    assert score_engine.incremental_recalculate(15) == {"scanned": 3, "recalculated": 2}
+    assert calculated == ["A", "B"]
 
 
 def test_profile_assemble_includes_score_trend(monkeypatch):

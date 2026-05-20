@@ -22,11 +22,15 @@
       }
     });
     chart.on('dblclick', function (params) {
-      if (params.dataType === 'node' && params.data.properties && params.data.properties.zjhm) {
+      if (params.dataType !== 'node' || !params.data.properties) return;
+      if (params.data.properties.zjhm) {
         loadGraph(params.data.properties.zjhm);
+      } else if (params.data.nodeType === 'case' && params.data.properties.ajbh) {
+        loadCaseGraph(params.data.properties.ajbh);
       }
     });
     window.addEventListener('resize', () => chart && chart.resize());
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
   }
 
   function renderGraph(data) {
@@ -62,7 +66,8 @@
       lineStyle: {
         color: (e.style && e.style.stroke) || '#475569',
         width: (e.style && e.style.lineWidth) || 1.5,
-        curveness: 0.1
+        curveness: 0.1,
+        type: (e.style && e.style.lineDash) ? 'dashed' : 'solid'
       }
     }));
 
@@ -344,6 +349,33 @@
     }
   }
 
+  async function toggleFullscreen() {
+    const target = document.getElementById('graphCanvas');
+    if (!target) return;
+    try {
+      if (!document.fullscreenElement) {
+        if (target.requestFullscreen) {
+          await target.requestFullscreen();
+        }
+      } else if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    } catch (e) {
+      alert('全屏切换失败: ' + e.message);
+    } finally {
+      updateFullscreenButton();
+      setTimeout(() => chart && chart.resize(), 80);
+    }
+  }
+
+  function updateFullscreenButton() {
+    const btn = document.getElementById('fullscreenBtn');
+    if (btn) {
+      btn.textContent = document.fullscreenElement ? '退出全屏' : '全屏';
+    }
+    setTimeout(() => chart && chart.resize(), 80);
+  }
+
   function riskLabel(level) {
     const map = { extreme: '极高风险', high: '高风险', medium: '中风险', low: '低风险', normal: '正常' };
     return map[level] || level || '';
@@ -364,6 +396,7 @@
 
   window.handleSearch = handleSearch;
   window.setDepth = setDepth;
+  window.toggleFullscreen = toggleFullscreen;
   window.reloadCurrentGraph = reloadCurrentGraph;
   window.closeSidebar = closeSidebar;
   window.loadCaseGraph = loadCaseGraph;

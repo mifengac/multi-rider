@@ -66,6 +66,21 @@ def _to_float(value):
         return value
 
 
+def _column_exists(schema: str, table: str, column: str) -> bool:
+    sql = """
+        SELECT 1 AS exists
+        FROM information_schema.columns
+        WHERE table_schema = %(schema)s
+          AND table_name = %(table)s
+          AND column_name = %(column)s
+        LIMIT 1
+    """
+    try:
+        return bool(query_one(sql, {"schema": schema, "table": table, "column": column}))
+    except Exception:
+        return False
+
+
 def _normalize_relations(relations):
     if not relations:
         return None
@@ -114,13 +129,20 @@ def _person_node(zjhm, xm, risk_score=None, risk_level=None):
     }
 
 
-def _case_node(ajbh, ajmc, ay, fasj):
+def _case_node(ajbh, ajmc, ay, fasj, cbdw_mc=None, ssfj=None):
     return {
         "id": f"C_{ajbh}",
         "type": "case",
         "label": ay or ajmc or ajbh[:10],
         "style": NODE_STYLES["case"],
-        "properties": {"ajbh": ajbh, "ajmc": ajmc, "ay": ay, "fasj": _format_time(fasj)},
+        "properties": {
+            "ajbh": ajbh,
+            "ajmc": ajmc,
+            "ay": ay,
+            "fasj": _format_time(fasj),
+            "cbdw_mc": cbdw_mc,
+            "ssfj": ssfj,
+        },
     }
 
 
@@ -249,7 +271,14 @@ def _add_cases(zjhm: str, nodes: dict, edges: list, since=None, exclude_ajbh=Non
         ajbh = c.get("ajxx_ajbh")
         if not ajbh:
             continue
-        node = _case_node(ajbh, c.get("ajxx_ajmc"), c.get("ajxx_ay"), c.get("ajxx_fasj"))
+        node = _case_node(
+            ajbh,
+            c.get("ajxx_ajmc"),
+            c.get("ajxx_ay"),
+            c.get("ajxx_fasj"),
+            c.get("ajxx_cbdw_mc"),
+            c.get("ssfj"),
+        )
         if node["id"] not in nodes:
             nodes[node["id"]] = node
         edge = {"source": f"P_{zjhm}", "target": node["id"], "label": "涉嫌", "type": "SUSPECTED_IN"}
@@ -456,13 +485,16 @@ def _add_same_area(zjhm: str, nodes: dict, edges: list):
 def build_case_graph(ajbh: str, depth: int = 1) -> dict:
     nodes = {}
     edges = []
+    has_ssfj = _column_exists("ywdata", "zq_zfba_ajxx", "ssfj")
+    ssfj_select = ', a."ssfj"' if has_ssfj else ""
 
     case_sql = """
-        SELECT a."ajxx_ajbh", a."ajxx_ajmc", a."ajxx_ay", a."ajxx_fasj"
+        SELECT a."ajxx_ajbh", a."ajxx_ajmc", a."ajxx_ay", a."ajxx_fasj",
+               a."ajxx_cbdw_mc"{ssfj_select}
         FROM "ywdata"."zq_zfba_ajxx" a
         WHERE a."ajxx_ajbh" = %(ajbh)s
         LIMIT 1
-    """
+    """.format(ssfj_select=ssfj_select)
     case = query_one(case_sql, {"ajbh": ajbh})
     if not case:
         return {"nodes": [], "edges": []}
@@ -472,6 +504,8 @@ def build_case_graph(ajbh: str, depth: int = 1) -> dict:
         case.get("ajxx_ajmc"),
         case.get("ajxx_ay"),
         case.get("ajxx_fasj"),
+        case.get("ajxx_cbdw_mc"),
+        case.get("ssfj"),
     )
     nodes[case_node["id"]] = case_node
 
@@ -523,7 +557,96 @@ def build_case_graph(ajbh: str, depth: int = 1) -> dict:
         for suspect_zjhm in suspect_ids[:10]:
             _add_cases(suspect_zjhm, nodes, edges, exclude_ajbh=ajbh)
 
+    if depth >= 1:
+        _add_related_cases(case, nodes, edges, has_ssfj=has_ssfj)
+
     return {"nodes": list(nodes.values()), "edges": edges}
+
+
+def _case_area_prefix(cbdw_mc: str | None) -> str | None:
+    value = str(cbdw_mc or "").strip()
+    if not value:
+        return None
+    markers = ("分局", "县局", "市局", "公安局")
+    for marker in markers:
+        idx = value.find(marker)
+        if idx >= 0:
+            return value[:idx + len(marker)]
+    return value[:4] if len(value) >= 4 else value
+
+
+def _add_related_cases(center_case: dict, nodes: dict, edges: list, has_ssfj: bool = False) -> None:
+    ajbh = center_case.get("ajxx_ajbh")
+    ay = center_case.get("ajxx_ay")
+    fasj = center_case.get("ajxx_fasj")
+    if not ajbh or not ay or not fasj:
+        return
+
+    params = {
+        "ajbh": ajbh,
+        "ay": ay,
+        "fasj": fasj,
+    }
+    area_conditions = []
+    area_prefix = _case_area_prefix(center_case.get("ajxx_cbdw_mc"))
+    if area_prefix:
+        area_conditions.append('a."ajxx_cbdw_mc" LIKE %(area_prefix)s')
+        params["area_prefix"] = f"{area_prefix}%"
+    if has_ssfj and center_case.get("ssfj"):
+        area_conditions.append('a."ssfj" = %(ssfj)s')
+        params["ssfj"] = center_case.get("ssfj")
+    if not area_conditions:
+        return
+
+    ssfj_select = ', a."ssfj"' if has_ssfj else ""
+    sql = """
+        -- RELATED_CASE ajxx_fasj BETWEEN
+        SELECT a."ajxx_ajbh", a."ajxx_ajmc", a."ajxx_ay", a."ajxx_fasj",
+               a."ajxx_cbdw_mc"{ssfj_select}
+        FROM "ywdata"."zq_zfba_ajxx" a
+        WHERE a."ajxx_ajbh" <> %(ajbh)s
+          AND a."ajxx_ay" = %(ay)s
+          AND a."ajxx_fasj" BETWEEN %(fasj)s - INTERVAL '30 days'
+                                AND %(fasj)s + INTERVAL '30 days'
+          AND ({area_clause})
+        ORDER BY ABS(EXTRACT(EPOCH FROM (a."ajxx_fasj" - %(fasj)s))) ASC
+        LIMIT 10
+    """.format(ssfj_select=ssfj_select, area_clause=" OR ".join(area_conditions))
+
+    try:
+        related_cases = query_all(sql, params)
+    except Exception:
+        return
+
+    center_node_id = f"C_{ajbh}"
+    for row in related_cases:
+        related_ajbh = row.get("ajxx_ajbh")
+        if not related_ajbh or related_ajbh == ajbh:
+            continue
+        node = _case_node(
+            related_ajbh,
+            row.get("ajxx_ajmc"),
+            row.get("ajxx_ay"),
+            row.get("ajxx_fasj"),
+            row.get("ajxx_cbdw_mc"),
+            row.get("ssfj"),
+        )
+        if node["id"] not in nodes:
+            nodes[node["id"]] = node
+        _append_edge(edges, {
+            "source": center_node_id,
+            "target": node["id"],
+            "label": "串并",
+            "type": "RELATED_CASE",
+            "style": {"stroke": "#a78bfa", "lineWidth": 1.5, "lineDash": [4, 4]},
+            "properties": {
+                "reason": "同类案由/时空关联",
+                "ay": row.get("ajxx_ay"),
+                "fasj": _format_time(row.get("ajxx_fasj")),
+                "cbdw_mc": row.get("ajxx_cbdw_mc"),
+                "ssfj": row.get("ssfj"),
+            },
+        })
 
 
 def _strip_node_prefix(node_id: str, prefix: str) -> str:

@@ -1,5 +1,8 @@
 (function () {
   const API = '/api/dashboard';
+  let alertsCache = [];
+  let alertPollTimer = null;
+  let alertEventSource = null;
 
   function updateClock() {
     const el = document.getElementById('clock');
@@ -157,8 +160,12 @@
 
   async function loadAlerts() {
     const d = await fetchJSON(`${API}/alerts?limit=15`);
+    alertsCache = (d.items || []).slice(0, 15);
+    renderAlerts(alertsCache);
+  }
+
+  function renderAlerts(items) {
     const container = document.getElementById('alertList');
-    const items = d.items || [];
     if (!items.length) {
       container.innerHTML = '<div class="text-slate-500 text-center py-8">暂无预警</div>';
       return;
@@ -174,9 +181,96 @@
           </div>
           <div class="text-xs text-slate-400 truncate">${a.alert_content || a.alert_type || ''}</div>
         </div>
-        <a href="/profile/${a.zjhm}" class="text-xs text-blue-400 hover:underline shrink-0">详情</a>
+        ${a.zjhm ? `<a href="/profile/${encodeURIComponent(a.zjhm)}" class="text-xs text-blue-400 hover:underline shrink-0">详情</a>` : '<span class="text-xs text-slate-500 shrink-0">详情</span>'}
+        <button type="button" data-action="dispatch-alert" data-zjhm="${escapeAttr(a.zjhm || '')}" class="text-xs text-blue-400 hover:underline shrink-0">派发</button>
       </div>
     `).join('');
+    container.querySelectorAll('[data-action="dispatch-alert"]').forEach(btn => {
+      btn.addEventListener('click', () => dispatchPerson(btn.dataset.zjhm));
+    });
+  }
+
+  function pushAlert(alert) {
+    if (!alert) return;
+    const key = alert.id != null ? `id:${alert.id}` : `${alert.alert_type || ''}|${alert.zjhm || ''}|${alert.trigger_time || ''}`;
+    const exists = alertsCache.some(item => {
+      const itemKey = item.id != null ? `id:${item.id}` : `${item.alert_type || ''}|${item.zjhm || ''}|${item.trigger_time || ''}`;
+      return itemKey === key;
+    });
+    if (exists) return;
+    alertsCache.unshift(alert);
+    alertsCache = alertsCache.slice(0, 15);
+    renderAlerts(alertsCache);
+  }
+
+  function startAlertPolling() {
+    if (alertPollTimer) return;
+    alertPollTimer = setInterval(loadAlerts, 30000);
+  }
+
+  function stopAlertPolling() {
+    if (!alertPollTimer) return;
+    clearInterval(alertPollTimer);
+    alertPollTimer = null;
+  }
+
+  function initAlertStream() {
+    if (!window.EventSource) {
+      startAlertPolling();
+      return;
+    }
+    try {
+      alertEventSource = new EventSource(`${API}/alerts/stream`);
+      stopAlertPolling();
+      alertEventSource.onmessage = event => {
+        try {
+          pushAlert(JSON.parse(event.data));
+        } catch {
+          startAlertPolling();
+        }
+      };
+      alertEventSource.onerror = () => {
+        if (alertEventSource) {
+          alertEventSource.close();
+          alertEventSource = null;
+        }
+        startAlertPolling();
+      };
+    } catch {
+      startAlertPolling();
+    }
+  }
+
+  async function dispatchPerson(zjhm) {
+    if (!zjhm) {
+      alert('该预警缺少证件号，无法派发');
+      return;
+    }
+    try {
+      const res = await fetch(`${API}/dispatch/from-person`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zjhm })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        alert('派发校验失败');
+        return;
+      }
+      window.location.href = data.redirect || `/dispatch?zjhm=${encodeURIComponent(zjhm)}`;
+    } catch (e) {
+      alert('派发失败: ' + e.message);
+    }
+  }
+
+  function escapeAttr(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/`/g, '&#96;');
   }
 
   loadSummary();
@@ -187,7 +281,7 @@
   loadAgeChart();
   loadHeatmap();
   loadAlerts();
+  initAlertStream();
 
-  setInterval(loadAlerts, 30000);
   setInterval(loadSummary, 60000);
 })();
