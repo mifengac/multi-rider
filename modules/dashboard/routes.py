@@ -36,12 +36,22 @@ def trend():
 
     if metric == "persons":
         data = get_person_trend(months)
+        points = data
+        degraded = False
     elif metric == "score":
         data = get_score_trend(months)
+        points = data
+        degraded = False
     else:
         data = get_case_trend(months)
+        if isinstance(data, dict):
+            points = data.get("points", [])
+            degraded = bool(data.get("degraded", False))
+        else:
+            points = data
+            degraded = False
 
-    return jsonify({"metric": metric, "months": months, "points": data})
+    return jsonify({"metric": metric, "months": months, "points": points, "degraded": degraded})
 
 
 @dashboard_bp.route("/distribution", methods=["GET"])
@@ -61,7 +71,14 @@ def distribution():
     if not handler:
         return jsonify({"error": "invalid_dim", "valid": list(handlers.keys())}), 400
 
-    return jsonify({"dimension": dim, "items": handler()})
+    result = handler()
+    if isinstance(result, dict):
+        items = result.get("items", [])
+        degraded = bool(result.get("degraded", False))
+    else:
+        items = result
+        degraded = False
+    return jsonify({"dimension": dim, "items": items, "degraded": degraded})
 
 
 @dashboard_bp.route("/alerts", methods=["GET"])
@@ -122,6 +139,13 @@ def heatmap():
     if not validate_int_range(days, 1, 365):
         return jsonify({"error": "invalid_days"}), 400
     return jsonify({"days": days, "items": get_heatmap(days)})
+
+
+@dashboard_bp.route("/data-health", methods=["GET"])
+def data_health():
+    from .services.data_health_service import collect_health
+
+    return jsonify(collect_health())
 
 
 @dashboard_bp.route("/alerts/<int:alert_id>/read", methods=["POST"])

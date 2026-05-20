@@ -1,26 +1,44 @@
-from shared.db.kingbase import query_all
+from shared.age_filter import build_age_exists_clause, get_age_filter_threshold
+from shared.config.config import logger
+from shared.db.kingbase import query_all, query_one
 
 
-def get_case_type_distribution() -> list[dict]:
+def _table_exists(schema: str, table: str) -> bool:
     sql = """
+        SELECT 1 AS exists
+        FROM information_schema.tables
+        WHERE table_schema = %(s)s
+          AND table_name = %(t)s
+        LIMIT 1
+    """
+    try:
+        return bool(query_one(sql, {"s": schema, "t": table}))
+    except Exception as exc:
+        logger.warning("Distribution table probe failed for %s.%s: %s", schema, table, exc)
+        return False
+
+
+def _case_type_sql(age_clause: str) -> str:
+    return f"""
         SELECT a."ajxx_ay" AS label,
                COUNT(DISTINCT a."ajxx_ajbh") AS value
         FROM "ywdata"."zq_zfba_ajxx" a
         WHERE a."ajxx_ay" IS NOT NULL
-          AND EXISTS (
-              SELECT 1 FROM "ywdata"."zq_zfba_xyrxx" x
-              WHERE x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
-                AND LENGTH(x."xyrxx_sfzh") = 18
-                AND DATE_PART('year',
-                      AGE(COALESCE(a."ajxx_fasj"::date, CURRENT_DATE),
-                          TO_DATE(SUBSTR(x."xyrxx_sfzh", 7, 8), 'YYYYMMDD'))
-                    ) < 18
-          )
+          {age_clause}
         GROUP BY a."ajxx_ay"
         ORDER BY value DESC
         LIMIT 10
     """
-    return query_all(sql)
+
+
+def get_case_type_distribution() -> dict:
+    if get_age_filter_threshold() <= 0:
+        return {"items": query_all(_case_type_sql("")), "degraded": False}
+
+    rows = query_all(_case_type_sql(build_age_exists_clause("a", "x")))
+    if rows:
+        return {"items": rows, "degraded": False}
+    return {"items": query_all(_case_type_sql("")), "degraded": True}
 
 
 def get_risk_level_distribution() -> list[dict]:
@@ -55,7 +73,47 @@ def get_area_distribution(metric: str = "risk_count") -> list[dict]:
         GROUP BY p.ssfj
         ORDER BY value DESC
     """
-    return query_all(sql)
+    rows = query_all(sql)
+    if rows:
+        return rows
+
+    dict_join = ""
+    label_expr = "LEFT(s.zjhm, 6)"
+    if _table_exists("stdata", "b_dic_zzjgdm"):
+        dict_join = """
+        LEFT JOIN "stdata"."b_dic_zzjgdm" d
+          ON d.ssfjdm = LEFT(s.zjhm, 6) || '000000'
+        """
+        label_expr = "COALESCE(d.ssfj, LEFT(s.zjhm, 6))"
+
+    fallback_sql = f"""
+        SELECT {label_expr} AS label,
+               COUNT(*) AS value
+        FROM "jcgkzx_monitor"."wcnr_score" s
+        {dict_join}
+        WHERE s.total_score >= 60
+          AND LENGTH(s.zjhm) >= 6
+        GROUP BY label
+        ORDER BY value DESC
+        LIMIT 10
+    """
+    try:
+        return query_all(fallback_sql)
+    except Exception as exc:
+        if not dict_join:
+            raise
+        logger.warning("Area dictionary join failed, falling back to region code: %s", exc)
+        code_sql = """
+            SELECT LEFT(s.zjhm, 6) AS label,
+                   COUNT(*) AS value
+            FROM "jcgkzx_monitor"."wcnr_score" s
+            WHERE s.total_score >= 60
+              AND LENGTH(s.zjhm) >= 6
+            GROUP BY label
+            ORDER BY value DESC
+            LIMIT 10
+        """
+        return query_all(code_sql)
 
 
 def get_school_ranking(metric: str = "risk_count") -> list[dict]:
@@ -104,7 +162,25 @@ def get_age_distribution() -> list[dict]:
         GROUP BY label
         ORDER BY label
     """
-    return query_all(sql)
+    rows = query_all(sql)
+    if rows:
+        return rows
+
+    fallback_sql = """
+        SELECT
+            CASE
+                WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(SUBSTR(zjhm, 7, 8), 'YYYYMMDD'))) < 14 THEN '14岁以下'
+                WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(SUBSTR(zjhm, 7, 8), 'YYYYMMDD'))) < 16 THEN '14-16岁'
+                ELSE '16-18岁'
+            END AS label,
+            COUNT(*) AS value
+        FROM "jcgkzx_monitor"."wcnr_target_pool"
+        WHERE LENGTH(zjhm) >= 14
+          AND SUBSTR(zjhm, 7, 8) ~ '^[0-9]{8}$'
+        GROUP BY label
+        ORDER BY label
+    """
+    return query_all(fallback_sql)
 
 
 def get_gender_distribution() -> list[dict]:

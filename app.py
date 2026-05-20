@@ -1,4 +1,5 @@
 import os
+import threading
 
 from flask import Flask, jsonify
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -33,11 +34,27 @@ from modules.graph.page_routes import graph_page_bp
 from modules.ai_analyst import ai_analyst_bp
 from modules.ai_analyst.page_routes import ai_analyst_page_bp
 from modules.workbench.page_routes import workbench_page_bp
+from modules.dashboard.services.alert_rule_engine import run_all_rules
 from shared.inference.infer_service import get_model
+
+
+def _seed_alerts_async() -> None:
+    if os.getenv("WCNR_SEED_ALERTS_ON_START", "true").lower() not in {"1", "true", "yes"}:
+        return
+    try:
+        result = run_all_rules()
+        logger.info("Alert seed on start: %s", result)
+    except Exception as exc:
+        logger.warning("Alert seed on start failed: %s", exc)
+
+
+def _start_alert_seed_thread() -> None:
+    threading.Thread(target=_seed_alerts_async, name="alert-seed", daemon=True).start()
 
 
 def create_app() -> Flask:
     init_db()
+    _start_alert_seed_thread()
     app = Flask(__name__)
     app.secret_key = FLASK_SECRET_KEY
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES

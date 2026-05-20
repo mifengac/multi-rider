@@ -56,6 +56,7 @@
 | POST | `/alerts/scan` | - | `{result}` | 手动触发规则扫描 |
 | POST | `/dispatch/from-person` | `{zjhm}` | `{ok, zjhm, redirect}` | 画像/预警派发跳转 |
 | GET | `/ranking` | `by=area|school`, `metric=case_count|risk_count` | `{by, metric, items}` | 辖区/学校排名 |
+| GET | `/data-health` | - | `{timestamp, tables, warnings}` | 数据健康自检 |
 
 ## AI 研判 `/api/ai`
 

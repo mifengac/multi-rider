@@ -1,5 +1,6 @@
 from shared.config.config import logger
 from shared.db.kingbase import query_all, query_one
+from shared.age_filter import build_age_exists_clause, get_age_filter_threshold
 
 
 def _table_exists(schema: str, table: str) -> bool:
@@ -37,6 +38,29 @@ def _change_pct(current, previous):
     return round((float(current or 0) - float(previous)) * 100.0 / float(previous), 1)
 
 
+def _case_count_sql(where_clause: str, age_clause: str) -> str:
+    return f"""
+        SELECT COUNT(DISTINCT a."ajxx_ajbh") AS total
+        FROM "ywdata"."zq_zfba_ajxx" a
+        WHERE {where_clause}
+          {age_clause}
+    """
+
+
+def _query_case_count_with_degrade(where_clause: str) -> tuple[int, bool]:
+    if get_age_filter_threshold() <= 0:
+        row = query_one(_case_count_sql(where_clause, ""))
+        return int(row.get("total") or 0), False
+
+    row = query_one(_case_count_sql(where_clause, build_age_exists_clause("a", "x")))
+    total = int(row.get("total") or 0)
+    if total:
+        return total, False
+
+    fallback = query_one(_case_count_sql(where_clause, ""))
+    return int(fallback.get("total") or 0), True
+
+
 def get_summary() -> dict:
     total_persons_sql = """
         SELECT COUNT(*) AS total FROM "jcgkzx_monitor"."wcnr_target_pool"
@@ -44,35 +68,6 @@ def get_summary() -> dict:
     high_risk_sql = """
         SELECT COUNT(*) AS total FROM "jcgkzx_monitor"."wcnr_score"
         WHERE total_score >= 60
-    """
-    month_cases_sql = """
-        SELECT COUNT(DISTINCT a."ajxx_ajbh") AS total
-        FROM "ywdata"."zq_zfba_ajxx" a
-        WHERE a."ajxx_fasj" >= DATE_TRUNC('month', CURRENT_DATE)
-          AND EXISTS (
-              SELECT 1 FROM "ywdata"."zq_zfba_xyrxx" x
-              WHERE x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
-                AND LENGTH(x."xyrxx_sfzh") = 18
-                AND DATE_PART('year',
-                      AGE(a."ajxx_fasj"::date,
-                          TO_DATE(SUBSTR(x."xyrxx_sfzh", 7, 8), 'YYYYMMDD'))
-                    ) < 18
-              )
-    """
-    month_cases_prev_sql = """
-        SELECT COUNT(DISTINCT a."ajxx_ajbh") AS total
-        FROM "ywdata"."zq_zfba_ajxx" a
-        WHERE a."ajxx_fasj" >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
-          AND a."ajxx_fasj" < DATE_TRUNC('month', CURRENT_DATE)
-          AND EXISTS (
-              SELECT 1 FROM "ywdata"."zq_zfba_xyrxx" x
-              WHERE x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
-                AND LENGTH(x."xyrxx_sfzh") = 18
-                AND DATE_PART('year',
-                      AGE(a."ajxx_fasj"::date,
-                          TO_DATE(SUBSTR(x."xyrxx_sfzh", 7, 8), 'YYYYMMDD'))
-                    ) < 18
-          )
     """
     extreme_risk_sql = """
         SELECT COUNT(*) AS total FROM "jcgkzx_monitor"."wcnr_score"
@@ -86,8 +81,13 @@ def get_summary() -> dict:
 
     total_persons = query_one(total_persons_sql).get("total", 0)
     high_risk = query_one(high_risk_sql).get("total", 0)
-    month_cases = query_one(month_cases_sql).get("total", 0)
-    month_cases_prev = query_one(month_cases_prev_sql).get("total", 0)
+    month_cases, month_cases_degraded = _query_case_count_with_degrade(
+        "a.\"ajxx_fasj\" >= DATE_TRUNC('month', CURRENT_DATE)"
+    )
+    month_cases_prev, month_cases_prev_degraded = _query_case_count_with_degrade(
+        "a.\"ajxx_fasj\" >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'\n"
+        "          AND a.\"ajxx_fasj\" < DATE_TRUNC('month', CURRENT_DATE)"
+    )
     extreme_risk = query_one(extreme_risk_sql).get("total", 0)
     avg_score = query_one(avg_score_sql).get("avg_score", 0)
 
@@ -98,6 +98,7 @@ def get_summary() -> dict:
         "month_cases": month_cases,
         "month_cases_prev": month_cases_prev,
         "month_cases_change_pct": _change_pct(month_cases, month_cases_prev),
+        "month_cases_degraded": month_cases_degraded or month_cases_prev_degraded,
         "avg_score": float(avg_score) if avg_score else 0,
     }
 

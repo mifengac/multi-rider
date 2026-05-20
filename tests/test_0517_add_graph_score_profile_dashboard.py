@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import threading
 
 
 def test_graph_person_route_passes_filter_params(client, monkeypatch):
@@ -809,3 +810,313 @@ def test_build_person_graph_enables_new_relations_only_when_explicit(monkeypatch
 
     graph_builder.build_person_graph("4401", relations="lives_at,same_school,same_area")
     assert calls == ["lives_at", "same_school", "same_area"]
+
+
+def test_startup_alert_seed_runs_async_when_enabled(monkeypatch):
+    import app as app_module
+
+    event = threading.Event()
+    calls = []
+
+    def fake_run_all_rules():
+        calls.append("called")
+        event.set()
+        return {"count": 3}
+
+    monkeypatch.setenv("WCNR_SEED_ALERTS_ON_START", "1")
+    monkeypatch.setattr(app_module, "run_all_rules", fake_run_all_rules, raising=False)
+
+    app_module.create_app()
+
+    assert event.wait(1)
+    assert calls == ["called"]
+
+
+def test_startup_alert_seed_skips_when_disabled(monkeypatch):
+    import app as app_module
+
+    event = threading.Event()
+
+    def fake_run_all_rules():
+        event.set()
+        return {"count": 3}
+
+    monkeypatch.setenv("WCNR_SEED_ALERTS_ON_START", "0")
+    monkeypatch.setattr(app_module, "run_all_rules", fake_run_all_rules, raising=False)
+
+    app_module.create_app()
+
+    assert not event.wait(0.2)
+
+
+def test_region_extracts_six_digit_code():
+    from shared.region import extract_region_code
+
+    assert extract_region_code("445302200901010011") == "445302"
+    assert extract_region_code("ABC302200901010011") is None
+    assert extract_region_code("44530") is None
+
+
+def test_area_distribution_degrades_to_zjhm_region_code(monkeypatch):
+    from modules.dashboard.services import distribution_service
+
+    calls = []
+
+    def fake_query_all(sql, params=None):
+        calls.append(sql)
+        if len(calls) == 1:
+            return []
+        return [{"label": "Luoding", "value": 12}]
+
+    monkeypatch.setattr(distribution_service, "query_all", fake_query_all)
+    monkeypatch.setattr(distribution_service, "_table_exists", lambda schema, table: True, raising=False)
+
+    assert distribution_service.get_area_distribution("risk_count") == [{"label": "Luoding", "value": 12}]
+    assert len(calls) == 2
+    assert "LEFT(s.zjhm, 6)" in calls[1]
+    assert '"stdata"."b_dic_zzjgdm"' in calls[1]
+
+
+def test_age_distribution_degrades_to_zjhm_birthdate(monkeypatch):
+    from modules.dashboard.services import distribution_service
+
+    calls = []
+
+    def fake_query_all(sql, params=None):
+        calls.append(sql)
+        if len(calls) == 1:
+            return []
+        return [{"label": "14-16岁", "value": 4}]
+
+    monkeypatch.setattr(distribution_service, "query_all", fake_query_all)
+
+    assert distribution_service.get_age_distribution() == [{"label": "14-16岁", "value": 4}]
+    assert len(calls) == 2
+    assert "SUBSTR(zjhm, 7, 8)" in calls[1]
+    assert "~ '^[0-9]{8}$'" in calls[1]
+
+
+def test_case_type_distribution_returns_degraded_false_when_age_filter_hits(monkeypatch):
+    from modules.dashboard.services import distribution_service
+
+    calls = []
+
+    def fake_query_all(sql, params=None):
+        calls.append(sql)
+        return [{"label": "theft", "value": 2}]
+
+    monkeypatch.delenv("WCNR_AGE_FILTER", raising=False)
+    monkeypatch.setattr(distribution_service, "query_all", fake_query_all)
+
+    assert distribution_service.get_case_type_distribution() == {
+        "items": [{"label": "theft", "value": 2}],
+        "degraded": False,
+    }
+    assert len(calls) == 1
+    assert "DATE_PART('year'" in calls[0]
+    assert "< 18" in calls[0]
+
+
+def test_case_type_distribution_requeries_without_age_filter_when_empty(monkeypatch):
+    from modules.dashboard.services import distribution_service
+
+    calls = []
+
+    def fake_query_all(sql, params=None):
+        calls.append(sql)
+        if len(calls) == 1:
+            return []
+        return [{"label": "robbery", "value": 5}]
+
+    monkeypatch.delenv("WCNR_AGE_FILTER", raising=False)
+    monkeypatch.setattr(distribution_service, "query_all", fake_query_all)
+
+    assert distribution_service.get_case_type_distribution() == {
+        "items": [{"label": "robbery", "value": 5}],
+        "degraded": True,
+    }
+    assert len(calls) == 2
+    assert "DATE_PART('year'" in calls[0]
+    assert "DATE_PART('year'" not in calls[1]
+
+
+def test_case_type_distribution_skips_age_filter_when_env_zero(monkeypatch):
+    from modules.dashboard.services import distribution_service
+
+    calls = []
+
+    def fake_query_all(sql, params=None):
+        calls.append(sql)
+        return [{"label": "all_cases", "value": 7}]
+
+    monkeypatch.setenv("WCNR_AGE_FILTER", "0")
+    monkeypatch.setattr(distribution_service, "query_all", fake_query_all)
+
+    assert distribution_service.get_case_type_distribution() == {
+        "items": [{"label": "all_cases", "value": 7}],
+        "degraded": False,
+    }
+    assert len(calls) == 1
+    assert "DATE_PART('year'" not in calls[0]
+
+
+def test_case_trend_degrades_when_age_filter_returns_empty(monkeypatch):
+    from modules.dashboard.services import trend_service
+
+    calls = []
+
+    def fake_query_all(sql, params=None):
+        calls.append((sql, params))
+        if len(calls) == 1:
+            return []
+        return [{"month": "2026-05", "count": 9}]
+
+    monkeypatch.delenv("WCNR_AGE_FILTER", raising=False)
+    monkeypatch.setattr(trend_service, "query_all", fake_query_all)
+
+    assert trend_service.get_case_trend(6) == {
+        "points": [{"month": "2026-05", "count": 9}],
+        "degraded": True,
+    }
+    assert len(calls) == 2
+    assert calls[0][1] == {"months": 6}
+    assert "DATE_PART('year'" in calls[0][0]
+    assert "DATE_PART('year'" not in calls[1][0]
+
+
+def test_dashboard_distribution_route_unpacks_degraded_result(client, monkeypatch):
+    import modules.dashboard.routes as dashboard_routes
+
+    monkeypatch.setattr(
+        dashboard_routes,
+        "get_case_type_distribution",
+        lambda: {"items": [{"label": "theft", "value": 1}], "degraded": True},
+    )
+
+    response = client.get("/api/dashboard/distribution?dim=case_type")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "dimension": "case_type",
+        "items": [{"label": "theft", "value": 1}],
+        "degraded": True,
+    }
+
+
+def test_dashboard_trend_route_unpacks_degraded_result(client, monkeypatch):
+    import modules.dashboard.routes as dashboard_routes
+
+    monkeypatch.setattr(
+        dashboard_routes,
+        "get_case_trend",
+        lambda months: {"points": [{"month": "2026-05", "count": 3}], "degraded": True},
+    )
+
+    response = client.get("/api/dashboard/trend?metric=cases&months=6")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "metric": "cases",
+        "months": 6,
+        "points": [{"month": "2026-05", "count": 3}],
+        "degraded": True,
+    }
+
+
+def test_dashboard_summary_month_cases_degrades_when_filtered_counts_are_zero(monkeypatch):
+    from modules.dashboard.services import summary_service
+
+    def fake_query_one(sql, params=None):
+        if "information_schema.tables" in sql:
+            return {}
+        if 'COUNT(*) AS total FROM "jcgkzx_monitor"."wcnr_target_pool"' in sql:
+            return {"total": 100}
+        if 'COUNT(*) AS total FROM "jcgkzx_monitor"."wcnr_score"' in sql and "total_score >= 60" in sql:
+            return {"total": 20}
+        if 'COUNT(*) AS total FROM "jcgkzx_monitor"."wcnr_score"' in sql and "total_score >= 80" in sql:
+            return {"total": 5}
+        if "ROUND(AVG(total_score), 1)" in sql:
+            return {"avg_score": 66.6}
+        if "DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'" in sql:
+            return {"total": 0 if "DATE_PART('year'" in sql else 3}
+        if "DATE_TRUNC('month', CURRENT_DATE)" in sql:
+            return {"total": 0 if "DATE_PART('year'" in sql else 8}
+        return {"total": 0}
+
+    monkeypatch.delenv("WCNR_AGE_FILTER", raising=False)
+    monkeypatch.setattr(summary_service, "query_one", fake_query_one)
+
+    summary = summary_service.get_summary()
+
+    assert summary["month_cases"] == 8
+    assert summary["month_cases_prev"] == 3
+    assert summary["month_cases_degraded"] is True
+
+
+def test_data_health_collects_nine_tables_and_warnings(monkeypatch):
+    from modules.dashboard.services import data_health_service
+
+    def fake_query_one(sql, params=None):
+        if "wcnr_target_pool" in sql:
+            return {"rows": 279, "with_ssfj": 0, "with_csrq": 0}
+        if "wcnr_score_history" in sql:
+            return {"rows": 279, "distinct_calc_days": 1}
+        if "wcnr_score" in sql:
+            return {"rows": 279, "with_risk": 279}
+        if "wcnr_alert" in sql:
+            return {"rows": 0}
+        if "wcnr_ryrl_gj" in sql and "with_coord" in sql:
+            return {"rows": 2745, "with_coord": 2745}
+        if "wcnr_ryrl_gj" in sql:
+            return {"rows": 8427}
+        if "wcnr_ly_checkin" in sql:
+            return {"rows": 60}
+        if "zq_zfba_ajxx" in sql:
+            return {"rows": 31871, "min_fasj": "1994-03-01", "max_fasj": "2026-05-18"}
+        if "zq_zfba_xyrxx" in sql:
+            return {"rows": 58385}
+        if "zq_zfba_wcnr_sfzxx" in sql:
+            return {"rows": 680}
+        return {}
+
+    monkeypatch.setattr(data_health_service, "query_one", fake_query_one)
+
+    health = data_health_service.collect_health()
+
+    assert "timestamp" in health
+    assert len(health["tables"]) == 9
+    names = {item["name"] for item in health["tables"]}
+    assert "jcgkzx_monitor.wcnr_ly_checkin" in names
+    assert health["tables"][0]["fields"] == {"ssfj_filled_pct": 0.0, "csrq_filled_pct": 0.0}
+    assert "wcnr_target_pool.ssfj 100% missing (will degrade area ranking)" in health["warnings"]
+    assert "wcnr_target_pool.csrq 100% missing (will degrade age distribution)" in health["warnings"]
+    assert "wcnr_alert table empty (no alerts seeded yet)" in health["warnings"]
+
+
+def test_data_health_keeps_collecting_when_one_query_fails(monkeypatch):
+    from modules.dashboard.services import data_health_service
+
+    def fake_query_one(sql, params=None):
+        if "wcnr_target_pool" in sql:
+            raise RuntimeError("probe failed")
+        return {"rows": 1}
+
+    monkeypatch.setattr(data_health_service, "query_one", fake_query_one)
+
+    health = data_health_service.collect_health()
+
+    assert len(health["tables"]) == 9
+    assert health["tables"][0]["name"] == "jcgkzx_monitor.wcnr_target_pool"
+    assert health["tables"][0]["error"] == "probe failed"
+
+
+def test_dashboard_data_health_route(client, monkeypatch):
+    from modules.dashboard.services import data_health_service
+
+    expected = {"timestamp": "2026-05-20T10:30:00", "tables": [], "warnings": []}
+    monkeypatch.setattr(data_health_service, "collect_health", lambda: expected)
+
+    response = client.get("/api/dashboard/data-health")
+
+    assert response.status_code == 200
+    assert response.get_json() == expected

@@ -1,26 +1,29 @@
+from shared.age_filter import build_age_exists_clause, get_age_filter_threshold
 from shared.db.kingbase import query_all
 
 
-def get_case_trend(months: int = 12) -> list[dict]:
-    sql = """
+def _case_trend_sql(age_clause: str) -> str:
+    return f"""
         SELECT TO_CHAR(a."ajxx_fasj", 'YYYY-MM') AS month,
                COUNT(DISTINCT a."ajxx_ajbh") AS count
         FROM "ywdata"."zq_zfba_ajxx" a
         WHERE a."ajxx_fasj" >= CURRENT_DATE - make_interval(months => %(months)s)
           AND a."ajxx_fasj" IS NOT NULL
-          AND EXISTS (
-              SELECT 1 FROM "ywdata"."zq_zfba_xyrxx" x
-              WHERE x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
-                AND LENGTH(x."xyrxx_sfzh") = 18
-                AND DATE_PART('year',
-                      AGE(a."ajxx_fasj"::date,
-                          TO_DATE(SUBSTR(x."xyrxx_sfzh", 7, 8), 'YYYYMMDD'))
-                    ) < 18
-          )
+          {age_clause}
         GROUP BY TO_CHAR(a."ajxx_fasj", 'YYYY-MM')
         ORDER BY month
     """
-    return query_all(sql, {"months": months})
+
+
+def get_case_trend(months: int = 12) -> dict:
+    params = {"months": months}
+    if get_age_filter_threshold() <= 0:
+        return {"points": query_all(_case_trend_sql(""), params), "degraded": False}
+
+    rows = query_all(_case_trend_sql(build_age_exists_clause("a", "x")), params)
+    if rows:
+        return {"points": rows, "degraded": False}
+    return {"points": query_all(_case_trend_sql(""), params), "degraded": True}
 
 
 def get_person_trend(months: int = 12) -> list[dict]:

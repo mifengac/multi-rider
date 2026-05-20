@@ -340,17 +340,12 @@ def _add_guardian(zjhm: str, nodes: dict, edges: list):
 
 
 def _add_school(zjhm: str, nodes: dict, edges: list):
-    sql = """
-        SELECT yxx FROM "ywdata"."b_per_qscxwcnr" WHERE zjhm = %(zjhm)s LIMIT 1
+    # b_per_qscxwcnr has no yxx column; yxx (school name) lives in zq_zfba_wcnr_sfzxx
+    sfz_sql = """
+        SELECT yxx FROM "ywdata"."zq_zfba_wcnr_sfzxx" WHERE sfzhm = %(zjhm)s LIMIT 1
     """
-    row = query_one(sql, {"zjhm": zjhm})
-    school_name = (row or {}).get("yxx")
-    if not school_name:
-        sfz_sql = """
-            SELECT yxx FROM "ywdata"."zq_zfba_wcnr_sfzxx" WHERE sfzhm = %(zjhm)s LIMIT 1
-        """
-        row2 = query_one(sfz_sql, {"zjhm": zjhm})
-        school_name = (row2 or {}).get("yxx")
+    row2 = query_one(sfz_sql, {"zjhm": zjhm})
+    school_name = (row2 or {}).get("yxx")
     if not school_name:
         return
     node = _school_node(school_name)

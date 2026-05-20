@@ -89,6 +89,7 @@ def _prepare_environment() -> None:
             "APP_HOST": "127.0.0.1",
             "APP_PORT": "5001",
             "WCNR_SCHEDULER_ENABLED": "0",
+            "WCNR_SEED_ALERTS_ON_START": "0",
         }
     )
 
