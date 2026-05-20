@@ -29,3 +29,6 @@ train_runs/
 datasets/
 face_data/
 jobs.sqlite3
+
+model/*
+!model/README.md

@@ -14,6 +14,7 @@ x-app-common: &app-common
     - ${MULTI_RIDER_ROOT:-./runtime}/face_data:/app/face_data
     - ${MULTI_RIDER_ROOT:-./runtime}/train_runs:/app/train_runs
     - ${MULTI_RIDER_ROOT:-./runtime}/upload_tmp:/app/upload_tmp
+    - ${MULTI_RIDER_MODEL_ROOT:-./model}:/app/model
   restart: unless-stopped
 
 services:

@@ -4,6 +4,17 @@ from datetime import datetime
 from typing import Any, Callable
 
 from shared.db.kingbase import query_one
+from .alert_service import get_recent_alerts
+from .distribution_service import (
+    get_age_distribution,
+    get_area_distribution,
+    get_case_type_distribution,
+    get_risk_level_distribution,
+    get_school_ranking,
+)
+from .heatmap_service import get_heatmap
+from .summary_service import get_summary
+from .trend_service import get_case_trend, get_person_trend, get_score_trend
 
 
 def _pct(filled: Any, total: Any) -> float | None:
@@ -28,6 +39,57 @@ def _safe_table(name: str, build: Callable[[], dict]) -> dict:
         return {"name": name, "error": str(exc)}
     item.setdefault("name", name)
     return item
+
+
+def _count_and_sample(payload: Any) -> tuple[int | None, Any]:
+    if isinstance(payload, dict):
+        for key in ("items", "points"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return len(value), value[0] if value else None
+        return (1, payload) if payload else (0, None)
+    if isinstance(payload, list):
+        return len(payload), payload[0] if payload else None
+    if payload is None:
+        return 0, None
+    return 1, payload
+
+
+def _safe_endpoint_probe(name: str, build: Callable[[], Any]) -> dict:
+    try:
+        payload = build()
+        count, sample = _count_and_sample(payload)
+        return {
+            "name": name,
+            "ok": True,
+            "count": count,
+            "sample": sample,
+            "error": None,
+        }
+    except Exception as exc:
+        return {
+            "name": name,
+            "ok": False,
+            "count": None,
+            "sample": None,
+            "error": str(exc),
+        }
+
+
+def _endpoint_probes() -> list[dict]:
+    return [
+        _safe_endpoint_probe("get_summary", get_summary),
+        _safe_endpoint_probe("get_case_type_distribution", get_case_type_distribution),
+        _safe_endpoint_probe("get_risk_level_distribution", get_risk_level_distribution),
+        _safe_endpoint_probe("get_area_distribution", get_area_distribution),
+        _safe_endpoint_probe("get_age_distribution", get_age_distribution),
+        _safe_endpoint_probe("get_case_trend", lambda: get_case_trend(months=12)),
+        _safe_endpoint_probe("get_person_trend", lambda: get_person_trend(12)),
+        _safe_endpoint_probe("get_score_trend", lambda: get_score_trend(12)),
+        _safe_endpoint_probe("get_school_ranking", lambda: get_school_ranking("risk_count")),
+        _safe_endpoint_probe("get_heatmap", lambda: get_heatmap(days=30)),
+        _safe_endpoint_probe("get_recent_alerts", lambda: get_recent_alerts(5)),
+    ]
 
 
 def _target_pool() -> dict:
@@ -180,5 +242,6 @@ def collect_health() -> dict:
     return {
         "timestamp": datetime.now().replace(microsecond=0).isoformat(),
         "tables": tables,
+        "endpoint_probes": _endpoint_probes(),
         "warnings": _add_warnings(tables),
     }

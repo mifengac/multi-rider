@@ -1,0 +1,20 @@
+请阅读并严格按照 docs/0520_debugV3/codex_round6_brief.md 的要求执行 R1-R4 四项任务。
+
+硬约束：
+1. 不要新增第三方依赖
+2. 不要执行 git commit
+3. 修改 Dockerfile / docker-compose.yml / .dockerignore / .env.example 是允许的（R4 就是要改打包策略）
+4. 完成后必须运行 `uv run pytest -q` 验证全部通过（基线 118 passed，加新增用例后应该更多）
+5. 完成后必须运行 `uv run python -c "import app"` 验证 exit 0
+6. 完成后用中文逐项输出 R1-R4 的改动文件清单与验收结果（沿用前几轮的格式，参考 docs/0517_add_graph/codex_run_round5_last.txt）
+7. 把最终的验收输出写入 docs/0520_debugV3/codex_run_round6_last.txt 文件中
+
+执行顺序建议：
+- R1 -> 跑一次 pytest 看通过
+- R2 -> 跑一次 pytest 看通过
+- R3 -> 跑一次 pytest 看通过
+- R4 -> 跑一次 pytest 看通过
+- 最后跑 `uv run python -c "import app"` 确认 exit 0
+- 写验收文件
+
+特别提醒：R3 的内网诊断脚本要**绝对不依赖外部库**，全部用 stdlib + 项目里现成的 shared.db.kingbase。脚本被拷到内网执行时不会有 pip install 机会。

@@ -1,4 +1,5 @@
 from shared.age_filter import build_age_exists_clause, get_age_filter_threshold
+from shared.config.config import logger
 from shared.db.kingbase import query_all
 
 
@@ -23,6 +24,7 @@ def get_case_trend(months: int = 12) -> dict:
     rows = query_all(_case_trend_sql(build_age_exists_clause("a", "x")), params)
     if rows:
         return {"points": rows, "degraded": False}
+    logger.info("Case trend fallback triggered, primary returned %d rows", len(rows))
     return {"points": query_all(_case_trend_sql(""), params), "degraded": True}
 
 

@@ -5,7 +5,7 @@ import os
 
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(CONFIG_DIR, "..", ".."))
-MODEL_DIR = os.path.join(BASE_DIR, "model")
+MODEL_DIR = os.environ.get("MODEL_DIR") or os.path.join(BASE_DIR, "model")
 MODEL_YOLO_DIR = os.path.join(MODEL_DIR, "yolo")
 MODEL_YOLO_FOUNDATION_DIR = os.path.join(MODEL_YOLO_DIR, "foundation")
 MODEL_YOLO_PRODUCTION_DIR = os.path.join(MODEL_YOLO_DIR, "production")

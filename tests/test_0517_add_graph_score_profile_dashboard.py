@@ -135,6 +135,55 @@ def test_build_person_graph_filters_relations_and_time_range(monkeypatch):
     assert calls == [("cases", True), ("appeared", True)]
 
 
+def test_add_school_skips_undefined_column(monkeypatch):
+    import psycopg2
+    import modules.graph.services.graph_builder as graph_builder
+
+    def fake_query_one(sql, params=None):
+        raise psycopg2.errors.UndefinedColumn("column yxx does not exist")
+
+    monkeypatch.setattr(graph_builder, "query_one", fake_query_one)
+
+    nodes = {"P_4401": {"id": "P_4401"}}
+    edges = []
+
+    graph_builder._add_school("4401", nodes, edges)
+
+    assert nodes == {"P_4401": {"id": "P_4401"}}
+    assert edges == []
+
+
+def test_build_person_graph_skips_failed_child_query_but_keeps_other_relations(monkeypatch):
+    import psycopg2
+    import modules.graph.services.graph_builder as graph_builder
+
+    def fake_query_one(sql, params=None):
+        if '"jcgkzx_monitor"."wcnr_target_pool"' in sql:
+            return {
+                "zjhm": params["zjhm"],
+                "xm": "张三",
+                "total_score": 70,
+                "risk_level": "high",
+            }
+        raise psycopg2.errors.UndefinedColumn("column yxx does not exist")
+
+    def fake_cases(zjhm, nodes, edges, since=None):
+        nodes["C_AJ001"] = {"id": "C_AJ001"}
+        edges.append({"source": f"P_{zjhm}", "target": "C_AJ001", "type": "SUSPECTED_IN"})
+
+    monkeypatch.setattr(graph_builder, "query_one", fake_query_one)
+    monkeypatch.setattr(graph_builder, "_add_cases", fake_cases)
+    monkeypatch.setattr(graph_builder, "_add_co_suspects", lambda *args, **kwargs: None)
+    monkeypatch.setattr(graph_builder, "_add_guardian", lambda *args, **kwargs: None)
+    monkeypatch.setattr(graph_builder, "_add_appeared_at", lambda *args, **kwargs: None)
+    monkeypatch.setattr(graph_builder, "_add_checked_in", lambda *args, **kwargs: None)
+
+    graph = graph_builder.build_person_graph("4401", relations="suspected_in,studies_at")
+
+    assert {node["id"] for node in graph["nodes"]} == {"P_4401", "C_AJ001"}
+    assert graph["edges"] == [{"source": "P_4401", "target": "C_AJ001", "type": "SUSPECTED_IN"}]
+
+
 def test_build_case_graph_adds_suspects_and_victims(monkeypatch):
     import modules.graph.services.graph_builder as graph_builder
 
@@ -1108,6 +1157,68 @@ def test_data_health_keeps_collecting_when_one_query_fails(monkeypatch):
     assert len(health["tables"]) == 9
     assert health["tables"][0]["name"] == "jcgkzx_monitor.wcnr_target_pool"
     assert health["tables"][0]["error"] == "probe failed"
+
+
+def test_dashboard_data_health_endpoint_probes_report_empty_success(client, monkeypatch):
+    from modules.dashboard.services import data_health_service
+
+    def fake_query_one(sql, params=None):
+        if "wcnr_target_pool" in sql:
+            return {"rows": 0, "with_ssfj": 0, "with_csrq": 0}
+        if "wcnr_score_history" in sql:
+            return {"rows": 0, "distinct_calc_days": 0}
+        if "zq_zfba_ajxx" in sql:
+            return {"rows": 0, "min_fasj": None, "max_fasj": None}
+        return {"rows": 0, "with_risk": 0, "with_coord": 0}
+
+    monkeypatch.setattr(data_health_service, "query_one", fake_query_one)
+    monkeypatch.setattr(data_health_service, "get_summary", lambda: {}, raising=False)
+    monkeypatch.setattr(data_health_service, "get_case_type_distribution", lambda: {"items": []}, raising=False)
+    monkeypatch.setattr(data_health_service, "get_risk_level_distribution", lambda: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_area_distribution", lambda: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_age_distribution", lambda: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_case_trend", lambda months=12: {"points": []}, raising=False)
+    monkeypatch.setattr(data_health_service, "get_person_trend", lambda months=12: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_score_trend", lambda months=12: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_school_ranking", lambda metric="risk_count": [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_heatmap", lambda days=30: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_recent_alerts", lambda limit=5: [], raising=False)
+
+    response = client.get("/api/dashboard/data-health")
+
+    assert response.status_code == 200
+    probes = response.get_json()["endpoint_probes"]
+    assert len(probes) >= 11
+    assert all(probe["ok"] is True for probe in probes)
+    assert all(probe["count"] == 0 for probe in probes)
+
+
+def test_data_health_endpoint_probe_records_error(monkeypatch):
+    from modules.dashboard.services import data_health_service
+
+    monkeypatch.setattr(data_health_service, "query_one", lambda sql, params=None: {"rows": 0})
+
+    def raise_summary():
+        raise RuntimeError("summary failed")
+
+    monkeypatch.setattr(data_health_service, "get_summary", raise_summary, raising=False)
+    monkeypatch.setattr(data_health_service, "get_case_type_distribution", lambda: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_risk_level_distribution", lambda: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_area_distribution", lambda: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_age_distribution", lambda: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_case_trend", lambda months=12: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_person_trend", lambda months=12: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_score_trend", lambda months=12: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_school_ranking", lambda metric="risk_count": [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_heatmap", lambda days=30: [], raising=False)
+    monkeypatch.setattr(data_health_service, "get_recent_alerts", lambda limit=5: [], raising=False)
+
+    health = data_health_service.collect_health()
+
+    summary_probe = next(probe for probe in health["endpoint_probes"] if probe["name"] == "get_summary")
+    assert summary_probe["ok"] is False
+    assert summary_probe["count"] is None
+    assert "summary failed" in summary_probe["error"]
 
 
 def test_dashboard_data_health_route(client, monkeypatch):

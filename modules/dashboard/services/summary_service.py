@@ -57,6 +57,7 @@ def _query_case_count_with_degrade(where_clause: str) -> tuple[int, bool]:
     if total:
         return total, False
 
+    logger.info("Summary case count fallback triggered, primary returned %d rows", total)
     fallback = query_one(_case_count_sql(where_clause, ""))
     return int(fallback.get("total") or 0), True
 

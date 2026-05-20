@@ -76,6 +76,7 @@ def get_area_distribution(metric: str = "risk_count") -> list[dict]:
     rows = query_all(sql)
     if rows:
         return rows
+    logger.info("Area distribution fallback triggered, primary returned %d rows", len(rows))
 
     dict_join = ""
     label_expr = "LEFT(s.zjhm, 6)"
@@ -165,6 +166,7 @@ def get_age_distribution() -> list[dict]:
     rows = query_all(sql)
     if rows:
         return rows
+    logger.info("Age distribution fallback triggered, primary returned %d rows", len(rows))
 
     fallback_sql = """
         SELECT

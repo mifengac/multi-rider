@@ -1,5 +1,8 @@
 from datetime import datetime, timedelta
 
+import psycopg2
+
+from shared.config.config import logger
 from shared.db.kingbase import query_all, query_one
 from .relation_engine import (
     appeared_at,
@@ -47,6 +50,42 @@ TIME_RANGE_DAYS = {
     "6m": 180,
     "1y": 365,
 }
+
+_SCHEMA_ERRORS = (psycopg2.errors.UndefinedColumn, psycopg2.errors.UndefinedTable)
+
+
+def _warn_graph_query(context: str, identifier: str, exc: Exception) -> None:
+    logger.warning("Graph %s skipped for %s: %s", context, identifier, exc)
+
+
+def _safe_query_one(context: str, identifier: str, sql: str, params=None):
+    try:
+        return query_one(sql, params)
+    except _SCHEMA_ERRORS as exc:
+        _warn_graph_query(context, identifier, exc)
+    except Exception as exc:
+        _warn_graph_query(context, identifier, exc)
+    return None
+
+
+def _safe_query_all(context: str, identifier: str, sql: str, params=None) -> list:
+    try:
+        return query_all(sql, params)
+    except _SCHEMA_ERRORS as exc:
+        _warn_graph_query(context, identifier, exc)
+    except Exception as exc:
+        _warn_graph_query(context, identifier, exc)
+    return []
+
+
+def _safe_relation_rows(context: str, identifier: str, loader) -> list:
+    try:
+        return loader() or []
+    except _SCHEMA_ERRORS as exc:
+        _warn_graph_query(context, identifier, exc)
+    except Exception as exc:
+        _warn_graph_query(context, identifier, exc)
+    return []
 
 
 def _format_time(value):
@@ -266,7 +305,7 @@ def _add_cases(zjhm: str, nodes: dict, edges: list, since=None, exclude_ajbh=Non
           ON x."ajxx_join_ajxx_ajbh" = a."ajxx_ajbh"
         WHERE {where_clause}
     """.format(where_clause=where_clause)
-    cases = query_all(sql, params)
+    cases = _safe_query_all("_add_cases", zjhm, sql, params)
     for c in cases:
         ajbh = c.get("ajxx_ajbh")
         if not ajbh:
@@ -300,12 +339,17 @@ def _add_co_suspects(zjhm: str, nodes: dict, edges: list):
         FROM "jcgkzx_monitor"."wcnr_score"
         WHERE zjhm = %(co_zjhm)s
     """
-    co_suspects = query_all(sql, {"zjhm": zjhm})
+    co_suspects = _safe_query_all("_add_co_suspects.people", zjhm, sql, {"zjhm": zjhm})
     for co in co_suspects[:10]:
         co_zjhm = co.get("xyrxx_sfzh")
         if not co_zjhm:
             continue
-        score_info = query_one(score_sql, {"co_zjhm": co_zjhm}) or {}
+        score_info = _safe_query_one(
+            "_add_co_suspects.score",
+            co_zjhm,
+            score_sql,
+            {"co_zjhm": co_zjhm},
+        ) or {}
         node = _person_node(
             co_zjhm, co.get("xyrxx_xm"),
             score_info.get("total_score"), score_info.get("risk_level"),
@@ -326,7 +370,7 @@ def _add_guardian(zjhm: str, nodes: dict, edges: list):
         WHERE zjhm = %(zjhm)s AND jhr1xm IS NOT NULL
         LIMIT 1
     """
-    row = query_one(sql, {"zjhm": zjhm})
+    row = _safe_query_one("_add_guardian", zjhm, sql, {"zjhm": zjhm})
     if not row or not row.get("jhr1xm"):
         return
     node = _guardian_node(row["jhr1xm"], None, row.get("jhr1lxdh"))
@@ -344,7 +388,7 @@ def _add_school(zjhm: str, nodes: dict, edges: list):
     sfz_sql = """
         SELECT yxx FROM "ywdata"."zq_zfba_wcnr_sfzxx" WHERE sfzhm = %(zjhm)s LIMIT 1
     """
-    row2 = query_one(sfz_sql, {"zjhm": zjhm})
+    row2 = _safe_query_one("_add_school", zjhm, sfz_sql, {"zjhm": zjhm})
     school_name = (row2 or {}).get("yxx")
     if not school_name:
         return
@@ -359,7 +403,7 @@ def _add_school(zjhm: str, nodes: dict, edges: list):
 
 
 def _add_appeared_at(zjhm: str, nodes: dict, edges: list):
-    for relation in appeared_at(zjhm, limit=3):
+    for relation in _safe_relation_rows("_add_appeared_at", zjhm, lambda: appeared_at(zjhm, limit=3)):
         props = relation.get("node", {}).get("properties", {})
         device_name = props.get("device_name") or props.get("name")
         if not device_name:
@@ -384,7 +428,7 @@ def _add_appeared_at(zjhm: str, nodes: dict, edges: list):
 
 
 def _add_checked_in(zjhm: str, nodes: dict, edges: list):
-    for relation in checked_in(zjhm):
+    for relation in _safe_relation_rows("_add_checked_in", zjhm, lambda: checked_in(zjhm)):
         props = relation.get("node", {}).get("properties", {})
         hotel_name = props.get("lgmc") or props.get("name")
         if not hotel_name:
@@ -408,7 +452,7 @@ def _add_checked_in(zjhm: str, nodes: dict, edges: list):
 
 
 def _add_lives_at(zjhm: str, nodes: dict, edges: list):
-    for relation in lives_at(zjhm):
+    for relation in _safe_relation_rows("_add_lives_at", zjhm, lambda: lives_at(zjhm)):
         props = relation.get("node", {}).get("properties", {})
         address = props.get("address") or props.get("name")
         if not address:
@@ -428,7 +472,7 @@ def _add_lives_at(zjhm: str, nodes: dict, edges: list):
 
 
 def _add_same_school(zjhm: str, nodes: dict, edges: list):
-    for relation in same_school(zjhm):
+    for relation in _safe_relation_rows("_add_same_school", zjhm, lambda: same_school(zjhm)):
         props = relation.get("node", {}).get("properties", {})
         peer_zjhm = props.get("zjhm")
         if not peer_zjhm:
@@ -453,7 +497,7 @@ def _add_same_school(zjhm: str, nodes: dict, edges: list):
 
 
 def _add_same_area(zjhm: str, nodes: dict, edges: list):
-    for relation in same_area(zjhm):
+    for relation in _safe_relation_rows("_add_same_area", zjhm, lambda: same_area(zjhm)):
         props = relation.get("node", {}).get("properties", {})
         peer_zjhm = props.get("zjhm")
         if not peer_zjhm:
@@ -608,10 +652,7 @@ def _add_related_cases(center_case: dict, nodes: dict, edges: list, has_ssfj: bo
         LIMIT 10
     """.format(ssfj_select=ssfj_select, area_clause=" OR ".join(area_conditions))
 
-    try:
-        related_cases = query_all(sql, params)
-    except Exception:
-        return
+    related_cases = _safe_query_all("_add_related_cases", ajbh, sql, params)
 
     center_node_id = f"C_{ajbh}"
     for row in related_cases:

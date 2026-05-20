@@ -1,0 +1,19 @@
+已按第六轮任务书完成 R1-R4，未执行 git commit。
+
+| 任务 | 改动文件 | 验收 |
+|---|---|---|
+| R1 graph 容错 | `modules/graph/services/graph_builder.py`, `tests/test_0517_add_graph_score_profile_dashboard.py` | `_add_cases`、`_add_co_suspects`、`_add_guardian`、`_add_school`、`_add_appeared_at`、`_add_checked_in`、`_add_lives_at`、`_add_same_school`、`_add_same_area`、`_add_related_cases` 已用安全查询/安全关系调用包装；`_add_school` 只查 `ywdata.zq_zfba_wcnr_sfzxx.yxx`，单个 `UndefinedColumn/UndefinedTable/Exception` 只记录 warning 并跳过该类边；新增 UndefinedColumn 单测通过。 |
+| R2 dashboard probe | `modules/dashboard/services/data_health_service.py`, `modules/dashboard/services/distribution_service.py`, `modules/dashboard/services/summary_service.py`, `modules/dashboard/services/trend_service.py`, `tests/test_0517_add_graph_score_profile_dashboard.py` | `get_area_distribution`、`get_age_distribution`、`_query_case_count_with_degrade`、`get_case_trend` fallback 时写 info 日志；`collect_health()` 新增 11 个 `endpoint_probes`，单个 probe 异常不影响 `/api/dashboard/data-health`；空结果和异常 probe 单测通过。 |
+| R3 内网诊断脚本 | `scripts/diagnostics/internal_dashboard_probe.py`, `tests/test_internal_dashboard_probe.py` | 新增纯 stdlib + `shared.db.kingbase` 诊断脚本，输出 `meta`、`db_probes`、`api_probes` 三段 JSON；本地 smoke 已生成 `runtime/internal_dashboard_probe_smoke.json`；mock DB/API 单测通过。 |
+| R4 model 外置 | `shared/config/config.py`, `docker-compose.yml`, `.dockerignore`, `Dockerfile`, `.env.example`, `docs/0520_debugV3/docker_model_external.md`, `tests/test_model_dir_env.py` | `MODEL_DIR` 支持 env 覆盖，compose 已挂载 `${MULTI_RIDER_MODEL_ROOT:-./model}:/app/model`，`.dockerignore` 已排除 `model/*` 并保留 `!model/README.md`，Dockerfile 已创建 `/app/model` 占位目录，`.env.example` 和迁移文档已补充；`MODEL_DIR=/tmp/x` 验收命令输出 `/tmp/x`。 |
+
+验收命令：
+- `uv run pytest -q`：exit 0，`124 passed in 4.05s`。
+- `uv run python -c "import app"`：exit 0。
+- `uv run python scripts/diagnostics/internal_dashboard_probe.py --out runtime/internal_dashboard_probe_smoke.json`：exit 0，已生成本地诊断 JSON。
+- `uv run python -c "import os; os.environ['MODEL_DIR']='/tmp/x'; import importlib, shared.config.config as c; importlib.reload(c); print(c.MODEL_DIR)"`：exit 0，输出 `/tmp/x`。
+
+备注：
+- 已按要求读取 `docs/business/business_database.md` 和 `docs/region/region_grouping.md`。`zq_zfba_ajxx`、`zq_zfba_xyrxx`、`stdata.b_dic_zzjgdm` 可在文档中找到；`jcgkzx_monitor.*`、`ywdata.b_per_qskjwcnr`、`ywdata.zq_zfba_wcnr_sfzxx`、`ywdata.b_per_qscxwcnr` 等业务扩展/监控表未在当前业务库参考文档中完整列字段，已通过 graph 容错和 R3 诊断脚本辅助内网确认。
+- pytest 在 Windows 上仍会在 exit 0 后打印既有 `torch/ultralytics` access violation 堆栈，和前几轮记录一致，不影响本次验收命令退出码。
+- 工作区中原已有 `docs/0518_debugv4.md` 删除状态和多项未跟踪文件，本轮未回滚这些既有变更。
