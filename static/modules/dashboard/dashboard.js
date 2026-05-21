@@ -3,6 +3,11 @@
   let alertsCache = [];
   let alertPollTimer = null;
   let alertEventSource = null;
+  const rankingState = {
+    level: 'ssfj',
+    parentCode: '',
+    parentLabel: ''
+  };
 
   function updateClock() {
     const el = document.getElementById('clock');
@@ -26,9 +31,41 @@
   }
 
   function bindChartResize(chart) {
+    if (chart.__resizeBound) {
+      requestAnimationFrame(() => chart.resize());
+      return;
+    }
     const resize = () => chart.resize();
+    chart.__resizeBound = true;
     window.addEventListener('resize', resize);
     requestAnimationFrame(resize);
+  }
+
+  function updateRankingScope() {
+    const scope = document.getElementById('rankingScope');
+    const backButton = document.getElementById('rankingBackButton');
+    if (scope) {
+      scope.textContent = rankingState.level === 'ssfj'
+        ? '分局级，点击柱条下钻到派出所'
+        : `${rankingState.parentLabel || '当前分局'} · 派出所级`;
+    }
+    if (backButton) {
+      backButton.classList.toggle('hidden', rankingState.level === 'ssfj');
+    }
+  }
+
+  function initRankingControls() {
+    const backButton = document.getElementById('rankingBackButton');
+    if (!backButton) return;
+    backButton.addEventListener('click', () => {
+      if (rankingState.level === 'ssfj') return;
+      rankingState.level = 'ssfj';
+      rankingState.parentCode = '';
+      rankingState.parentLabel = '';
+      updateRankingScope();
+      loadRankingChart();
+    });
+    updateRankingScope();
   }
 
   async function loadSummary() {
@@ -105,15 +142,34 @@
   }
 
   async function loadRankingChart() {
-    const d = await fetchJSON(`${API}/ranking?metric=risk_count`);
-    const chart = echarts.init(document.getElementById('chartRanking'));
+    const params = new URLSearchParams({ metric: 'risk_count', level: rankingState.level });
+    if (rankingState.parentCode) params.set('parent_code', rankingState.parentCode);
+    const d = await fetchJSON(`${API}/ranking?${params.toString()}`);
+    const container = document.getElementById('chartRanking');
+    const chart = echarts.getInstanceByDom(container) || echarts.init(container);
     const items = (d.items || []).slice(0, 8).reverse();
+    updateRankingScope();
     chart.setOption({
       tooltip: { trigger: 'axis' },
       grid: { left: 80, right: 20, top: 10, bottom: 20 },
       xAxis: { type: 'value', axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: '#334155' } } },
       yAxis: { type: 'category', data: items.map(i => i.label || ''), axisLabel: { color: '#94a3b8', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
-      series: [{ type: 'bar', data: items.map(i => i.value), itemStyle: { color: '#3b82f6', borderRadius: [0, 4, 4, 0] } }]
+      series: [{
+        type: 'bar',
+        cursor: rankingState.level === 'ssfj' ? 'pointer' : 'default',
+        data: items.map(i => ({ value: i.value, item: i })),
+        itemStyle: { color: '#3b82f6', borderRadius: [0, 4, 4, 0] }
+      }]
+    }, true);
+    chart.off('click');
+    chart.on('click', params => {
+      const item = params?.data?.item;
+      if (rankingState.level !== 'ssfj' || !item || !item.code) return;
+      rankingState.level = 'sspcs';
+      rankingState.parentCode = item.code;
+      rankingState.parentLabel = item.label || params.name || '';
+      updateRankingScope();
+      loadRankingChart();
     });
     bindChartResize(chart);
   }
@@ -295,6 +351,7 @@
       .replace(/`/g, '&#96;');
   }
 
+  initRankingControls();
   loadSummary();
   loadCaseTypeChart();
   loadTrendChart();

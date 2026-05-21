@@ -55,7 +55,7 @@
 | POST | `/alerts/<id>/handle` | `{status}` | `{success}` | 处理预警 |
 | POST | `/alerts/scan` | - | `{result}` | 手动触发规则扫描 |
 | POST | `/dispatch/from-person` | `{zjhm}` | `{ok, zjhm, redirect}` | 画像/预警派发跳转 |
-| GET | `/ranking` | `by=area|school`, `metric=case_count|risk_count` | `{by, metric, items}` | 辖区/学校排名 |
+| GET | `/ranking` | `by=area|school`, `metric=case_count|risk_count`, `level=ssfj|sspcs`(仅 area), `parent_code=`(仅 sspcs) | `{by, metric, items}` | 辖区/学校排名，辖区支持分局到派出所下钻 |
 | GET | `/data-health` | - | `{timestamp, tables, warnings}` | 数据健康自检 |
 
 ## AI 研判 `/api/ai`

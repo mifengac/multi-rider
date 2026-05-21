@@ -427,6 +427,38 @@ def test_dashboard_ranking_supports_school(client, monkeypatch):
     }
 
 
+def test_dashboard_ranking_supports_area_drilldown(client, monkeypatch):
+    import modules.dashboard.routes as dashboard_routes
+
+    calls = {}
+
+    def fake_get_area_distribution(metric="risk_count", level="ssfj", parent_code=None, limit=10):
+        calls["metric"] = metric
+        calls["level"] = level
+        calls["parent_code"] = parent_code
+        calls["limit"] = limit
+        return [{"code": "445381120000", "parent_code": "445381000000", "label": "罗定派出所", "value": 3}]
+
+    monkeypatch.setattr(dashboard_routes, "get_area_distribution", fake_get_area_distribution)
+
+    response = client.get("/api/dashboard/ranking?by=area&metric=risk_count&level=sspcs&parent_code=445381000000")
+
+    assert response.status_code == 200
+    assert calls == {
+        "metric": "risk_count",
+        "level": "sspcs",
+        "parent_code": "445381000000",
+        "limit": 10,
+    }
+    assert response.get_json() == {
+        "by": "area",
+        "metric": "risk_count",
+        "level": "sspcs",
+        "parent_code": "445381000000",
+        "items": [{"code": "445381120000", "parent_code": "445381000000", "label": "罗定派出所", "value": 3}],
+    }
+
+
 def test_models_packages_export_lightweight_dataclasses():
     from modules.dashboard.models import DashboardItem
     from modules.graph.models import GraphEdge, GraphNode
@@ -924,6 +956,31 @@ def test_area_distribution_degrades_to_zjhm_region_code(monkeypatch):
     assert len(calls) == 2
     assert "LEFT(s.zjhm, 6)" in calls[1]
     assert '"stdata"."b_dic_zzjgdm"' in calls[1]
+
+
+def test_area_distribution_supports_station_drilldown(monkeypatch):
+    from modules.dashboard.services import distribution_service
+
+    captured = {}
+
+    def fake_query_all(sql, params=None):
+        captured["sql"] = sql
+        captured["params"] = params
+        return [{"code": "445381120000", "parent_code": "445381000000", "label": "罗定派出所", "value": 3}]
+
+    monkeypatch.setattr(distribution_service, "query_all", fake_query_all)
+    monkeypatch.setattr(distribution_service, "_table_exists", lambda schema, table: False, raising=False)
+
+    rows = distribution_service.get_area_distribution(
+        "risk_count",
+        level="sspcs",
+        parent_code="445381000000",
+    )
+
+    assert rows == [{"code": "445381120000", "parent_code": "445381000000", "label": "罗定派出所", "value": 3}]
+    assert "p.sspcsdm" in captured["sql"]
+    assert "p.ssfjdm = %(parent_code)s" in captured["sql"]
+    assert captured["params"] == {"parent_code": "445381000000", "limit": 10}
 
 
 def test_age_distribution_degrades_to_zjhm_birthdate(monkeypatch):

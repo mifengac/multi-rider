@@ -194,14 +194,23 @@ def dispatch_from_person():
 
 @dashboard_bp.route("/ranking", methods=["GET"])
 def ranking():
-    by = request.args.get("by", "area")
-    metric = request.args.get("metric", "risk_count")
+    by = request.args.get("by", "area").strip()
+    metric = request.args.get("metric", "risk_count").strip()
+    level = request.args.get("level", "ssfj").strip().lower()
+    parent_code = str(request.args.get("parent_code") or "").strip() or None
     if metric not in {"case_count", "risk_count"}:
         return jsonify({"error": "invalid_metric", "valid": ["case_count", "risk_count"]}), 400
     if by == "school":
         data = get_school_ranking(metric)
     elif by == "area":
-        data = get_area_distribution(metric)
+        if level not in {"ssfj", "sspcs"}:
+            return jsonify({"error": "invalid_level", "valid": ["ssfj", "sspcs"]}), 400
+        data = get_area_distribution(metric, level=level, parent_code=parent_code)
     else:
         return jsonify({"error": "invalid_by", "valid": ["area", "school"]}), 400
-    return jsonify({"by": by, "metric": metric, "items": data[:10]})
+
+    payload = {"by": by, "metric": metric, "items": data[:10]}
+    if by == "area":
+        payload["level"] = level
+        payload["parent_code"] = parent_code
+    return jsonify(payload)
