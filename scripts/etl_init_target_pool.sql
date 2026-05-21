@@ -60,6 +60,41 @@ SELECT EXISTS (
 );
 $$;
 
+CREATE OR REPLACE FUNCTION pg_temp.derive_ssfjdm(id_no VARCHAR)
+RETURNS VARCHAR
+LANGUAGE SQL
+AS $$
+SELECT CASE
+    WHEN CHAR_LENGTH(COALESCE(id_no, '')) < 6 THEN NULL
+    WHEN LEFT(id_no, 2) <> '44' THEN NULL
+    WHEN LEFT(id_no, 4) <> '4453' THEN NULL
+    ELSE LEFT(id_no, 6) || '000000'
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION pg_temp.derive_ssfj_label(id_no VARCHAR)
+RETURNS VARCHAR
+LANGUAGE SQL
+AS $$
+SELECT CASE
+    WHEN CHAR_LENGTH(COALESCE(id_no, '')) < 2 THEN NULL
+    WHEN LEFT(id_no, 2) <> '44' THEN '外省'
+    WHEN LEFT(id_no, 4) <> '4453' THEN '本省外市'
+    ELSE NULL
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION pg_temp.derive_sspcsdm(id_no VARCHAR)
+RETURNS VARCHAR
+LANGUAGE SQL
+AS $$
+SELECT CASE
+    WHEN CHAR_LENGTH(COALESCE(id_no, '')) < 8 THEN NULL
+    WHEN LEFT(id_no, 4) = '4453' THEN LEFT(id_no, 8) || '0000'
+    ELSE NULL
+END;
+$$;
+
 DROP VIEW IF EXISTS pg_temp.zzjg_fj_dict;
 CREATE TEMP VIEW zzjg_fj_dict AS
 SELECT ssfjdm,
@@ -68,14 +103,6 @@ FROM stdata.b_dic_zzjgdm
 WHERE ssfjdm IS NOT NULL
 GROUP BY ssfjdm;
 
-DROP VIEW IF EXISTS pg_temp.zzjg_pcs_dict;
-CREATE TEMP VIEW zzjg_pcs_dict AS
-SELECT sspcsdm,
-       MAX(sspcs) AS sspcs
-FROM stdata.b_dic_zzjgdm
-WHERE sspcsdm IS NOT NULL
-GROUP BY sspcsdm;
-
 INSERT INTO wcnr_target_pool (
     zjhm,
     xm,
@@ -89,14 +116,22 @@ INSERT INTO wcnr_target_pool (
 )
 WITH source_rows AS (
     SELECT
-        UPPER(NULLIF(TRIM(CAST(xyrxx_sfzh AS VARCHAR)), '')) AS zjhm,
-        NULLIF(TRIM(CAST(xyrxx_xm AS VARCHAR)), '') AS xm,
-        NULLIF(TRIM(CAST(xyrxx_xb AS VARCHAR)), '') AS xb,
-        NULLIF(TRIM(CAST(xyrxx_csrq AS VARCHAR)), '') AS csrq,
-        LEFT(UPPER(NULLIF(TRIM(CAST(xyrxx_sfzh AS VARCHAR)), '')), 6) || '000000' AS ssfjdm,
-        LEFT(UPPER(NULLIF(TRIM(CAST(xyrxx_sfzh AS VARCHAR)), '')), 8) || '0000' AS sspcsdm
-    FROM ywdata.zq_zfba_wcnr_xyr
-    WHERE pg_temp.is_valid_mainland_id18(CAST(xyrxx_sfzh AS VARCHAR))
+        raw.zjhm,
+        raw.xm,
+        raw.xb,
+        raw.csrq,
+        pg_temp.derive_ssfjdm(raw.zjhm) AS ssfjdm,
+        pg_temp.derive_ssfj_label(raw.zjhm) AS ssfj,
+        pg_temp.derive_sspcsdm(raw.zjhm) AS sspcsdm
+    FROM (
+        SELECT
+            UPPER(NULLIF(TRIM(CAST(xyrxx_sfzh AS VARCHAR)), '')) AS zjhm,
+            NULLIF(TRIM(CAST(xyrxx_xm AS VARCHAR)), '') AS xm,
+            NULLIF(TRIM(CAST(xyrxx_xb AS VARCHAR)), '') AS xb,
+            NULLIF(TRIM(CAST(xyrxx_csrq AS VARCHAR)), '') AS csrq
+        FROM ywdata.zq_zfba_wcnr_xyr
+        WHERE pg_temp.is_valid_mainland_id18(CAST(xyrxx_sfzh AS VARCHAR))
+    ) raw
 )
 SELECT
     s.zjhm,
@@ -105,12 +140,11 @@ SELECT
     s.csrq,
     'suspect' AS source_type,
     s.ssfjdm,
-    fj.ssfj,
+    COALESCE(s.ssfj, fj.ssfj, s.ssfjdm) AS ssfj,
     s.sspcsdm,
-    pcs.sspcs
+    NULL::VARCHAR AS sspcs
 FROM source_rows s
 LEFT JOIN zzjg_fj_dict fj ON fj.ssfjdm = s.ssfjdm
-LEFT JOIN zzjg_pcs_dict pcs ON pcs.sspcsdm = s.sspcsdm
 ON CONFLICT (zjhm) DO NOTHING;
 
 INSERT INTO wcnr_target_pool (
@@ -126,14 +160,22 @@ INSERT INTO wcnr_target_pool (
 )
 WITH source_rows AS (
     SELECT
-        UPPER(NULLIF(TRIM(CAST(sfzhm AS VARCHAR)), '')) AS zjhm,
-        NULLIF(TRIM(CAST(dsrxm AS VARCHAR)), '') AS xm,
-        NULL::VARCHAR AS xb,
-        NULL::VARCHAR AS csrq,
-        LEFT(UPPER(NULLIF(TRIM(CAST(sfzhm AS VARCHAR)), '')), 6) || '000000' AS ssfjdm,
-        LEFT(UPPER(NULLIF(TRIM(CAST(sfzhm AS VARCHAR)), '')), 8) || '0000' AS sspcsdm
-    FROM ywdata.b_per_qswcnrbczj
-    WHERE pg_temp.is_valid_mainland_id18(CAST(sfzhm AS VARCHAR))
+        raw.zjhm,
+        raw.xm,
+        raw.xb,
+        raw.csrq,
+        pg_temp.derive_ssfjdm(raw.zjhm) AS ssfjdm,
+        pg_temp.derive_ssfj_label(raw.zjhm) AS ssfj,
+        pg_temp.derive_sspcsdm(raw.zjhm) AS sspcsdm
+    FROM (
+        SELECT
+            UPPER(NULLIF(TRIM(CAST(sfzhm AS VARCHAR)), '')) AS zjhm,
+            NULLIF(TRIM(CAST(dsrxm AS VARCHAR)), '') AS xm,
+            NULL::VARCHAR AS xb,
+            NULL::VARCHAR AS csrq
+        FROM ywdata.b_per_qswcnrbczj
+        WHERE pg_temp.is_valid_mainland_id18(CAST(sfzhm AS VARCHAR))
+    ) raw
 )
 SELECT
     s.zjhm,
@@ -142,12 +184,11 @@ SELECT
     s.csrq,
     'bczj' AS source_type,
     s.ssfjdm,
-    fj.ssfj,
+    COALESCE(s.ssfj, fj.ssfj, s.ssfjdm) AS ssfj,
     s.sspcsdm,
-    pcs.sspcs
+    NULL::VARCHAR AS sspcs
 FROM source_rows s
 LEFT JOIN zzjg_fj_dict fj ON fj.ssfjdm = s.ssfjdm
-LEFT JOIN zzjg_pcs_dict pcs ON pcs.sspcsdm = s.sspcsdm
 ON CONFLICT (zjhm) DO NOTHING;
 
 INSERT INTO wcnr_target_pool (
@@ -163,14 +204,22 @@ INSERT INTO wcnr_target_pool (
 )
 WITH source_rows AS (
     SELECT
-        UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')) AS zjhm,
-        NULLIF(TRIM(CAST(xm AS VARCHAR)), '') AS xm,
-        NULL::VARCHAR AS xb,
-        NULL::VARCHAR AS csrq,
-        LEFT(UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')), 6) || '000000' AS ssfjdm,
-        LEFT(UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')), 8) || '0000' AS sspcsdm
-    FROM ywdata.b_per_qsyzjszawcnr
-    WHERE pg_temp.is_valid_mainland_id18(CAST(zjhm AS VARCHAR))
+        raw.zjhm,
+        raw.xm,
+        raw.xb,
+        raw.csrq,
+        pg_temp.derive_ssfjdm(raw.zjhm) AS ssfjdm,
+        pg_temp.derive_ssfj_label(raw.zjhm) AS ssfj,
+        pg_temp.derive_sspcsdm(raw.zjhm) AS sspcsdm
+    FROM (
+        SELECT
+            UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')) AS zjhm,
+            NULLIF(TRIM(CAST(xm AS VARCHAR)), '') AS xm,
+            NULL::VARCHAR AS xb,
+            NULL::VARCHAR AS csrq
+        FROM ywdata.b_per_qsyzjszawcnr
+        WHERE pg_temp.is_valid_mainland_id18(CAST(zjhm AS VARCHAR))
+    ) raw
 )
 SELECT
     s.zjhm,
@@ -179,12 +228,11 @@ SELECT
     s.csrq,
     'correction' AS source_type,
     s.ssfjdm,
-    fj.ssfj,
+    COALESCE(s.ssfj, fj.ssfj, s.ssfjdm) AS ssfj,
     s.sspcsdm,
-    pcs.sspcs
+    NULL::VARCHAR AS sspcs
 FROM source_rows s
 LEFT JOIN zzjg_fj_dict fj ON fj.ssfjdm = s.ssfjdm
-LEFT JOIN zzjg_pcs_dict pcs ON pcs.sspcsdm = s.sspcsdm
 ON CONFLICT (zjhm) DO NOTHING;
 
 INSERT INTO wcnr_target_pool (
@@ -200,14 +248,22 @@ INSERT INTO wcnr_target_pool (
 )
 WITH source_rows AS (
     SELECT
-        UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')) AS zjhm,
-        NULLIF(TRIM(CAST(xm AS VARCHAR)), '') AS xm,
-        NULL::VARCHAR AS xb,
-        NULL::VARCHAR AS csrq,
-        LEFT(UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')), 6) || '000000' AS ssfjdm,
-        LEFT(UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')), 8) || '0000' AS sspcsdm
-    FROM ywdata.b_per_qscxwcnr
-    WHERE pg_temp.is_valid_mainland_id18(CAST(zjhm AS VARCHAR))
+        raw.zjhm,
+        raw.xm,
+        raw.xb,
+        raw.csrq,
+        pg_temp.derive_ssfjdm(raw.zjhm) AS ssfjdm,
+        pg_temp.derive_ssfj_label(raw.zjhm) AS ssfj,
+        pg_temp.derive_sspcsdm(raw.zjhm) AS sspcsdm
+    FROM (
+        SELECT
+            UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')) AS zjhm,
+            NULLIF(TRIM(CAST(xm AS VARCHAR)), '') AS xm,
+            NULL::VARCHAR AS xb,
+            NULL::VARCHAR AS csrq
+        FROM ywdata.b_per_qscxwcnr
+        WHERE pg_temp.is_valid_mainland_id18(CAST(zjhm AS VARCHAR))
+    ) raw
 )
 SELECT
     s.zjhm,
@@ -216,12 +272,11 @@ SELECT
     s.csrq,
     'dropout' AS source_type,
     s.ssfjdm,
-    fj.ssfj,
+    COALESCE(s.ssfj, fj.ssfj, s.ssfjdm) AS ssfj,
     s.sspcsdm,
-    pcs.sspcs
+    NULL::VARCHAR AS sspcs
 FROM source_rows s
 LEFT JOIN zzjg_fj_dict fj ON fj.ssfjdm = s.ssfjdm
-LEFT JOIN zzjg_pcs_dict pcs ON pcs.sspcsdm = s.sspcsdm
 ON CONFLICT (zjhm) DO NOTHING;
 
 INSERT INTO wcnr_target_pool (
@@ -237,14 +292,22 @@ INSERT INTO wcnr_target_pool (
 )
 WITH source_rows AS (
     SELECT
-        UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')) AS zjhm,
-        NULLIF(TRIM(CAST(xm AS VARCHAR)), '') AS xm,
-        NULL::VARCHAR AS xb,
-        NULL::VARCHAR AS csrq,
-        LEFT(UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')), 6) || '000000' AS ssfjdm,
-        LEFT(UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')), 8) || '0000' AS sspcsdm
-    FROM ywdata.b_per_qskjwcnr
-    WHERE pg_temp.is_valid_mainland_id18(CAST(zjhm AS VARCHAR))
+        raw.zjhm,
+        raw.xm,
+        raw.xb,
+        raw.csrq,
+        pg_temp.derive_ssfjdm(raw.zjhm) AS ssfjdm,
+        pg_temp.derive_ssfj_label(raw.zjhm) AS ssfj,
+        pg_temp.derive_sspcsdm(raw.zjhm) AS sspcsdm
+    FROM (
+        SELECT
+            UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')) AS zjhm,
+            NULLIF(TRIM(CAST(xm AS VARCHAR)), '') AS xm,
+            NULL::VARCHAR AS xb,
+            NULL::VARCHAR AS csrq
+        FROM ywdata.b_per_qskjwcnr
+        WHERE pg_temp.is_valid_mainland_id18(CAST(zjhm AS VARCHAR))
+    ) raw
 )
 SELECT
     s.zjhm,
@@ -253,12 +316,11 @@ SELECT
     s.csrq,
     'truant' AS source_type,
     s.ssfjdm,
-    fj.ssfj,
+    COALESCE(s.ssfj, fj.ssfj, s.ssfjdm) AS ssfj,
     s.sspcsdm,
-    pcs.sspcs
+    NULL::VARCHAR AS sspcs
 FROM source_rows s
 LEFT JOIN zzjg_fj_dict fj ON fj.ssfjdm = s.ssfjdm
-LEFT JOIN zzjg_pcs_dict pcs ON pcs.sspcsdm = s.sspcsdm
 ON CONFLICT (zjhm) DO NOTHING;
 
 INSERT INTO wcnr_target_pool (
@@ -274,14 +336,22 @@ INSERT INTO wcnr_target_pool (
 )
 WITH source_rows AS (
     SELECT
-        UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')) AS zjhm,
-        NULLIF(TRIM(CAST(xm AS VARCHAR)), '') AS xm,
-        NULL::VARCHAR AS xb,
-        NULL::VARCHAR AS csrq,
-        LEFT(UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')), 6) || '000000' AS ssfjdm,
-        LEFT(UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')), 8) || '0000' AS sspcsdm
-    FROM ywdata.b_per_qslswcnr
-    WHERE pg_temp.is_valid_mainland_id18(CAST(zjhm AS VARCHAR))
+        raw.zjhm,
+        raw.xm,
+        raw.xb,
+        raw.csrq,
+        pg_temp.derive_ssfjdm(raw.zjhm) AS ssfjdm,
+        pg_temp.derive_ssfj_label(raw.zjhm) AS ssfj,
+        pg_temp.derive_sspcsdm(raw.zjhm) AS sspcsdm
+    FROM (
+        SELECT
+            UPPER(NULLIF(TRIM(CAST(zjhm AS VARCHAR)), '')) AS zjhm,
+            NULLIF(TRIM(CAST(xm AS VARCHAR)), '') AS xm,
+            NULL::VARCHAR AS xb,
+            NULL::VARCHAR AS csrq
+        FROM ywdata.b_per_qslswcnr
+        WHERE pg_temp.is_valid_mainland_id18(CAST(zjhm AS VARCHAR))
+    ) raw
 )
 SELECT
     s.zjhm,
@@ -290,10 +360,9 @@ SELECT
     s.csrq,
     'lost' AS source_type,
     s.ssfjdm,
-    fj.ssfj,
+    COALESCE(s.ssfj, fj.ssfj, s.ssfjdm) AS ssfj,
     s.sspcsdm,
-    pcs.sspcs
+    NULL::VARCHAR AS sspcs
 FROM source_rows s
 LEFT JOIN zzjg_fj_dict fj ON fj.ssfjdm = s.ssfjdm
-LEFT JOIN zzjg_pcs_dict pcs ON pcs.sspcsdm = s.sspcsdm
 ON CONFLICT (zjhm) DO NOTHING;
