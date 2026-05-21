@@ -17,11 +17,29 @@
     .badge-medium { background: #ca8a04; }
     .badge-low { background: #2563eb; }
     .badge-normal { background: #16a34a; }
+    .dashboard-grid {
+      box-sizing: border-box;
+      height: 100%;
+      min-height: 760px;
+      grid-template-rows: minmax(112px, auto) minmax(360px, 1.1fr) minmax(300px, 0.9fr);
+    }
+    .dashboard-chart-card {
+      min-height: 0;
+    }
+    .dashboard-chart-card--main {
+      min-height: 360px;
+    }
+    .dashboard-chart-card--secondary {
+      min-height: 300px;
+    }
+    .dashboard-chart {
+      min-height: 0;
+    }
   </style>
 {% endblock %}
 
 {% block content %}
-  <main class="p-6 grid grid-cols-12 gap-4" style="height: 100%;">
+  <main class="dashboard-grid p-6 grid grid-cols-12 gap-4">
 
     <!-- Top Stats Row -->
     <div class="col-span-3 card p-5 flex flex-col justify-center">
@@ -42,35 +60,35 @@
     </div>
 
     <!-- Left: Charts -->
-    <div class="col-span-4 card p-4 flex flex-col" style="height: calc(50% - 60px);">
+    <div class="col-span-4 card p-4 flex flex-col dashboard-chart-card dashboard-chart-card--main">
       <h3 class="text-sm font-semibold text-slate-300 mb-2">案件类型分布</h3>
-      <div id="chartCaseType" class="flex-1"></div>
+      <div id="chartCaseType" class="dashboard-chart flex-1"></div>
     </div>
-    <div class="col-span-5 card p-4 flex flex-col" style="height: calc(50% - 60px);">
+    <div class="col-span-5 card p-4 flex flex-col dashboard-chart-card dashboard-chart-card--main">
       <h3 class="text-sm font-semibold text-slate-300 mb-2">月度趋势</h3>
-      <div id="chartTrend" class="flex-1"></div>
+      <div id="chartTrend" class="dashboard-chart flex-1"></div>
     </div>
-    <div class="col-span-3 card p-4 flex flex-col" style="height: calc(50% - 60px);">
+    <div class="col-span-3 card p-4 flex flex-col dashboard-chart-card dashboard-chart-card--main">
       <h3 class="text-sm font-semibold text-slate-300 mb-2">风险等级分布</h3>
-      <div id="chartRiskLevel" class="flex-1"></div>
+      <div id="chartRiskLevel" class="dashboard-chart flex-1"></div>
     </div>
 
     <!-- Bottom Row -->
-    <div class="col-span-3 card p-4 flex flex-col" style="height: calc(50% - 60px);">
+    <div class="col-span-3 card p-4 flex flex-col dashboard-chart-card dashboard-chart-card--secondary">
       <h3 class="text-sm font-semibold text-slate-300 mb-2">辖区排名</h3>
-      <div id="chartRanking" class="flex-1"></div>
+      <div id="chartRanking" class="dashboard-chart flex-1"></div>
     </div>
-    <div class="col-span-4 card p-4 flex flex-col overflow-hidden" style="height: calc(50% - 60px);">
+    <div class="col-span-4 card p-4 flex flex-col overflow-hidden dashboard-chart-card dashboard-chart-card--secondary">
       <h3 class="text-sm font-semibold text-slate-300 mb-2">实时预警</h3>
       <div id="alertList" class="flex-1 overflow-y-auto text-sm"></div>
     </div>
-    <div class="col-span-2 card p-4 flex flex-col" style="height: calc(50% - 60px);">
+    <div class="col-span-2 card p-4 flex flex-col dashboard-chart-card dashboard-chart-card--secondary">
       <h3 class="text-sm font-semibold text-slate-300 mb-2">年龄分布</h3>
-      <div id="chartAge" class="flex-1"></div>
+      <div id="chartAge" class="dashboard-chart flex-1"></div>
     </div>
-    <div class="col-span-3 card p-4 flex flex-col" style="height: calc(50% - 60px);">
+    <div class="col-span-3 card p-4 flex flex-col dashboard-chart-card dashboard-chart-card--secondary">
       <h3 class="text-sm font-semibold text-slate-300 mb-2">轨迹热力图</h3>
-      <div id="chartHeatmap" class="flex-1"></div>
+      <div id="chartHeatmap" class="dashboard-chart flex-1"></div>
     </div>
   </main>
 {% endblock %}

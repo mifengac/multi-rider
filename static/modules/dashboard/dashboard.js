@@ -25,6 +25,12 @@
     }
   }
 
+  function bindChartResize(chart) {
+    const resize = () => chart.resize();
+    window.addEventListener('resize', resize);
+    requestAnimationFrame(resize);
+  }
+
   async function loadSummary() {
     const d = await fetchJSON(`${API}/summary`);
     renderStat('statTotal', (d.total_persons || 0).toLocaleString(), d.total_persons_change_pct);
@@ -52,12 +58,14 @@
     chart.setOption({
       tooltip: { trigger: 'item' },
       series: [{
-        type: 'pie', radius: ['35%', '65%'],
-        label: { color: '#94a3b8', fontSize: 11 },
+        type: 'pie',
+        radius: ['42%', '78%'],
+        center: ['50%', '52%'],
+        label: { color: '#94a3b8', fontSize: 12 },
         data: (d.items || []).map(i => ({ name: i.label, value: i.value }))
       }]
     });
-    window.addEventListener('resize', () => chart.resize());
+    bindChartResize(chart);
   }
 
   async function loadTrendChart() {
@@ -66,12 +74,12 @@
     const points = d.points || [];
     chart.setOption({
       tooltip: { trigger: 'axis' },
-      grid: { left: 50, right: 20, top: 20, bottom: 30 },
-      xAxis: { type: 'category', data: points.map(p => p.month), axisLabel: { color: '#94a3b8', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
-      yAxis: { type: 'value', axisLabel: { color: '#94a3b8', fontSize: 10 }, splitLine: { lineStyle: { color: '#334155' } } },
+      grid: { left: 46, right: 18, top: 12, bottom: 26 },
+      xAxis: { type: 'category', data: points.map(p => p.month), axisLabel: { color: '#94a3b8', fontSize: 11 }, axisLine: { lineStyle: { color: '#334155' } } },
+      yAxis: { type: 'value', axisLabel: { color: '#94a3b8', fontSize: 11 }, splitLine: { lineStyle: { color: '#334155' } } },
       series: [{ type: 'line', smooth: true, data: points.map(p => p.count), areaStyle: { color: 'rgba(59,130,246,0.15)' }, lineStyle: { color: '#3b82f6' }, itemStyle: { color: '#3b82f6' } }]
     });
-    window.addEventListener('resize', () => chart.resize());
+    bindChartResize(chart);
   }
 
   async function loadRiskLevelChart() {
@@ -82,8 +90,10 @@
     chart.setOption({
       tooltip: { trigger: 'item' },
       series: [{
-        type: 'pie', radius: ['40%', '70%'],
-        label: { color: '#94a3b8', fontSize: 11 },
+        type: 'pie',
+        radius: ['45%', '80%'],
+        center: ['50%', '52%'],
+        label: { color: '#94a3b8', fontSize: 12 },
         data: (d.items || []).map(i => ({
           name: labelMap[i.label] || i.label,
           value: i.value,
@@ -91,7 +101,7 @@
         }))
       }]
     });
-    window.addEventListener('resize', () => chart.resize());
+    bindChartResize(chart);
   }
 
   async function loadRankingChart() {
@@ -105,7 +115,7 @@
       yAxis: { type: 'category', data: items.map(i => i.label || ''), axisLabel: { color: '#94a3b8', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
       series: [{ type: 'bar', data: items.map(i => i.value), itemStyle: { color: '#3b82f6', borderRadius: [0, 4, 4, 0] } }]
     });
-    window.addEventListener('resize', () => chart.resize());
+    bindChartResize(chart);
   }
 
   async function loadAgeChart() {
@@ -120,7 +130,7 @@
         itemStyle: { color: function (p) { return ['#3b82f6', '#f59e0b', '#ef4444'][p.dataIndex % 3]; } }
       }]
     });
-    window.addEventListener('resize', () => chart.resize());
+    bindChartResize(chart);
   }
 
   async function loadHeatmap() {
@@ -164,7 +174,7 @@
         itemStyle: { opacity: 0.85 }
       }]
     });
-    window.addEventListener('resize', () => chart.resize());
+    bindChartResize(chart);
   }
 
   async function loadAlerts() {
