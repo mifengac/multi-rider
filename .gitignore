@@ -48,3 +48,22 @@ CLIP/
 generate_mock_data.py
 mock_database_samples/
 kingbase_latest_samples/
+
+# Editor / IDE
+.vscode/
+
+# Repo snapshots & generated runtime artifacts (heavy, never versioned)
+*.tar
+runtime/
+outputs/
+clip_repo/
+
+# Generated deliverables (Office docs / video produced by scripts — kept local)
+*.pptx
+*.docx
+docs/0521cailiao/video/
+
+# Codex job-tracking temp files
+*_jobid.txt
+*_pid.txt
+probe_*.json
