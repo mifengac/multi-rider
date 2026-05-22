@@ -21,22 +21,44 @@
     {% if zjhm %}
       <div class="text-center py-20 text-slate-400" id="loadingState">加载中...</div>
     {% else %}
-      <section class="profile-card max-w-2xl mx-auto mt-16">
-        <div class="section-title">人员查询</div>
-        <h1 class="text-2xl font-bold mb-3">个人画像</h1>
-        <p class="text-sm text-slate-400 mb-6">请输入身份证号，查询人员画像、风险评分、关系网络和轨迹分析。</p>
-        <form method="get" action="/profile" class="flex gap-3">
-          <input
-            type="text"
-            name="zjhm"
-            autocomplete="off"
-            placeholder="请输入身份证号"
-            class="flex-1 rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-slate-100 outline-none focus:border-blue-500"
-          >
-          <button type="submit" class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-500">
-            搜索
-          </button>
-        </form>
+      <section class="max-w-5xl mx-auto mt-10">
+        <div class="profile-card mb-4">
+          <div class="section-title">人员查询</div>
+          <div class="flex items-end justify-between gap-6 flex-wrap">
+            <div>
+              <h1 class="text-2xl font-bold mb-1">个人画像</h1>
+              <p class="text-sm text-slate-400">输入身份证号查询，或直接从下方「重点人员速览」中点选。</p>
+            </div>
+            <form method="get" action="/profile" class="flex gap-3">
+              <input
+                type="text"
+                name="zjhm"
+                autocomplete="off"
+                placeholder="请输入身份证号"
+                class="w-72 rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-slate-100 outline-none focus:border-blue-500"
+              >
+              <button type="submit" class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+                搜索
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <div class="profile-card">
+          <div class="flex items-center justify-between mb-4">
+            <div class="text-sm font-bold uppercase tracking-wide text-slate-400">重点人员速览</div>
+            <button
+              type="button"
+              id="randomBtn"
+              class="rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-200 hover:border-blue-500 hover:text-blue-400"
+            >
+              🎲 随机一人
+            </button>
+          </div>
+          <div id="featuredGrid" class="grid grid-cols-3 gap-3">
+            <div class="col-span-3 py-10 text-center text-sm text-slate-400">加载中...</div>
+          </div>
+        </div>
       </section>
     {% endif %}
   </main>
@@ -49,5 +71,7 @@
       const ZJHM = {{ zjhm | tojson }};
     </script>
     <script src="{{ url_for('static', filename='modules/profile/profile.js') }}"></script>
+  {% else %}
+    <script src="{{ url_for('static', filename='modules/profile/profile_landing.js') }}"></script>
   {% endif %}
 {% endblock %}

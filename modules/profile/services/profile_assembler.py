@@ -154,6 +154,35 @@ def get_score_info(zjhm: str) -> dict:
     return query_one(sql, {"zjhm": zjhm})
 
 
+def get_featured_people(limit: int = 12) -> list[dict]:
+    """Monitored people ordered by risk score — powers the demo landing page list.
+
+    Anchored on the target pool (the monitored population). Risk score/level are
+    taken from wcnr_score when available, otherwise from the pool's own columns,
+    so the list still works whichever table the demo data lives in.
+    """
+    sql = """
+        SELECT t.zjhm,
+               COALESCE(NULLIF(BTRIM(t.xm), ''), '未知') AS xm,
+               t.xb,
+               t.csrq,
+               COALESCE(NULLIF(BTRIM(t.sspcs), ''),
+                        NULLIF(BTRIM(t.ssfj), ''), '') AS area,
+               COALESCE(s.total_score, t.risk_score, 0) AS total_score,
+               COALESCE(NULLIF(s.risk_level, ''),
+                        NULLIF(t.risk_level, ''), 'normal') AS risk_level
+        FROM "jcgkzx_monitor"."wcnr_target_pool" t
+        LEFT JOIN "jcgkzx_monitor"."wcnr_score" s ON s.zjhm = t.zjhm
+        ORDER BY COALESCE(s.total_score, t.risk_score, 0) DESC, t.zjhm
+        LIMIT %(limit)s
+    """
+    try:
+        return query_all(sql, {"limit": limit})
+    except Exception as exc:
+        logger.warning("Featured people query failed: %s", exc)
+        return []
+
+
 def detect_gang(zjhm: str, xm: str | None, co_suspects: list[dict]) -> dict:
     member_map = {zjhm: xm or ""}
     for item in co_suspects:

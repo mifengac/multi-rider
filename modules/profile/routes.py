@@ -1,12 +1,21 @@
 from flask import request, jsonify
 from . import profile_bp
-from .services.profile_assembler import assemble_profile, get_photo
+from .services.profile_assembler import assemble_profile, get_photo, get_featured_people
 from .services.trajectory_service import (
     get_recent_trajectory, get_hotspots, get_time_pattern, get_last_seen,
 )
 from .services.timeline_service import build_timeline
 from .services.suggestion_engine import generate_suggestions
 from shared.validators import parse_int_arg, validate_int_range, validate_zjhm
+
+
+@profile_bp.route("/featured", methods=["GET"])
+def profile_featured():
+    """Demo helper: list monitored people ordered by risk, no zjhm needed."""
+    limit = parse_int_arg(request.args.get("limit"), 12)
+    if not validate_int_range(limit, 1, 60):
+        limit = 12
+    return jsonify({"items": get_featured_people(limit)})
 
 
 @profile_bp.route("/<zjhm>", methods=["GET"])
