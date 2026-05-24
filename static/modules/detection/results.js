@@ -222,7 +222,7 @@
               '<input type="checkbox" class="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500" ' + (checked ? 'checked ' : '') + 'onchange="toggleResultSelection(\'' + prefix + '\', \'' + encodeURIComponent(item.id) + '\', this.checked)">' +
             '</label>' +
             '<button type="button" class="block w-full" onclick="openResultDetail(\'' + prefix + '\', \'' + encodeURIComponent(item.id) + '\')">' +
-              '<img src="' + item.asset_url + '" alt="' + escapeHtml(item.name) + '" class="h-40 w-full bg-slate-100 object-cover" />' +
+              '<img src="' + item.asset_url + '" alt="' + escapeHtml(item.name) + '" class="h-40 w-full bg-slate-100 object-cover" onerror="this.classList.add(\'opacity-30\');this.alt=\'图片不可用\';" />' +
             '</button>' +
             '<div class="p-4">' +
               '<div class="flex items-center justify-between gap-2">' +

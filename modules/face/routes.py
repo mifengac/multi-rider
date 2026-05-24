@@ -1,6 +1,6 @@
 import os
 
-from flask import Blueprint, jsonify, request, send_file, url_for
+from flask import Blueprint, abort, jsonify, request, send_file, url_for
 
 from shared.db.sqlite import get_job as get_saved_job
 from shared.db.sqlite import save_job
@@ -24,7 +24,7 @@ from modules.face.services.library_task_service import (
     list_face_library_tasks,
     start_face_library_task,
 )
-from shared.config.config import logger
+from shared.config.config import RESULTS_DIR, logger
 from shared.ownership.ownership import get_request_owner
 
 
@@ -94,13 +94,39 @@ def result_asset(job_id: str, asset_id: str):
         return "result manifest not found", 404
 
     safe_asset_id = os.path.basename(asset_id)
+    tried = []
     for item in manifest.get("items", []):
-        if item.get("id") == safe_asset_id:
-            path = item.get("path")
-            if path and os.path.isfile(path):
-                return send_file(path)
-            break
-    return "asset not found", 404
+        if item.get("id") != safe_asset_id:
+            continue
+
+        original = item.get("path") or ""
+        item_id = item.get("id") or safe_asset_id
+        tried = [original]
+        assets_dir = manifest.get("assets_dir") or ""
+        if assets_dir:
+            tried.append(os.path.join(assets_dir, item_id))
+        tried.append(os.path.join(RESULTS_DIR, job_id, "assets", item_id))
+
+        for candidate in tried:
+            if candidate and os.path.isfile(candidate):
+                if candidate != original:
+                    logger.warning(
+                        "face.result_asset path stale, fell back: job=%s asset=%s original=%s used=%s",
+                        job_id, safe_asset_id, original, candidate,
+                    )
+                return send_file(candidate)
+
+        logger.warning(
+            "face.result_asset fallback miss: job=%s asset=%s tried=%s",
+            job_id, safe_asset_id, tried,
+        )
+        abort(404)
+
+    logger.warning(
+        "face.result_asset fallback miss: job=%s asset=%s tried=%s",
+        job_id, safe_asset_id, tried,
+    )
+    abort(404)
 
 
 @face_bp.get("/library/status")

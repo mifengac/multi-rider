@@ -216,7 +216,7 @@
           return (
             '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noreferrer" class="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-sm">' +
               '<div class="aspect-[4/3] overflow-hidden bg-slate-100">' +
-                '<img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(assetName) + '" loading="lazy" class="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]" />' +
+                '<img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(assetName) + '" loading="lazy" class="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]" onerror="this.classList.add(\'opacity-30\');this.alt=\'图片不可用\';" />' +
               '</div>' +
               '<div class="px-3 py-3">' +
                 '<div class="truncate text-sm font-medium text-slate-800">' + escapeHtml(assetName) + '</div>' +

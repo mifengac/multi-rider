@@ -1,6 +1,6 @@
 import os
 
-from flask import Blueprint, jsonify, render_template, request, send_file, url_for
+from flask import Blueprint, abort, jsonify, render_template, request, send_file, url_for
 
 from shared.config.config import MODEL_DIR, get_upload_model_options, logger
 from shared.job_lookup import resolve_job
@@ -815,12 +815,42 @@ def dataset_auto_annotate_job_create(dataset_id: str):
 
 @train_bp.get("/datasets/<dataset_id>/assets/<asset_id>")
 def dataset_asset_file(dataset_id: str, asset_id: str):
+    safe_asset_id = os.path.basename(asset_id)
     try:
-        item = get_dataset_asset(dataset_id, os.path.basename(asset_id))
+        item = get_dataset_asset(dataset_id, safe_asset_id)
     except LookupError:
-        return "dataset not found", 404
+        logger.warning(
+            "train.dataset_asset_file fallback miss: dataset=%s asset=%s tried=%s",
+            dataset_id, safe_asset_id, [],
+        )
+        abort(404)
 
-    path = item.get("file_path")
-    if path and os.path.isfile(path):
-        return send_file(path)
-    return "asset not found", 404
+    original = item.get("file_path") or ""
+    candidates = [original]
+    try:
+        dataset = get_dataset(dataset_id)
+        root_dir = dataset.get("root_dir") if isinstance(dataset, dict) else getattr(dataset, "root_dir", "")
+        root_dir = root_dir or ""
+        if root_dir:
+            candidates.append(os.path.join(root_dir, "images", safe_asset_id))
+    except LookupError:
+        logger.warning(
+            "train.dataset_asset_file fallback miss: dataset=%s asset=%s tried=%s",
+            dataset_id, safe_asset_id, candidates,
+        )
+        abort(404)
+
+    for candidate in candidates:
+        if candidate and os.path.isfile(candidate):
+            if candidate != original:
+                logger.warning(
+                    "train.dataset_asset_file path stale, fell back: dataset=%s asset=%s original=%s used=%s",
+                    dataset_id, safe_asset_id, original, candidate,
+                )
+            return send_file(candidate)
+
+    logger.warning(
+        "train.dataset_asset_file fallback miss: dataset=%s asset=%s tried=%s",
+        dataset_id, safe_asset_id, candidates,
+    )
+    abort(404)

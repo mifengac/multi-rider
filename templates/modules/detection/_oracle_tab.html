@@ -4,10 +4,13 @@
   <div class="wb-col wb-col-7 xl:col-span-8 space-y-xl">
     <!-- Task Creation Form -->
     <section class="wb-card bg-surface ring-1 ring-[#e8e6dc] rounded-[24px] p-lg shadow-sm">
-      <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface mb-md">
-        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-        配置检测参数
-      </h3>
+      <div class="flex justify-between items-start mb-md">
+        <h3 class="wb-section-title font-headline-md text-headline-md text-on-surface">
+          <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          配置检测参数
+        </h3>
+        <a href="/history-page" target="_blank" class="bg-surface-variant px-3 py-1 rounded-lg text-sm border border-outline-variant hover:bg-outline-variant text-on-surface transition-colors inline-block">运行记录</a>
+      </div>
       <form id="jobForm" onsubmit="return startJob(event)" class="wb-form-grid space-y-md">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
           <div class="space-y-base">
